@@ -7,6 +7,7 @@ public static class NativeExports
     static readonly HandleTable<AcornFacade.JsonIterator> Iterators = new();
     static readonly HandleTable<AcornFacade.JsonSubscription> Subscriptions = new();
     static readonly HandleTable<SubscriptionContext> SubscriptionContexts = new();
+    static readonly HandleTable<AcornFacade.JsonTransaction> Transactions = new();
 
     [UnmanagedCallersOnly(EntryPoint = "acorn_open_tree")]
     public static int OpenTree(IntPtr uriUtf8, IntPtr handlePtr)
@@ -450,5 +451,73 @@ public static class NativeExports
             Error.Set(ex);
             return -1;
         }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_begin_transaction")]
+    public static int BeginTransaction(ulong treeHandle, IntPtr outTransactionPtr)
+    {
+        try {
+            var tree = Trees.Get(treeHandle);
+            var transaction = tree.BeginTransaction();
+            ulong transactionHandle = Transactions.Add(transaction);
+            unsafe { *(ulong*)outTransactionPtr = transactionHandle; }
+            return 0;
+        } catch (Exception ex) {
+            unsafe { *(ulong*)outTransactionPtr = 0; }
+            Error.Set(ex);
+            return -1;
+        }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_transaction_stash")]
+    public static unsafe int TransactionStash(ulong transactionHandle, IntPtr idUtf8, IntPtr data, nuint len)
+    {
+        try {
+            var transaction = Transactions.Get(transactionHandle);
+            string id = Utf8.In(idUtf8);
+            var span = new ReadOnlySpan<byte>(data.ToPointer(), checked((int)len));
+            transaction.Stash(id, span);
+            return 0;
+        } catch (Exception ex) { Error.Set(ex); return -1; }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_transaction_delete")]
+    public static int TransactionDelete(ulong transactionHandle, IntPtr idUtf8)
+    {
+        try {
+            var transaction = Transactions.Get(transactionHandle);
+            string id = Utf8.In(idUtf8);
+            transaction.Delete(id);
+            return 0;
+        } catch (Exception ex) { Error.Set(ex); return -1; }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_transaction_commit")]
+    public static int TransactionCommit(ulong transactionHandle)
+    {
+        try {
+            var transaction = Transactions.Get(transactionHandle);
+            bool success = transaction.Commit();
+            return success ? 0 : -1;
+        } catch (Exception ex) { Error.Set(ex); return -1; }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_transaction_rollback")]
+    public static int TransactionRollback(ulong transactionHandle)
+    {
+        try {
+            var transaction = Transactions.Get(transactionHandle);
+            transaction.Rollback();
+            return 0;
+        } catch (Exception ex) { Error.Set(ex); return -1; }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_transaction_close")]
+    public static int TransactionClose(ulong transactionHandle)
+    {
+        try {
+            Transactions.Remove(transactionHandle, out _);
+            return 0;
+        } catch (Exception ex) { Error.Set(ex); return -1; }
     }
 }

@@ -65,6 +65,16 @@ ACORN_API int acorn_unsubscribe(acorn_sub_handle sub);
 // Sync (optional)
 ACORN_API int acorn_sync_http(acorn_tree_handle tree, const char* url);
 
+// Transactions
+typedef uint64_t acorn_transaction_handle;
+
+ACORN_API int acorn_begin_transaction(acorn_tree_handle tree, acorn_transaction_handle* out_transaction);
+ACORN_API int acorn_transaction_stash(acorn_transaction_handle transaction, const char* id, const uint8_t* json, size_t len);
+ACORN_API int acorn_transaction_delete(acorn_transaction_handle transaction, const char* id);
+ACORN_API int acorn_transaction_commit(acorn_transaction_handle transaction);
+ACORN_API int acorn_transaction_rollback(acorn_transaction_handle transaction);
+ACORN_API int acorn_transaction_close(acorn_transaction_handle transaction);
+
 // Batch operations for improved performance when working with multiple items
 // All batch operations return 0 on success, -1 on error
 

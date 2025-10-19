@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
 using AcornDB;
+using AcornDB.Transaction;
 using AcornDB.Storage;
 using AcornDB.Shim;
 using AcornDB.Reactive;
@@ -186,6 +187,19 @@ internal static class AcornFacade
                 throw new InvalidOperationException($"Failed to batch delete: {ex.Message}", ex);
             }
         }
+
+        public JsonTransaction BeginTransaction()
+        {
+            try
+            {
+                var transaction = _tree.BeginTransaction();
+                return new JsonTransaction(transaction);
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"Failed to begin transaction: {ex.Message}", ex);
+            }
+        }
     }
 
     /// <summary>
@@ -316,6 +330,73 @@ internal static class AcornFacade
         catch (Exception ex)
         {
             throw new InvalidOperationException($"Failed to open tree with URI '{uri}': {ex.Message}", ex);
+        }
+    }
+
+    /// <summary>
+    /// JSON-compatible transaction wrapper around AcornDB TreeTransaction
+    /// </summary>
+    internal sealed class JsonTransaction
+    {
+        private readonly TreeTransaction<object> _transaction;
+
+        public JsonTransaction(TreeTransaction<object> transaction)
+        {
+            _transaction = transaction;
+        }
+
+        public void Stash(string id, ReadOnlySpan<byte> json)
+        {
+            try
+            {
+                // Parse JSON bytes into object using System.Text.Json with source generation
+                var jsonString = System.Text.Encoding.UTF8.GetString(json);
+                var obj = System.Text.Json.JsonSerializer.Deserialize(jsonString, JsonContext.Default.Object);
+                if (obj != null)
+                {
+                    _transaction.Stash(id, obj);
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"Failed to stash JSON for id '{id}' in transaction: {ex.Message}", ex);
+            }
+        }
+
+        public void Delete(string id)
+        {
+            try
+            {
+                _transaction.Toss(id);
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"Failed to delete id '{id}' in transaction: {ex.Message}", ex);
+            }
+        }
+
+        public bool Commit()
+        {
+            try
+            {
+                return _transaction.Commit();
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"Failed to commit transaction: {ex.Message}", ex);
+            }
+        }
+
+        public void Rollback()
+        {
+            try
+            {
+                _transaction.Rollback();
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"Failed to rollback transaction: {ex.Message}", ex);
+            }
         }
     }
 }

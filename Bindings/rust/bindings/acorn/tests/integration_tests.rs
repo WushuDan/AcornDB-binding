@@ -766,5 +766,138 @@ mod unit_tests {
         let not_found = Error::NotFound;
         assert!(not_found.to_string().contains("Not found"));
     }
+
+    #[test]
+    fn test_transaction_basic() {
+        let mut tree = AcornTree::open("memory://").unwrap();
+        
+        // Start transaction
+        let mut tx = tree.begin_transaction().unwrap();
+        
+        // Add data in transaction
+        tx.stash("user1", &TestData { id: "user1".to_string(), name: "Alice".to_string(), value: 30 }).unwrap();
+        tx.stash("user2", &TestData { id: "user2".to_string(), name: "Bob".to_string(), value: 25 }).unwrap();
+        
+        // Data should not be visible before commit
+        assert!(tree.crack::<TestData>("user1").is_err());
+        assert!(tree.crack::<TestData>("user2").is_err());
+        
+        // Commit transaction
+        assert!(tx.commit().unwrap());
+        
+        // Data should be visible after commit
+        let user1: TestData = tree.crack("user1").unwrap();
+        let user2: TestData = tree.crack("user2").unwrap();
+        assert_eq!(user1.name, "Alice");
+        assert_eq!(user2.name, "Bob");
+    }
+
+    #[test]
+    fn test_transaction_rollback() {
+        let mut tree = AcornTree::open("memory://").unwrap();
+        
+        // Add some initial data
+        tree.stash("user1", &TestData { id: "user1".to_string(), name: "Alice".to_string(), value: 30 }).unwrap();
+        
+        // Start transaction
+        let mut tx = tree.begin_transaction().unwrap();
+        
+        // Modify existing data and add new data
+        tx.stash("user1", &TestData { id: "user1".to_string(), name: "Alice Modified".to_string(), value: 35 }).unwrap();
+        tx.stash("user2", &TestData { id: "user2".to_string(), name: "Bob".to_string(), value: 25 }).unwrap();
+        
+        // Rollback transaction
+        tx.rollback().unwrap();
+        
+        // Original data should be unchanged
+        let user1: TestData = tree.crack("user1").unwrap();
+        assert_eq!(user1.name, "Alice");
+        assert_eq!(user1.value, 30);
+        
+        // New data should not exist
+        assert!(tree.crack::<TestData>("user2").is_err());
+    }
+
+    #[test]
+    fn test_transaction_delete() {
+        let mut tree = AcornTree::open("memory://").unwrap();
+        
+        // Add initial data
+        tree.stash("user1", &TestData { id: "user1".to_string(), name: "Alice".to_string(), value: 30 }).unwrap();
+        tree.stash("user2", &TestData { id: "user2".to_string(), name: "Bob".to_string(), value: 25 }).unwrap();
+        
+        // Start transaction
+        let mut tx = tree.begin_transaction().unwrap();
+        
+        // Delete data in transaction
+        tx.delete("user1").unwrap();
+        tx.stash("user3", &TestData { id: "user3".to_string(), name: "Charlie".to_string(), value: 35 }).unwrap();
+        
+        // Data should still be visible before commit
+        assert!(tree.crack::<TestData>("user1").is_ok());
+        assert!(tree.crack::<TestData>("user3").is_err());
+        
+        // Commit transaction
+        assert!(tx.commit().unwrap());
+        
+        // user1 should be deleted, user3 should exist
+        assert!(tree.crack::<TestData>("user1").is_err());
+        let user3: TestData = tree.crack("user3").unwrap();
+        assert_eq!(user3.name, "Charlie");
+        
+        // user2 should be unchanged
+        let user2: TestData = tree.crack("user2").unwrap();
+        assert_eq!(user2.name, "Bob");
+    }
+
+    #[test]
+    fn test_transaction_multiple_operations() {
+        let mut tree = AcornTree::open("memory://").unwrap();
+        
+        // Start transaction
+        let mut tx = tree.begin_transaction().unwrap();
+        
+        // Multiple operations
+        tx.stash("user1", &TestData { id: "user1".to_string(), name: "Alice".to_string(), value: 30 }).unwrap();
+        tx.stash("user2", &TestData { id: "user2".to_string(), name: "Bob".to_string(), value: 25 }).unwrap();
+        tx.stash("user3", &TestData { id: "user3".to_string(), name: "Charlie".to_string(), value: 35 }).unwrap();
+        
+        // Modify user2
+        tx.stash("user2", &TestData { id: "user2".to_string(), name: "Bob Modified".to_string(), value: 27 }).unwrap();
+        
+        // Delete user3
+        tx.delete("user3").unwrap();
+        
+        // Commit transaction
+        assert!(tx.commit().unwrap());
+        
+        // Verify all operations
+        let user1: TestData = tree.crack("user1").unwrap();
+        assert_eq!(user1.name, "Alice");
+        
+        let user2: TestData = tree.crack("user2").unwrap();
+        assert_eq!(user2.name, "Bob Modified");
+        assert_eq!(user2.value, 27);
+        
+        // user3 should not exist
+        assert!(tree.crack::<TestData>("user3").is_err());
+    }
+
+    #[test]
+    fn test_transaction_error_handling() {
+        let mut tree = AcornTree::open("memory://").unwrap();
+        
+        // Start transaction
+        let mut tx = tree.begin_transaction().unwrap();
+        
+        // Valid operation
+        tx.stash("user1", &TestData { id: "user1".to_string(), name: "Alice".to_string(), value: 30 }).unwrap();
+        
+        // Test rollback functionality
+        tx.rollback().unwrap();
+        
+        // No data should be committed
+        assert!(tree.crack::<TestData>("user1").is_err());
+    }
 }
 

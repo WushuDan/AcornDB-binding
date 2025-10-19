@@ -311,6 +311,36 @@ impl AcornTree {
     pub fn query(&self) -> AcornQuery {
         AcornQuery::new(self.h)
     }
+
+    /// Begin a new transaction for atomic multi-operation changes.
+    /// 
+    /// # Example
+    /// 
+    /// ```rust
+    /// use acorn::AcornTree;
+    /// 
+    /// let mut tree = AcornTree::open("memory://")?;
+    /// let mut tx = tree.begin_transaction()?;
+    /// 
+    /// tx.stash("user1", &serde_json::json!({"name": "Alice", "age": 30}))?;
+    /// tx.stash("user2", &serde_json::json!({"name": "Bob", "age": 25}))?;
+    /// 
+    /// if tx.commit()? {
+    ///     println!("Transaction committed successfully");
+    /// } else {
+    ///     println!("Transaction failed to commit");
+    /// }
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn begin_transaction(&self) -> Result<AcornTransaction> {
+        let mut h: acorn_transaction_handle = 0;
+        let rc = unsafe { acorn_begin_transaction(self.h, &mut h as *mut _) };
+        if rc == 0 {
+            Ok(AcornTransaction { h })
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
 }
 
 impl Drop for AcornTree {
@@ -321,6 +351,117 @@ impl Drop for AcornTree {
 /// The iterator holds a snapshot of the tree at the time it was created.
 pub struct AcornIterator {
     h: acorn_iter_handle,
+}
+
+/// Transaction for atomic multi-operation changes.
+/// Provides snapshot isolation and rollback capabilities.
+pub struct AcornTransaction {
+    h: acorn_transaction_handle,
+}
+
+impl AcornTransaction {
+    /// Store a value in the transaction.
+    /// 
+    /// # Example
+    /// 
+    /// ```rust
+    /// use acorn::AcornTree;
+    /// 
+    /// let mut tree = AcornTree::open("memory://")?;
+    /// let mut tx = tree.begin_transaction()?;
+    /// tx.stash("user1", &serde_json::json!({"name": "Alice"}))?;
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn stash<T: Serialize>(&mut self, id: &str, value: &T) -> Result<()> {
+        let json = serde_json::to_vec(value).map_err(|e| Error::Acorn(format!("Serialization error: {}", e)))?;
+        let idc = CString::new(id).map_err(|e| Error::Acorn(format!("Invalid ID: {}", e)))?;
+        let rc = unsafe { acorn_transaction_stash(self.h, idc.as_ptr(), json.as_ptr(), json.len()) };
+        if rc == 0 {
+            Ok(())
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+
+    /// Delete a value from the transaction.
+    /// 
+    /// # Example
+    /// 
+    /// ```rust
+    /// use acorn::AcornTree;
+    /// 
+    /// let mut tree = AcornTree::open("memory://")?;
+    /// let mut tx = tree.begin_transaction()?;
+    /// tx.delete("user1")?;
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn delete(&mut self, id: &str) -> Result<()> {
+        let idc = CString::new(id).map_err(|e| Error::Acorn(format!("Invalid ID: {}", e)))?;
+        let rc = unsafe { acorn_transaction_delete(self.h, idc.as_ptr()) };
+        if rc == 0 {
+            Ok(())
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+
+    /// Commit the transaction, applying all changes atomically.
+    /// Returns true if the commit was successful, false if it failed.
+    /// 
+    /// # Example
+    /// 
+    /// ```rust
+    /// use acorn::AcornTree;
+    /// 
+    /// let mut tree = AcornTree::open("memory://")?;
+    /// let mut tx = tree.begin_transaction()?;
+    /// tx.stash("user1", &serde_json::json!({"name": "Alice"}))?;
+    /// 
+    /// if tx.commit()? {
+    ///     println!("Transaction committed successfully");
+    /// } else {
+    ///     println!("Transaction failed to commit");
+    /// }
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn commit(&mut self) -> Result<bool> {
+        let rc = unsafe { acorn_transaction_commit(self.h) };
+        if rc == 0 {
+            Ok(true)
+        } else if rc == 1 {
+            Ok(false) // Transaction failed to commit
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+
+    /// Rollback the transaction, discarding all changes.
+    /// 
+    /// # Example
+    /// 
+    /// ```rust
+    /// use acorn::AcornTree;
+    /// 
+    /// let mut tree = AcornTree::open("memory://")?;
+    /// let mut tx = tree.begin_transaction()?;
+    /// tx.stash("user1", &serde_json::json!({"name": "Alice"}))?;
+    /// tx.rollback()?; // All changes are discarded
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn rollback(&mut self) -> Result<()> {
+        let rc = unsafe { acorn_transaction_rollback(self.h) };
+        if rc == 0 {
+            Ok(())
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+}
+
+impl Drop for AcornTransaction {
+    fn drop(&mut self) {
+        unsafe { acorn_transaction_close(self.h); }
+    }
 }
 
 impl AcornIterator {
