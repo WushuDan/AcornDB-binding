@@ -20,9 +20,17 @@ fn main() {
 
     // Link args: expect loader to find the shim at runtime; allow env override for build/test.
     // Only link if ACORN_SHIM_DIR is explicitly set
-    if env::var("ACORN_SHIM_DIR").is_ok() {
-        if let Ok(dir) = env::var("ACORN_SHIM_DIR") {
-            println!("cargo:rustc-link-search=native={}", dir);
+    if let Ok(dir) = env::var("ACORN_SHIM_DIR") {
+        println!("cargo:rustc-link-search=native={}", dir);
+
+        // Also set runtime search path
+        #[cfg(target_os = "macos")]
+        {
+            println!("cargo:rustc-link-arg=-Wl,-rpath,{}", dir);
+        }
+        #[cfg(target_os = "linux")]
+        {
+            println!("cargo:rustc-link-arg=-Wl,-rpath,{}", dir);
         }
 
         let libname = "acornshim";

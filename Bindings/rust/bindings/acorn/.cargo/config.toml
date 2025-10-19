@@ -1,0 +1,26 @@
+# Cargo configuration for AcornDB Rust bindings
+#
+# This configuration helps with dynamic linking to the AcornDB shim library.
+#
+# Environment variables:
+#   ACORN_SHIM_DIR: Path to the directory containing the built shim library
+#                   (e.g., Bindings/rust/shim/bin/Release/net8.0/osx-arm64/publish)
+
+# Uncomment the appropriate section for your platform:
+
+# macOS
+[target.aarch64-apple-darwin]
+rustflags = ["-C", "link-arg=-Wl,-rpath,@loader_path"]
+
+[target.x86_64-apple-darwin]
+rustflags = ["-C", "link-arg=-Wl,-rpath,@loader_path"]
+
+# Linux
+[target.x86_64-unknown-linux-gnu]
+rustflags = ["-C", "link-arg=-Wl,-rpath,$ORIGIN"]
+
+[target.aarch64-unknown-linux-gnu]
+rustflags = ["-C", "link-arg=-Wl,-rpath,$ORIGIN"]
+
+# Windows uses different dynamic linking mechanism
+# No special configuration needed for Windows
