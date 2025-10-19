@@ -371,6 +371,14 @@ fn main() -> Result<(), Error> {
         println!("{}: {}", key, user.name);
     }
     
+    // Subscribe to real-time changes
+    let _sub = tree.subscribe(|key: &str, value: &serde_json::Value| {
+        println!("Changed: {} = {:?}", key, value);
+    })?;
+    
+    // Synchronize with remote server
+    tree.sync_http("http://example.com/api/acorn")?;
+    
     Ok(())
 }
 ```
@@ -378,11 +386,13 @@ fn main() -> Result<(), Error> {
 **Features:**
 - ✅ **Complete CRUD**: `stash()`, `crack()`, `delete()`, `exists()`, `count()`
 - ✅ **Iterator API**: Prefix-based iteration with snapshot semantics
+- ✅ **Subscription Support**: Real-time event handling with callbacks
+- ✅ **Sync Support**: HTTP sync with TreeBark servers
 - ✅ **Memory Safe**: All FFI operations properly wrapped
 - ✅ **Cross-Platform**: macOS, Linux, Windows support
 - ✅ **NativeAOT Compatible**: No reflection warnings
 - ✅ **Automated Build**: Single-command build script
-- ✅ **Comprehensive Tests**: Unit and integration test suites
+- ✅ **Comprehensive Tests**: Unit and integration test suites (18 tests)
 
 **[Read More: Rust Bindings Guide →](Bindings/README.md)**
 
