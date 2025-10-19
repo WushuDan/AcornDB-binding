@@ -177,6 +177,7 @@ grove.Oversee<User>(branch); // Auto-syncs on every change
 | **🗜️ Compression** | Gzip/Brotli compression for storage optimization |
 | **📈 LINQ Support** | `GetAll()` returns `IEnumerable<T>` for LINQ queries |
 | **📜 Full History** | `GetHistory(id)` for version history (Git & DocumentStore trunks) |
+| **🦀 Rust Bindings** | Production-ready Rust bindings with NativeAOT shim |
 
 ### 🔜 Roadmap (Upcoming)
 
@@ -332,6 +333,61 @@ auditLog.Stash(new AuditEntry { Action = "Login", User = "alice" });
 
 ---
 
+## 🦀 Rust Bindings
+
+AcornDB now includes **production-ready Rust bindings** with a NativeAOT C# shim:
+
+```rust
+use acorn::{AcornTree, Error};
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize)]
+struct User {
+    id: String,
+    name: String,
+    email: String,
+}
+
+fn main() -> Result<(), Error> {
+    // Open a tree (file or memory storage)
+    let mut tree = AcornTree::open("file://./my_database")?;
+    
+    // Store a user
+    let user = User {
+        id: "user-1".to_string(),
+        name: "Alice".to_string(),
+        email: "alice@example.com".to_string(),
+    };
+    
+    tree.stash("user-1", &user)?;
+    
+    // Retrieve the user
+    let retrieved: User = tree.crack("user-1")?;
+    println!("Retrieved user: {:?}", retrieved);
+    
+    // Iterate with prefix filtering
+    let mut iter = tree.iter("user:")?;
+    while let Some((key, user)) = iter.next::<User>()? {
+        println!("{}: {}", key, user.name);
+    }
+    
+    Ok(())
+}
+```
+
+**Features:**
+- ✅ **Complete CRUD**: `stash()`, `crack()`, `delete()`, `exists()`, `count()`
+- ✅ **Iterator API**: Prefix-based iteration with snapshot semantics
+- ✅ **Memory Safe**: All FFI operations properly wrapped
+- ✅ **Cross-Platform**: macOS, Linux, Windows support
+- ✅ **NativeAOT Compatible**: No reflection warnings
+- ✅ **Automated Build**: Single-command build script
+- ✅ **Comprehensive Tests**: Unit and integration test suites
+
+**[Read More: Rust Bindings Guide →](Bindings/README.md)**
+
+---
+
 ## 🎨 Canopy - Web UI
 
 Explore your Grove with an interactive dashboard:
@@ -365,6 +421,7 @@ dotnet run
 | `AcornDB.Demo` | Example applications |
 | `AcornDB.Test` | Test suite (100+ tests) |
 | `AcornDB.Benchmarks` | Performance benchmarks |
+| `Bindings/rust` | **NEW**: Production-ready Rust bindings with NativeAOT shim |
 
 ---
 
