@@ -4,7 +4,6 @@ obj/
 *.user
 *.suo
 *.log
-*.md
 .vscode/
 .env
 /.vs
