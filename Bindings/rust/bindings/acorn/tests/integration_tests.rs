@@ -229,6 +229,149 @@ mod integration_tests {
 
         assert_eq!(items.len(), 0);
     }
+
+    #[test]
+    fn test_subscription_basic() {
+        use std::sync::{Arc, Mutex};
+        use std::thread;
+        use std::time::Duration;
+
+        let mut tree = get_test_tree();
+
+        // Track notifications
+        let notifications = Arc::new(Mutex::new(Vec::new()));
+        let notifications_clone = notifications.clone();
+
+        // Subscribe to changes
+        let _sub = tree.subscribe(move |key: &str, _value: &serde_json::Value| {
+            let mut n = notifications_clone.lock().unwrap();
+            n.push(key.to_string());
+        }).unwrap();
+
+        // Give subscription time to initialize
+        thread::sleep(Duration::from_millis(100));
+
+        // Store some data
+        tree.stash("test-1", &TestData { id: "1".to_string(), value: 42, name: "First".to_string() }).unwrap();
+        tree.stash("test-2", &TestData { id: "2".to_string(), value: 43, name: "Second".to_string() }).unwrap();
+
+        // Wait for notifications
+        thread::sleep(Duration::from_millis(300));
+
+        // Check we received notifications (order may vary due to async nature)
+        let n = notifications.lock().unwrap();
+        assert_eq!(n.len(), 2);
+        assert!(n.contains(&"test-1".to_string()));
+        assert!(n.contains(&"test-2".to_string()));
+    }
+
+    #[test]
+    fn test_subscription_update() {
+        use std::sync::{Arc, Mutex};
+        use std::thread;
+        use std::time::Duration;
+
+        let mut tree = get_test_tree();
+
+        let notifications = Arc::new(Mutex::new(Vec::new()));
+        let notifications_clone = notifications.clone();
+
+        let _sub = tree.subscribe(move |key: &str, _value: &serde_json::Value| {
+            let mut n = notifications_clone.lock().unwrap();
+            n.push(key.to_string());
+        }).unwrap();
+
+        thread::sleep(Duration::from_millis(100));
+
+        // Store initial value
+        tree.stash("item", &TestData { id: "1".to_string(), value: 1, name: "One".to_string() }).unwrap();
+        thread::sleep(Duration::from_millis(200));
+
+        // Update the value
+        tree.stash("item", &TestData { id: "1".to_string(), value: 2, name: "Two".to_string() }).unwrap();
+        thread::sleep(Duration::from_millis(200));
+
+        // Should have received 2 notifications for the same key
+        let n = notifications.lock().unwrap();
+        assert_eq!(n.len(), 2);
+        assert_eq!(n[0], "item");
+        assert_eq!(n[1], "item");
+    }
+
+    #[test]
+    fn test_subscription_drop() {
+        use std::sync::{Arc, Mutex};
+        use std::thread;
+        use std::time::Duration;
+
+        let mut tree = get_test_tree();
+
+        let notifications = Arc::new(Mutex::new(Vec::new()));
+        let notifications_clone = notifications.clone();
+
+        {
+            let _sub = tree.subscribe(move |key: &str, _value: &serde_json::Value| {
+                let mut n = notifications_clone.lock().unwrap();
+                n.push(key.to_string());
+            }).unwrap();
+
+            thread::sleep(Duration::from_millis(100));
+
+            // This should trigger a notification
+            tree.stash("before-drop", &TestData { id: "1".to_string(), value: 1, name: "One".to_string() }).unwrap();
+            thread::sleep(Duration::from_millis(200));
+
+            // Subscription is dropped here
+        }
+
+        // After subscription is dropped, this should NOT trigger a notification
+        tree.stash("after-drop", &TestData { id: "2".to_string(), value: 2, name: "Two".to_string() }).unwrap();
+        thread::sleep(Duration::from_millis(200));
+
+        // Should only have received 1 notification
+        let n = notifications.lock().unwrap();
+        assert_eq!(n.len(), 1);
+        assert_eq!(n[0], "before-drop");
+    }
+
+    #[test]
+    fn test_multiple_subscriptions() {
+        use std::sync::{Arc, Mutex};
+        use std::thread;
+        use std::time::Duration;
+
+        let mut tree = get_test_tree();
+
+        let notifications1 = Arc::new(Mutex::new(Vec::new()));
+        let notifications2 = Arc::new(Mutex::new(Vec::new()));
+        let n1_clone = notifications1.clone();
+        let n2_clone = notifications2.clone();
+
+        // Create two subscriptions
+        let _sub1 = tree.subscribe(move |key: &str, _value: &serde_json::Value| {
+            let mut n = n1_clone.lock().unwrap();
+            n.push(key.to_string());
+        }).unwrap();
+
+        let _sub2 = tree.subscribe(move |key: &str, _value: &serde_json::Value| {
+            let mut n = n2_clone.lock().unwrap();
+            n.push(key.to_string());
+        }).unwrap();
+
+        thread::sleep(Duration::from_millis(100));
+
+        // Store data
+        tree.stash("shared", &TestData { id: "1".to_string(), value: 1, name: "One".to_string() }).unwrap();
+        thread::sleep(Duration::from_millis(300));
+
+        // Both subscriptions should have received the notification
+        let n1 = notifications1.lock().unwrap();
+        let n2 = notifications2.lock().unwrap();
+        assert_eq!(n1.len(), 1);
+        assert_eq!(n2.len(), 1);
+        assert_eq!(n1[0], "shared");
+        assert_eq!(n2[0], "shared");
+    }
 }
 
 // Unit tests that don't require the shim

@@ -67,6 +67,29 @@ impl AcornTree {
             Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
+
+    /// Subscribe to changes in the tree. The callback will be invoked whenever
+    /// an item is added or modified. The callback is called from a background thread.
+    ///
+    /// Returns an `AcornSubscription` that will automatically unsubscribe when dropped.
+    ///
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornTree, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let tree = AcornTree::open("memory://")?;
+    /// let _sub = tree.subscribe(|key: &str, value: &serde_json::Value| {
+    ///     println!("Changed: {} = {:?}", key, value);
+    /// })?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn subscribe<F>(&self, callback: F) -> Result<AcornSubscription>
+    where
+        F: Fn(&str, &serde_json::Value) + Send + 'static,
+    {
+        AcornSubscription::new(self.h, callback)
+    }
 }
 
 impl Drop for AcornTree {
@@ -133,6 +156,93 @@ impl AcornIterator {
 impl Drop for AcornIterator {
     fn drop(&mut self) {
         unsafe { acorn_iter_close(self.h); }
+    }
+}
+
+/// Subscription to tree changes. Automatically unsubscribes when dropped.
+pub struct AcornSubscription {
+    h: acorn_sub_handle,
+    // Keep the callback alive by storing the boxed callback
+    // The user_data pointer in the C subscription points to this
+    _callback: Box<Box<dyn Fn(&str, &serde_json::Value) + Send>>,
+}
+
+impl AcornSubscription {
+    fn new<F>(tree_h: acorn_tree_handle, callback: F) -> Result<Self>
+    where
+        F: Fn(&str, &serde_json::Value) + Send + 'static,
+    {
+        // Box the callback - this will be passed as user data to C
+        let callback_box: Box<dyn Fn(&str, &serde_json::Value) + Send> = Box::new(callback);
+        let user_data = Box::into_raw(Box::new(callback_box)) as *mut std::ffi::c_void;
+
+        // Define the C callback wrapper
+        unsafe extern "C" fn c_callback(
+            key: *const std::os::raw::c_char,
+            json: *const u8,
+            len: usize,
+            user: *mut std::ffi::c_void,
+        ) {
+            if user.is_null() {
+                return;
+            }
+
+            // Reconstruct the callback from user data
+            let callback_ptr = user as *const Box<dyn Fn(&str, &serde_json::Value) + Send>;
+            let callback = &**callback_ptr;
+
+            // Convert key to str
+            let key_str = if key.is_null() {
+                ""
+            } else {
+                std::ffi::CStr::from_ptr(key)
+                    .to_str()
+                    .unwrap_or("")
+            };
+
+            // Convert JSON bytes to serde_json::Value
+            if !json.is_null() && len > 0 {
+                let json_slice = std::slice::from_raw_parts(json, len);
+                if let Ok(value) = serde_json::from_slice::<serde_json::Value>(json_slice) {
+                    // Invoke the user callback
+                    callback(key_str, &value);
+                }
+            }
+        }
+
+        let mut sub_h: acorn_sub_handle = 0;
+        let rc = unsafe {
+            acorn_subscribe(
+                tree_h,
+                Some(c_callback),
+                user_data,
+                &mut sub_h as *mut _,
+            )
+        };
+
+        if rc == 0 {
+            // Reconstruct the Box to store in Self (we own it now)
+            // user_data points to Box<Box<dyn Fn...>>
+            let callback_box = unsafe { Box::from_raw(user_data as *mut Box<dyn Fn(&str, &serde_json::Value) + Send>) };
+            Ok(Self {
+                h: sub_h,
+                _callback: callback_box,
+            })
+        } else {
+            // Clean up on error
+            unsafe {
+                let _ = Box::from_raw(user_data as *mut Box<dyn Fn(&str, &serde_json::Value) + Send>);
+            }
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+}
+
+impl Drop for AcornSubscription {
+    fn drop(&mut self) {
+        unsafe {
+            acorn_unsubscribe(self.h);
+        }
     }
 }
 

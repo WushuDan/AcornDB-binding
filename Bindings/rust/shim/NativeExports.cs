@@ -5,6 +5,8 @@ public static class NativeExports
 {
     static readonly HandleTable<AcornFacade.JsonTree> Trees = new();
     static readonly HandleTable<AcornFacade.JsonIterator> Iterators = new();
+    static readonly HandleTable<AcornFacade.JsonSubscription> Subscriptions = new();
+    static readonly HandleTable<SubscriptionContext> SubscriptionContexts = new();
 
     [UnmanagedCallersOnly(EntryPoint = "acorn_open_tree")]
     public static int OpenTree(IntPtr uriUtf8, IntPtr handlePtr)
@@ -208,6 +210,103 @@ public static class NativeExports
             if (Iterators.Remove(iterHandle, out var iterator))
             {
                 iterator?.Dispose();
+            }
+            return 0;
+        } catch (Exception ex) {
+            Error.Set(ex);
+            return -1;
+        }
+    }
+
+    // Subscription exports
+
+    // Callback delegate matching the C signature
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+    private delegate void AcornEventCallback(IntPtr key, IntPtr json, nuint len, IntPtr user);
+
+    // Context to hold callback and user data
+    private class SubscriptionContext
+    {
+        public AcornEventCallback Callback { get; set; }
+        public IntPtr UserData { get; set; }
+        public AcornFacade.JsonSubscription? Subscription { get; set; }
+
+        public SubscriptionContext(AcornEventCallback callback, IntPtr userData)
+        {
+            Callback = callback;
+            UserData = userData;
+        }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_subscribe")]
+    public static int Subscribe(ulong treeHandle, IntPtr callbackPtr, IntPtr userData, IntPtr outSubPtr)
+    {
+        try {
+            var tree = Trees.Get(treeHandle);
+
+            // Marshal the function pointer to a delegate
+            var callback = Marshal.GetDelegateForFunctionPointer<AcornEventCallback>(callbackPtr);
+
+            // Create subscription context
+            var context = new SubscriptionContext(callback, userData);
+
+            // Create the subscription with a wrapper that calls the native callback
+            var subscription = tree.Subscribe((key, jsonBytes) =>
+            {
+                unsafe
+                {
+                    // Allocate unmanaged memory for key
+                    var keyBytes = System.Text.Encoding.UTF8.GetBytes(key);
+                    var keyMem = (byte*)NativeMemory.Alloc((nuint)keyBytes.Length + 1); // +1 for null terminator
+                    fixed (byte* p = keyBytes)
+                    {
+                        new ReadOnlySpan<byte>(p, keyBytes.Length).CopyTo(new Span<byte>(keyMem, keyBytes.Length));
+                    }
+                    keyMem[keyBytes.Length] = 0; // Null terminator
+
+                    // Allocate unmanaged memory for JSON
+                    var jsonMem = (byte*)NativeMemory.Alloc((nuint)jsonBytes.Length);
+                    fixed (byte* p = jsonBytes)
+                    {
+                        new ReadOnlySpan<byte>(p, jsonBytes.Length).CopyTo(new Span<byte>(jsonMem, jsonBytes.Length));
+                    }
+
+                    try
+                    {
+                        // Invoke the callback
+                        context.Callback((IntPtr)keyMem, (IntPtr)jsonMem, (nuint)jsonBytes.Length, context.UserData);
+                    }
+                    finally
+                    {
+                        // Free the allocated memory
+                        // Note: The callback must copy the data if it needs it after returning
+                        NativeMemory.Free(keyMem);
+                        NativeMemory.Free(jsonMem);
+                    }
+                }
+            });
+
+            context.Subscription = subscription;
+
+            // Store context and return handle
+            ulong subHandle = SubscriptionContexts.Add(context);
+            unsafe { *(ulong*)outSubPtr = subHandle; }
+
+            return 0;
+        } catch (Exception ex) {
+            unsafe { *(ulong*)outSubPtr = 0; }
+            Error.Set(ex);
+            return -1;
+        }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_unsubscribe")]
+    public static int Unsubscribe(ulong subHandle)
+    {
+        try {
+            if (SubscriptionContexts.Remove(subHandle, out var context))
+            {
+                context?.Subscription?.Dispose();
             }
             return 0;
         } catch (Exception ex) {

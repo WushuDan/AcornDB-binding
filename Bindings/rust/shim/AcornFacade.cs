@@ -5,6 +5,7 @@ using System.Text.Json;
 using AcornDB;
 using AcornDB.Storage;
 using AcornDB.Shim;
+using AcornDB.Reactive;
 
 internal static class AcornFacade
 {
@@ -95,6 +96,11 @@ internal static class AcornFacade
         {
             return new JsonIterator(_tree, prefix);
         }
+
+        public JsonSubscription Subscribe(Action<string, byte[]> callback)
+        {
+            return new JsonSubscription(_tree, callback);
+        }
     }
 
     /// <summary>
@@ -150,6 +156,52 @@ internal static class AcornFacade
         public void Dispose()
         {
             _enumerator.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// Subscription to tree changes. Invokes callback when items are added or modified.
+    /// The callback is invoked from a background thread.
+    /// </summary>
+    internal sealed class JsonSubscription
+    {
+        private readonly IDisposable _subscription;
+
+        public JsonSubscription(Tree<object> tree, Action<string, byte[]> callback)
+        {
+            // Subscribe to stash events using Reactive Extensions
+            _subscription = tree.ObserveStash().Subscribe(change =>
+            {
+                try
+                {
+                    // Serialize the payload to JSON
+                    var jsonString = System.Text.Json.JsonSerializer.Serialize(change.Item, JsonContext.Default.Object);
+                    var jsonBytes = System.Text.Encoding.UTF8.GetBytes(jsonString);
+
+                    // Invoke the callback on a background thread
+                    System.Threading.ThreadPool.QueueUserWorkItem(_ =>
+                    {
+                        try
+                        {
+                            callback(change.Id, jsonBytes);
+                        }
+                        catch
+                        {
+                            // Ignore exceptions in user callback to prevent crashing the event handler
+                        }
+                    });
+                }
+                catch
+                {
+                    // Ignore serialization errors
+                }
+            });
+        }
+
+        public void Dispose()
+        {
+            // Unsubscribe from tree events
+            _subscription?.Dispose();
         }
     }
 
