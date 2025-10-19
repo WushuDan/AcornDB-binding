@@ -314,4 +314,24 @@ public static class NativeExports
             return -1;
         }
     }
+
+    // Sync export
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_sync_http")]
+    public static int SyncHttp(ulong treeHandle, IntPtr urlUtf8)
+    {
+        try {
+            var tree = Trees.Get(treeHandle);
+            string url = Utf8.In(urlUtf8);
+
+            // SyncHttpAsync is async, but we need to block for FFI
+            // Use GetAwaiter().GetResult() to synchronously wait
+            tree.SyncHttpAsync(url).GetAwaiter().GetResult();
+
+            return 0;
+        } catch (Exception ex) {
+            Error.Set(ex);
+            return -1;
+        }
+    }
 }

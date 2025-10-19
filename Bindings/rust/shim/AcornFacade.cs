@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
+using System.Threading.Tasks;
 using AcornDB;
 using AcornDB.Storage;
 using AcornDB.Shim;
@@ -100,6 +101,22 @@ internal static class AcornFacade
         public JsonSubscription Subscribe(Action<string, byte[]> callback)
         {
             return new JsonSubscription(_tree, callback);
+        }
+
+        public async Task SyncHttpAsync(string url)
+        {
+            try
+            {
+                // Create a Branch for HTTP synchronization
+                var branch = new AcornDB.Sync.Branch(url, AcornDB.Sync.SyncMode.Bidirectional);
+
+                // ShakeAsync pulls data from the remote
+                await branch.ShakeAsync(_tree);
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"Failed to sync with '{url}': {ex.Message}", ex);
+            }
         }
     }
 

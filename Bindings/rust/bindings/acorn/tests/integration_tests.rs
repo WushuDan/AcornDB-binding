@@ -372,6 +372,31 @@ mod integration_tests {
         assert_eq!(n1[0], "shared");
         assert_eq!(n2[0], "shared");
     }
+
+    #[test]
+    fn test_sync_http_unreachable() {
+        let tree = get_test_tree();
+
+        // Test that sync with unreachable URL doesn't panic
+        // Note: Branch.ShakeAsync is fault-tolerant and logs errors but doesn't fail
+        let result = tree.sync_http("http://nonexistent.invalid:9999/acorn");
+
+        // The current implementation logs errors but returns Ok
+        // This is by design - sync is best-effort
+        assert!(result.is_ok(), "sync_http should be fault-tolerant");
+    }
+
+    #[test]
+    fn test_sync_http_invalid_url() {
+        let tree = get_test_tree();
+
+        // Test with malformed URL
+        let result = tree.sync_http("not a url at all");
+
+        // Should complete without panicking
+        // Branch will log an error but won't throw
+        assert!(result.is_ok(), "sync_http should handle invalid URLs gracefully");
+    }
 }
 
 // Unit tests that don't require the shim

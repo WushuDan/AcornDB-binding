@@ -90,6 +90,28 @@ impl AcornTree {
     {
         AcornSubscription::new(self.h, callback)
     }
+
+    /// Synchronize this tree with a remote HTTP endpoint.
+    /// This pulls data from the remote server and merges it into the local tree.
+    ///
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornTree, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let tree = AcornTree::open("file://./db")?;
+    /// tree.sync_http("http://example.com/api/acorn")?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn sync_http(&self, url: &str) -> Result<()> {
+        let url_c = CString::new(url).map_err(|e| Error::Acorn(format!("Invalid URL: {}", e)))?;
+        let rc = unsafe { acorn_sync_http(self.h, url_c.as_ptr()) };
+        if rc == 0 {
+            Ok(())
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
 }
 
 impl Drop for AcornTree {
