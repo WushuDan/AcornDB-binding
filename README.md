@@ -376,6 +376,13 @@ fn main() -> Result<(), Error> {
         println!("Changed: {} = {:?}", key, value);
     })?;
     
+    // Batch operations for improved performance
+    let users = vec![
+        ("user-2", User { id: "user-2".to_string(), name: "Bob".to_string(), email: "bob@example.com".to_string() }),
+        ("user-3", User { id: "user-3".to_string(), name: "Charlie".to_string(), email: "charlie@example.com".to_string() }),
+    ];
+    tree.batch_stash(&users)?;
+    
     // Synchronize with remote server
     tree.sync_http("http://example.com/api/acorn")?;
     
@@ -388,11 +395,12 @@ fn main() -> Result<(), Error> {
 - ✅ **Iterator API**: Prefix-based iteration with snapshot semantics
 - ✅ **Subscription Support**: Real-time event handling with callbacks
 - ✅ **Sync Support**: HTTP sync with TreeBark servers
+- ✅ **Batch Operations**: `batch_stash()`, `batch_crack()`, `batch_delete()` for improved performance
 - ✅ **Memory Safe**: All FFI operations properly wrapped
 - ✅ **Cross-Platform**: macOS, Linux, Windows support
 - ✅ **NativeAOT Compatible**: No reflection warnings
+- ✅ **23 Integration Tests**: Comprehensive test coverage
 - ✅ **Automated Build**: Single-command build script
-- ✅ **Comprehensive Tests**: Unit and integration test suites (18 tests)
 
 **[Read More: Rust Bindings Guide →](Bindings/README.md)**
 

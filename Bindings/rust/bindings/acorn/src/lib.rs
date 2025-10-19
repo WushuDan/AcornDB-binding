@@ -112,6 +112,181 @@ impl AcornTree {
             Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
+
+    /// Store multiple key-value pairs in a single operation.
+    /// This is more efficient than calling stash() multiple times.
+    ///
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornTree, Error};
+    /// # use serde::{Deserialize, Serialize};
+    /// # #[derive(Serialize, Deserialize)]
+    /// # struct Data { value: i32 }
+    /// # fn main() -> Result<(), Error> {
+    /// let mut tree = AcornTree::open("memory://")?;
+    /// let items = vec![
+    ///     ("key1", Data { value: 1 }),
+    ///     ("key2", Data { value: 2 }),
+    ///     ("key3", Data { value: 3 }),
+    /// ];
+    /// tree.batch_stash(&items)?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn batch_stash<T: Serialize>(&mut self, items: &[(&str, T)]) -> Result<()> {
+        if items.is_empty() {
+            return Ok(());
+        }
+
+        // Prepare C-compatible arrays
+        let ids: Vec<CString> = items
+            .iter()
+            .map(|(id, _)| CString::new(*id).map_err(|e| Error::Acorn(format!("Invalid ID: {}", e))))
+            .collect::<Result<Vec<_>>>()?;
+
+        let jsons: Vec<Vec<u8>> = items
+            .iter()
+            .map(|(_, value)| serde_json::to_vec(value).map_err(|e| Error::Acorn(format!("Serialization error: {}", e))))
+            .collect::<Result<Vec<_>>>()?;
+
+        let id_ptrs: Vec<*const i8> = ids.iter().map(|s| s.as_ptr()).collect();
+        let json_ptrs: Vec<*const u8> = jsons.iter().map(|v| v.as_ptr()).collect();
+        let json_lens: Vec<usize> = jsons.iter().map(|v| v.len()).collect();
+
+        let rc = unsafe {
+            acorn_batch_stash(
+                self.h,
+                id_ptrs.as_ptr() as *mut *const i8,
+                json_ptrs.as_ptr() as *mut *const u8,
+                json_lens.as_ptr(),
+                items.len(),
+            )
+        };
+
+        if rc == 0 {
+            Ok(())
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+
+    /// Retrieve multiple values by their IDs in a single operation.
+    /// Returns a vector of Option<T> where None indicates the key was not found.
+    ///
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornTree, Error};
+    /// # use serde::{Deserialize, Serialize};
+    /// # #[derive(Serialize, Deserialize)]
+    /// # struct Data { value: i32 }
+    /// # fn main() -> Result<(), Error> {
+    /// let tree = AcornTree::open("memory://")?;
+    /// let keys = vec!["key1", "key2", "key3"];
+    /// let results: Vec<Option<Data>> = tree.batch_crack(&keys)?;
+    /// for (key, result) in keys.iter().zip(results.iter()) {
+    ///     match result {
+    ///         Some(data) => println!("{}: {:?}", key, data.value),
+    ///         None => println!("{}: not found", key),
+    ///     }
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn batch_crack<T: DeserializeOwned>(&self, ids: &[&str]) -> Result<Vec<Option<T>>> {
+        if ids.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        // Prepare C-compatible arrays
+        let id_cstrings: Vec<CString> = ids
+            .iter()
+            .map(|id| CString::new(*id).map_err(|e| Error::Acorn(format!("Invalid ID: {}", e))))
+            .collect::<Result<Vec<_>>>()?;
+
+        let id_ptrs: Vec<*const i8> = id_cstrings.iter().map(|s| s.as_ptr()).collect();
+
+        let mut out_jsons: Vec<acorn_buf> = vec![acorn_buf { data: ptr::null_mut(), len: 0 }; ids.len()];
+        let mut out_found: Vec<i32> = vec![0; ids.len()];
+
+        let rc = unsafe {
+            acorn_batch_crack(
+                self.h,
+                id_ptrs.as_ptr() as *mut *const i8,
+                ids.len(),
+                out_jsons.as_mut_ptr(),
+                out_found.as_mut_ptr(),
+            )
+        };
+
+        if rc != 0 {
+            // Clean up any allocated buffers
+            for buf in &mut out_jsons {
+                if !buf.data.is_null() {
+                    unsafe { acorn_free_buf(buf as *mut _) };
+                }
+            }
+            return Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }));
+        }
+
+        // Convert results to Rust types
+        let mut results = Vec::with_capacity(ids.len());
+        for i in 0..ids.len() {
+            if out_found[i] == 0 {
+                results.push(None);
+            } else {
+                let slice = unsafe { std::slice::from_raw_parts(out_jsons[i].data, out_jsons[i].len) };
+                let value = serde_json::from_slice(slice).map_err(|e| Error::Acorn(e.to_string()))?;
+                results.push(Some(value));
+            }
+
+            // Free the buffer
+            if !out_jsons[i].data.is_null() {
+                unsafe { acorn_free_buf(&mut out_jsons[i] as *mut _) };
+            }
+        }
+
+        Ok(results)
+    }
+
+    /// Delete multiple items by their IDs in a single operation.
+    ///
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornTree, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let mut tree = AcornTree::open("memory://")?;
+    /// let keys_to_delete = vec!["key1", "key2", "key3"];
+    /// tree.batch_delete(&keys_to_delete)?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn batch_delete(&mut self, ids: &[&str]) -> Result<()> {
+        if ids.is_empty() {
+            return Ok(());
+        }
+
+        // Prepare C-compatible arrays
+        let id_cstrings: Vec<CString> = ids
+            .iter()
+            .map(|id| CString::new(*id).map_err(|e| Error::Acorn(format!("Invalid ID: {}", e))))
+            .collect::<Result<Vec<_>>>()?;
+
+        let id_ptrs: Vec<*const i8> = id_cstrings.iter().map(|s| s.as_ptr()).collect();
+
+        let rc = unsafe {
+            acorn_batch_delete(
+                self.h,
+                id_ptrs.as_ptr() as *mut *const i8,
+                ids.len(),
+            )
+        };
+
+        if rc == 0 {
+            Ok(())
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
 }
 
 impl Drop for AcornTree {

@@ -65,6 +65,38 @@ ACORN_API int acorn_unsubscribe(acorn_sub_handle sub);
 // Sync (optional)
 ACORN_API int acorn_sync_http(acorn_tree_handle tree, const char* url);
 
+// Batch operations for improved performance when working with multiple items
+// All batch operations return 0 on success, -1 on error
+
+// Batch stash: Store multiple key-value pairs
+// ids: array of null-terminated UTF-8 strings (keys)
+// jsons: array of JSON byte buffers
+// json_lens: array of JSON buffer lengths
+// count: number of items to store
+ACORN_API int acorn_batch_stash(acorn_tree_handle tree,
+                                 const char** ids,
+                                 const uint8_t** jsons,
+                                 const size_t* json_lens,
+                                 size_t count);
+
+// Batch crack: Retrieve multiple values by their IDs
+// ids: array of null-terminated UTF-8 strings (keys to retrieve)
+// count: number of items to retrieve
+// out_jsons: array of acorn_buf to receive JSON data (caller must free each with acorn_free_buf)
+// out_found: array of int flags (1 if found, 0 if not found)
+ACORN_API int acorn_batch_crack(acorn_tree_handle tree,
+                                 const char** ids,
+                                 size_t count,
+                                 acorn_buf* out_jsons,
+                                 int* out_found);
+
+// Batch delete: Delete multiple items by their IDs
+// ids: array of null-terminated UTF-8 strings (keys to delete)
+// count: number of items to delete
+ACORN_API int acorn_batch_delete(acorn_tree_handle tree,
+                                  const char** ids,
+                                  size_t count);
+
 // Memory management for buffers allocated by shim
 ACORN_API void acorn_free_buf(acorn_buf* buf);
 

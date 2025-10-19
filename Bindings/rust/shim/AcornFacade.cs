@@ -118,6 +118,74 @@ internal static class AcornFacade
                 throw new InvalidOperationException($"Failed to sync with '{url}': {ex.Message}", ex);
             }
         }
+
+        public void BatchStash(string[] ids, byte[][] jsons)
+        {
+            try
+            {
+                if (ids.Length != jsons.Length)
+                {
+                    throw new ArgumentException("ids and jsons arrays must have the same length");
+                }
+
+                for (int i = 0; i < ids.Length; i++)
+                {
+                    var jsonString = System.Text.Encoding.UTF8.GetString(jsons[i]);
+                    var obj = System.Text.Json.JsonSerializer.Deserialize(jsonString, JsonContext.Default.Object);
+                    if (obj != null)
+                    {
+                        _tree.Stash(ids[i], obj);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"Failed to batch stash: {ex.Message}", ex);
+            }
+        }
+
+        public byte[]?[] BatchCrack(string[] ids)
+        {
+            try
+            {
+                var results = new byte[]?[ids.Length];
+
+                for (int i = 0; i < ids.Length; i++)
+                {
+                    var obj = _tree.Crack(ids[i]);
+                    if (obj == null)
+                    {
+                        results[i] = null;
+                    }
+                    else
+                    {
+                        var jsonString = System.Text.Json.JsonSerializer.Serialize(obj, JsonContext.Default.Object);
+                        results[i] = System.Text.Encoding.UTF8.GetBytes(jsonString);
+                    }
+                }
+
+                return results;
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"Failed to batch crack: {ex.Message}", ex);
+            }
+        }
+
+        public void BatchDelete(string[] ids)
+        {
+            try
+            {
+                foreach (var id in ids)
+                {
+                    _tree.Toss(id);
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"Failed to batch delete: {ex.Message}", ex);
+            }
+        }
     }
 
     /// <summary>

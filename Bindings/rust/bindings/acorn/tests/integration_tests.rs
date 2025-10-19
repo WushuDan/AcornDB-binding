@@ -397,6 +397,126 @@ mod integration_tests {
         // Branch will log an error but won't throw
         assert!(result.is_ok(), "sync_http should handle invalid URLs gracefully");
     }
+
+    #[test]
+    fn test_batch_stash() {
+        let mut tree = get_test_tree();
+
+        let items = vec![
+            ("batch-1", TestData { id: "1".to_string(), value: 100, name: "First".to_string() }),
+            ("batch-2", TestData { id: "2".to_string(), value: 200, name: "Second".to_string() }),
+            ("batch-3", TestData { id: "3".to_string(), value: 300, name: "Third".to_string() }),
+        ];
+
+        tree.batch_stash(&items).unwrap();
+
+        // Verify all items were stored
+        for (key, expected) in &items {
+            let retrieved: TestData = tree.crack(key).unwrap();
+            assert_eq!(&retrieved, expected);
+        }
+    }
+
+    #[test]
+    fn test_batch_crack() {
+        let mut tree = get_test_tree();
+
+        // Store some items
+        tree.stash("key1", &TestData { id: "1".to_string(), value: 1, name: "One".to_string() }).unwrap();
+        tree.stash("key2", &TestData { id: "2".to_string(), value: 2, name: "Two".to_string() }).unwrap();
+        tree.stash("key3", &TestData { id: "3".to_string(), value: 3, name: "Three".to_string() }).unwrap();
+
+        // Batch crack with some found and some not found
+        let keys = vec!["key1", "key2", "missing", "key3"];
+        let results: Vec<Option<TestData>> = tree.batch_crack(&keys).unwrap();
+
+        assert_eq!(results.len(), 4);
+        assert!(results[0].is_some());
+        assert_eq!(results[0].as_ref().unwrap().value, 1);
+        assert!(results[1].is_some());
+        assert_eq!(results[1].as_ref().unwrap().value, 2);
+        assert!(results[2].is_none()); // missing key
+        assert!(results[3].is_some());
+        assert_eq!(results[3].as_ref().unwrap().value, 3);
+    }
+
+    #[test]
+    fn test_batch_delete() {
+        let mut tree = get_test_tree();
+
+        // Store some items
+        for i in 0..5 {
+            tree.stash(&format!("del-{}", i), &TestData {
+                id: i.to_string(),
+                value: i,
+                name: format!("Item {}", i),
+            }).unwrap();
+        }
+
+        // Batch delete some items
+        let to_delete = vec!["del-1", "del-3"];
+        tree.batch_delete(&to_delete).unwrap();
+
+        // Verify deleted items are gone
+        let result: Result<TestData, _> = tree.crack("del-1");
+        assert!(matches!(result, Err(Error::NotFound)));
+
+        let result: Result<TestData, _> = tree.crack("del-3");
+        assert!(matches!(result, Err(Error::NotFound)));
+
+        // Verify other items still exist
+        let result: Result<TestData, _> = tree.crack("del-0");
+        assert!(result.is_ok());
+
+        let result: Result<TestData, _> = tree.crack("del-2");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_batch_empty() {
+        let mut tree = get_test_tree();
+
+        // Test empty batch operations
+        let empty_items: Vec<(&str, TestData)> = vec![];
+        tree.batch_stash(&empty_items).unwrap();
+
+        let empty_keys: Vec<&str> = vec![];
+        let results: Vec<Option<TestData>> = tree.batch_crack(&empty_keys).unwrap();
+        assert_eq!(results.len(), 0);
+
+        tree.batch_delete(&empty_keys).unwrap();
+    }
+
+    #[test]
+    fn test_batch_large() {
+        let mut tree = get_test_tree();
+
+        // Test with larger batch (100 items)
+        let items: Vec<(&str, TestData)> = (0..100)
+            .map(|i| {
+                (
+                    Box::leak(format!("large-{}", i).into_boxed_str()) as &str,
+                    TestData {
+                        id: i.to_string(),
+                        value: i,
+                        name: format!("Item {}", i),
+                    },
+                )
+            })
+            .collect();
+
+        tree.batch_stash(&items).unwrap();
+
+        // Verify with batch crack
+        let keys: Vec<&str> = items.iter().map(|(k, _)| *k).collect();
+        let results: Vec<Option<TestData>> = tree.batch_crack(&keys).unwrap();
+
+        assert_eq!(results.len(), 100);
+        for (i, result) in results.iter().enumerate() {
+            assert!(result.is_some());
+            assert_eq!(result.as_ref().unwrap().value, i as i32);
+        }
+    }
 }
 
 // Unit tests that don't require the shim

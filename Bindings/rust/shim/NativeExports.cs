@@ -334,4 +334,121 @@ public static class NativeExports
             return -1;
         }
     }
+
+    // Batch operations exports
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_batch_stash")]
+    public static unsafe int BatchStash(ulong treeHandle, IntPtr* idsPtr, IntPtr* jsonsPtr, nuint* jsonLensPtr, nuint count)
+    {
+        try {
+            var tree = Trees.Get(treeHandle);
+            int itemCount = checked((int)count);
+
+            // Convert arrays from C to C#
+            var ids = new string[itemCount];
+            var jsons = new byte[itemCount][];
+
+            for (int i = 0; i < itemCount; i++)
+            {
+                ids[i] = Utf8.In(idsPtr[i]);
+
+                int jsonLen = checked((int)jsonLensPtr[i]);
+                jsons[i] = new byte[jsonLen];
+
+                var jsonSpan = new ReadOnlySpan<byte>((void*)jsonsPtr[i], jsonLen);
+                jsonSpan.CopyTo(jsons[i]);
+            }
+
+            tree.BatchStash(ids, jsons);
+            return 0;
+        } catch (Exception ex) {
+            Error.Set(ex);
+            return -1;
+        }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_batch_crack")]
+    public static unsafe int BatchCrack(ulong treeHandle, IntPtr* idsPtr, nuint count, IntPtr outJsonsPtr, IntPtr outFoundPtr)
+    {
+        try {
+            var tree = Trees.Get(treeHandle);
+            int itemCount = checked((int)count);
+
+            // Convert IDs from C to C#
+            var ids = new string[itemCount];
+            for (int i = 0; i < itemCount; i++)
+            {
+                ids[i] = Utf8.In(idsPtr[i]);
+            }
+
+            // Call batch crack
+            var results = tree.BatchCrack(ids);
+
+            // Convert results to C buffers
+            var outJsons = (AcornBuf*)outJsonsPtr;
+            var outFound = (int*)outFoundPtr;
+
+            for (int i = 0; i < itemCount; i++)
+            {
+                if (results[i] == null)
+                {
+                    outJsons[i] = new AcornBuf { data = null, len = 0 };
+                    outFound[i] = 0;
+                }
+                else
+                {
+                    var jsonBytes = results[i];
+                    var mem = (byte*)NativeMemory.Alloc((nuint)jsonBytes.Length);
+                    if (mem == null)
+                    {
+                        // Clean up previously allocated buffers
+                        for (int j = 0; j < i; j++)
+                        {
+                            if (outJsons[j].data != null)
+                            {
+                                NativeMemory.Free(outJsons[j].data);
+                            }
+                        }
+                        Error.Set("Failed to allocate memory for JSON data");
+                        return -1;
+                    }
+
+                    fixed (byte* p = jsonBytes)
+                    {
+                        new ReadOnlySpan<byte>(p, jsonBytes.Length).CopyTo(new Span<byte>(mem, jsonBytes.Length));
+                    }
+
+                    outJsons[i] = new AcornBuf { data = mem, len = (nuint)jsonBytes.Length };
+                    outFound[i] = 1;
+                }
+            }
+
+            return 0;
+        } catch (Exception ex) {
+            Error.Set(ex);
+            return -1;
+        }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_batch_delete")]
+    public static unsafe int BatchDelete(ulong treeHandle, IntPtr* idsPtr, nuint count)
+    {
+        try {
+            var tree = Trees.Get(treeHandle);
+            int itemCount = checked((int)count);
+
+            // Convert IDs from C to C#
+            var ids = new string[itemCount];
+            for (int i = 0; i < itemCount; i++)
+            {
+                ids[i] = Utf8.In(idsPtr[i]);
+            }
+
+            tree.BatchDelete(ids);
+            return 0;
+        } catch (Exception ex) {
+            Error.Set(ex);
+            return -1;
+        }
+    }
 }
