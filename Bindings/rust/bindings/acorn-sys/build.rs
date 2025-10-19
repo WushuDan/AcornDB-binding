@@ -19,8 +19,8 @@ fn main() {
         .expect("write bindings");
 
     // Link args: expect loader to find the shim at runtime; allow env override for build/test.
-    // Only link if we're not in test mode or if ACORN_SHIM_DIR is explicitly set
-    if env::var("CARGO_CFG_TEST").is_err() || env::var("ACORN_SHIM_DIR").is_ok() {
+    // Only link if ACORN_SHIM_DIR is explicitly set
+    if env::var("ACORN_SHIM_DIR").is_ok() {
         if let Ok(dir) = env::var("ACORN_SHIM_DIR") {
             println!("cargo:rustc-link-search=native={}", dir);
         }

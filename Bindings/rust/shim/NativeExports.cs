@@ -6,14 +6,19 @@ public static class NativeExports
     static readonly HandleTable<AcornFacade.JsonTree> Trees = new();
 
     [UnmanagedCallersOnly(EntryPoint = "acorn_open_tree")]
-    public static int OpenTree(IntPtr uriUtf8, out ulong handle)
+    public static int OpenTree(IntPtr uriUtf8, IntPtr handlePtr)
     {
         try {
             string uri = Utf8.In(uriUtf8);
             var tree = AcornFacade.OpenJsonTree(uri);
-            handle = Trees.Add(tree);
+            ulong handle = Trees.Add(tree);
+            unsafe { *(ulong*)handlePtr = handle; }
             return 0;
-        } catch (Exception ex) { handle = 0; Error.Set(ex); return -1; }
+        } catch (Exception ex) { 
+            unsafe { *(ulong*)handlePtr = 0; }
+            Error.Set(ex); 
+            return -1; 
+        }
     }
 
     [UnmanagedCallersOnly(EntryPoint = "acorn_close_tree")]
@@ -41,9 +46,8 @@ public static class NativeExports
     public struct AcornBuf { public unsafe byte* data; public nuint len; }
 
     [UnmanagedCallersOnly(EntryPoint = "acorn_crack_json")]
-    public static unsafe int Crack(ulong handle, IntPtr idUtf8, out AcornBuf outBuf)
+    public static unsafe int Crack(ulong handle, IntPtr idUtf8, IntPtr outBufPtr)
     {
-        outBuf = default;
         try {
             var tree = Trees.Get(handle);
             string id = Utf8.In(idUtf8);
@@ -61,7 +65,8 @@ public static class NativeExports
                 fixed (byte* p = bytes) {
                     new ReadOnlySpan<byte>(p, bytes.Length).CopyTo(new Span<byte>(mem, bytes.Length));
                 }
-                outBuf = new AcornBuf { data = mem, len = (nuint)bytes.Length };
+                var buf = new AcornBuf { data = mem, len = (nuint)bytes.Length };
+                *(AcornBuf*)outBufPtr = buf;
                 return 0;
             } catch {
                 // If copying fails, free the allocated memory
@@ -96,19 +101,29 @@ public static class NativeExports
     }
 
     [UnmanagedCallersOnly(EntryPoint = "acorn_count")]
-    public static int Count(ulong handle, out nuint count)
+    public static int Count(ulong handle, IntPtr countPtr)
     {
-        count = 0;
         try {
             var tree = Trees.Get(handle);
-            count = (nuint)tree.Count();
+            nuint count = (nuint)tree.Count();
+            unsafe { *(nuint*)countPtr = count; }
             return 0;
-        } catch (Exception ex) { Error.Set(ex); return -1; }
+        } catch (Exception ex) { 
+            unsafe { *(nuint*)countPtr = 0; }
+            Error.Set(ex); 
+            return -1; 
+        }
     }
 
     [UnmanagedCallersOnly(EntryPoint = "acorn_free_buf")]
-    public static unsafe void FreeBuf(ref AcornBuf buf)
+    public static unsafe void FreeBuf(IntPtr bufPtr)
     {
-        if (buf.data != null) { NativeMemory.Free(buf.data); buf.data = null; buf.len = 0; }
+        var buf = *(AcornBuf*)bufPtr;
+        if (buf.data != null) { 
+            NativeMemory.Free(buf.data); 
+            buf.data = null; 
+            buf.len = 0; 
+            *(AcornBuf*)bufPtr = buf;
+        }
     }
 }

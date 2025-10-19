@@ -48,7 +48,7 @@ mod integration_tests {
         assert_eq!(test_data, retrieved);
 
         // Test not found
-        let result: Result<TestData> = tree.crack("nonexistent");
+        let result: Result<TestData, Error> = tree.crack("nonexistent");
         assert!(matches!(result, Err(Error::NotFound)));
     }
 

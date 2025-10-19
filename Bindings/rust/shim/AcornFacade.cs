@@ -20,7 +20,10 @@ internal static class AcornFacade
             {
                 var jsonString = System.Text.Encoding.UTF8.GetString(json);
                 var obj = System.Text.Json.JsonSerializer.Deserialize<object>(jsonString);
-                _tree.Stash(id, obj);
+                if (obj != null)
+                {
+                    _tree.Stash(id, obj);
+                }
             }
             catch (Exception ex)
             {
@@ -72,7 +75,7 @@ internal static class AcornFacade
         {
             try
             {
-                return _tree.Nuts.Count();
+                return _tree.NutCount;
             }
             catch (Exception ex)
             {
@@ -89,18 +92,18 @@ internal static class AcornFacade
             if (uri.StartsWith("file://"))
             {
                 var path = uri.Substring(7); // Remove "file://" prefix
-                var tree = new Tree<object>(path);
+                var tree = new Tree<object>(new FileTrunk<object>(path));
                 return new JsonTree(tree);
             }
             else if (uri.StartsWith("memory://"))
             {
-                var tree = new Tree<object>(); // Default to in-memory
+                var tree = new Tree<object>(new MemoryTrunk<object>());
                 return new JsonTree(tree);
             }
             else
             {
                 // Default to file storage with the URI as the path
-                var tree = new Tree<object>(uri);
+                var tree = new Tree<object>(new FileTrunk<object>(uri));
                 return new JsonTree(tree);
             }
         }
