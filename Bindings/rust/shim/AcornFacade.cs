@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Text.Json;
 using AcornDB;
 using AcornDB.Storage;
@@ -81,6 +83,66 @@ internal static class AcornFacade
             {
                 throw new InvalidOperationException($"Failed to count items: {ex.Message}", ex);
             }
+        }
+
+        public JsonIterator CreateIterator(string prefix)
+        {
+            return new JsonIterator(_tree, prefix);
+        }
+    }
+
+    /// <summary>
+    /// Iterator over key-value pairs in a tree, filtered by prefix.
+    /// Holds a snapshot of matching entries at creation time.
+    /// </summary>
+    internal sealed class JsonIterator
+    {
+        private readonly IEnumerator<Nut<JsonElement>> _enumerator;
+        private bool _done;
+
+        public JsonIterator(Tree<JsonElement> tree, string prefix)
+        {
+            // Get all nuts and filter by prefix (case-sensitive)
+            var filteredNuts = tree.GetAllNuts()
+                .Where(nut => string.IsNullOrEmpty(prefix) || nut.Id.StartsWith(prefix))
+                .OrderBy(nut => nut.Id) // Ensure consistent ordering
+                .ToList(); // Snapshot at this point in time
+
+            _enumerator = filteredNuts.GetEnumerator();
+            _done = false;
+        }
+
+        /// <summary>
+        /// Advance to the next item. Returns true if there's a current item, false if done.
+        /// </summary>
+        public bool Next(out string key, out byte[] json)
+        {
+            if (_done)
+            {
+                key = string.Empty;
+                json = Array.Empty<byte>();
+                return false;
+            }
+
+            if (_enumerator.MoveNext())
+            {
+                var nut = _enumerator.Current;
+                key = nut.Id;
+                json = JsonSerializer.SerializeToUtf8Bytes(nut.Payload, JsonContext.Default.JsonElement);
+                return true;
+            }
+            else
+            {
+                _done = true;
+                key = string.Empty;
+                json = Array.Empty<byte>();
+                return false;
+            }
+        }
+
+        public void Dispose()
+        {
+            _enumerator.Dispose();
         }
     }
 

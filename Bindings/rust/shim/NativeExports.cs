@@ -4,6 +4,7 @@ using System.Runtime.InteropServices;
 public static class NativeExports
 {
     static readonly HandleTable<AcornFacade.JsonTree> Trees = new();
+    static readonly HandleTable<AcornFacade.JsonIterator> Iterators = new();
 
     [UnmanagedCallersOnly(EntryPoint = "acorn_open_tree")]
     public static int OpenTree(IntPtr uriUtf8, IntPtr handlePtr)
@@ -119,11 +120,99 @@ public static class NativeExports
     public static unsafe void FreeBuf(IntPtr bufPtr)
     {
         var buf = *(AcornBuf*)bufPtr;
-        if (buf.data != null) { 
-            NativeMemory.Free(buf.data); 
-            buf.data = null; 
-            buf.len = 0; 
+        if (buf.data != null) {
+            NativeMemory.Free(buf.data);
+            buf.data = null;
+            buf.len = 0;
             *(AcornBuf*)bufPtr = buf;
+        }
+    }
+
+    // Iterator exports
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_iter_start")]
+    public static int IterStart(ulong treeHandle, IntPtr prefixUtf8, IntPtr outIterPtr)
+    {
+        try {
+            var tree = Trees.Get(treeHandle);
+            string prefix = Utf8.In(prefixUtf8);
+            var iterator = tree.CreateIterator(prefix);
+            ulong iterHandle = Iterators.Add(iterator);
+            unsafe { *(ulong*)outIterPtr = iterHandle; }
+            return 0;
+        } catch (Exception ex) {
+            unsafe { *(ulong*)outIterPtr = 0; }
+            Error.Set(ex);
+            return -1;
+        }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_iter_next")]
+    public static unsafe int IterNext(ulong iterHandle, IntPtr outKeyPtr, IntPtr outJsonPtr, IntPtr outDonePtr)
+    {
+        try {
+            var iterator = Iterators.Get(iterHandle);
+
+            bool hasItem = iterator.Next(out string key, out byte[] json);
+
+            // Set done flag
+            *(int*)outDonePtr = hasItem ? 0 : 1;
+
+            if (hasItem)
+            {
+                // Allocate and copy key
+                var keyBytes = System.Text.Encoding.UTF8.GetBytes(key);
+                var keyMem = (byte*)NativeMemory.Alloc((nuint)keyBytes.Length);
+                if (keyMem == null) {
+                    Error.Set("Failed to allocate memory for key");
+                    return -1;
+                }
+                fixed (byte* p = keyBytes) {
+                    new ReadOnlySpan<byte>(p, keyBytes.Length).CopyTo(new Span<byte>(keyMem, keyBytes.Length));
+                }
+                var keyBuf = new AcornBuf { data = keyMem, len = (nuint)keyBytes.Length };
+                *(AcornBuf*)outKeyPtr = keyBuf;
+
+                // Allocate and copy JSON
+                var jsonMem = (byte*)NativeMemory.Alloc((nuint)json.Length);
+                if (jsonMem == null) {
+                    NativeMemory.Free(keyMem); // Clean up key memory
+                    Error.Set("Failed to allocate memory for JSON");
+                    return -1;
+                }
+                fixed (byte* p = json) {
+                    new ReadOnlySpan<byte>(p, json.Length).CopyTo(new Span<byte>(jsonMem, json.Length));
+                }
+                var jsonBuf = new AcornBuf { data = jsonMem, len = (nuint)json.Length };
+                *(AcornBuf*)outJsonPtr = jsonBuf;
+            }
+            else
+            {
+                // No more items - set empty buffers
+                *(AcornBuf*)outKeyPtr = new AcornBuf { data = null, len = 0 };
+                *(AcornBuf*)outJsonPtr = new AcornBuf { data = null, len = 0 };
+            }
+
+            return 0;
+        } catch (Exception ex) {
+            unsafe { *(int*)outDonePtr = 1; }
+            Error.Set(ex);
+            return -1;
+        }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_iter_close")]
+    public static int IterClose(ulong iterHandle)
+    {
+        try {
+            if (Iterators.Remove(iterHandle, out var iterator))
+            {
+                iterator?.Dispose();
+            }
+            return 0;
+        } catch (Exception ex) {
+            Error.Set(ex);
+            return -1;
         }
     }
 }

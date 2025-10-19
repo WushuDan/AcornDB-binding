@@ -17,3 +17,7 @@ integration-tests = []
 [[example]]
 name = "basic_usage"
 path = "examples/basic_usage.rs"
+
+[[example]]
+name = "iterator_usage"
+path = "examples/iterator_usage.rs"
