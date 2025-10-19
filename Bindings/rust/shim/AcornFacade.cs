@@ -4,16 +4,17 @@ using System.Linq;
 using System.Text.Json;
 using AcornDB;
 using AcornDB.Storage;
+using AcornDB.Shim;
 
 internal static class AcornFacade
 {
-    // Real AcornDB integration using Tree<JsonElement> for JSON storage
-    // JsonElement is NativeAOT-compatible and can represent any JSON structure
+    // Real AcornDB integration using Tree<object> for JSON storage
+    // This avoids JsonElement serialization issues with Newtonsoft.Json
     internal sealed class JsonTree
     {
-        private readonly Tree<JsonElement> _tree;
+        private readonly Tree<object> _tree;
 
-        public JsonTree(Tree<JsonElement> tree)
+        public JsonTree(Tree<object> tree)
         {
             _tree = tree;
         }
@@ -22,9 +23,13 @@ internal static class AcornFacade
         {
             try
             {
-                // Parse JSON bytes into JsonElement using source-generated context
-                var jsonElement = JsonSerializer.Deserialize(json, JsonContext.Default.JsonElement);
-                _tree.Stash(id, jsonElement);
+                // Parse JSON bytes into object using System.Text.Json with source generation
+                var jsonString = System.Text.Encoding.UTF8.GetString(json);
+                var obj = System.Text.Json.JsonSerializer.Deserialize(jsonString, JsonContext.Default.Object);
+                if (obj != null)
+                {
+                    _tree.Stash(id, obj);
+                }
             }
             catch (Exception ex)
             {
@@ -36,11 +41,12 @@ internal static class AcornFacade
         {
             try
             {
-                var element = _tree.Crack(id);
-                if (element.ValueKind == JsonValueKind.Undefined) return null;
+                var obj = _tree.Crack(id);
+                if (obj == null) return null;
 
-                // Serialize JsonElement back to bytes using source-generated context
-                return JsonSerializer.SerializeToUtf8Bytes(element, JsonContext.Default.JsonElement);
+                // Serialize object back to bytes using System.Text.Json with source generation
+                var jsonString = System.Text.Json.JsonSerializer.Serialize(obj, JsonContext.Default.Object);
+                return System.Text.Encoding.UTF8.GetBytes(jsonString);
             }
             catch (Exception ex)
             {
@@ -64,8 +70,8 @@ internal static class AcornFacade
         {
             try
             {
-                var element = _tree.Crack(id);
-                return element.ValueKind != JsonValueKind.Undefined;
+                var obj = _tree.Crack(id);
+                return obj != null;
             }
             catch
             {
@@ -97,10 +103,10 @@ internal static class AcornFacade
     /// </summary>
     internal sealed class JsonIterator
     {
-        private readonly IEnumerator<Nut<JsonElement>> _enumerator;
+        private readonly IEnumerator<Nut<object>> _enumerator;
         private bool _done;
 
-        public JsonIterator(Tree<JsonElement> tree, string prefix)
+        public JsonIterator(Tree<object> tree, string prefix)
         {
             // Get all nuts and filter by prefix (case-sensitive)
             var filteredNuts = tree.GetAllNuts()
@@ -128,7 +134,8 @@ internal static class AcornFacade
             {
                 var nut = _enumerator.Current;
                 key = nut.Id;
-                json = JsonSerializer.SerializeToUtf8Bytes(nut.Payload, JsonContext.Default.JsonElement);
+                var jsonString = System.Text.Json.JsonSerializer.Serialize(nut.Payload, JsonContext.Default.Object);
+                json = System.Text.Encoding.UTF8.GetBytes(jsonString);
                 return true;
             }
             else
@@ -154,18 +161,18 @@ internal static class AcornFacade
             if (uri.StartsWith("file://"))
             {
                 var path = uri.Substring(7); // Remove "file://" prefix
-                var tree = new Tree<JsonElement>(new FileTrunk<JsonElement>(path));
+                var tree = new Tree<object>(new FileTrunk<object>(path));
                 return new JsonTree(tree);
             }
             else if (uri.StartsWith("memory://"))
             {
-                var tree = new Tree<JsonElement>(new MemoryTrunk<JsonElement>());
+                var tree = new Tree<object>(new MemoryTrunk<object>());
                 return new JsonTree(tree);
             }
             else
             {
                 // Default to file storage with the URI as the path
-                var tree = new Tree<JsonElement>(new FileTrunk<JsonElement>(uri));
+                var tree = new Tree<object>(new FileTrunk<object>(uri));
                 return new JsonTree(tree);
             }
         }

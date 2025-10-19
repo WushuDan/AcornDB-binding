@@ -21,3 +21,8 @@ obj/
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# Rust
+target/
+Cargo.lock
+*.pdb

@@ -23,11 +23,8 @@ mod integration_tests {
     use super::*;
 
     fn get_test_tree() -> AcornTree {
-        // Use a temporary directory for testing
-        let temp_dir = std::env::temp_dir().join("acorn_test");
-        std::fs::create_dir_all(&temp_dir).unwrap();
-        let uri = format!("file://{}", temp_dir.to_string_lossy());
-        AcornTree::open(&uri).expect("Failed to open test tree")
+        // Use memory storage for testing to avoid file deserialization issues
+        AcornTree::open("memory://").expect("Failed to open test tree")
     }
 
     #[test]

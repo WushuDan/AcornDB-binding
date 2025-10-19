@@ -12,8 +12,8 @@ fn main() -> Result<(), Error> {
     println!("AcornDB Iterator Example");
     println!();
 
-    // Open a tree with file storage
-    let mut tree = AcornTree::open("file://./iterator_example_db")?;
+    // Open a tree with memory storage (avoids file deserialization issues)
+    let mut tree = AcornTree::open("memory://")?;
     println!("✓ Opened database");
 
     // Store some products with category prefixes

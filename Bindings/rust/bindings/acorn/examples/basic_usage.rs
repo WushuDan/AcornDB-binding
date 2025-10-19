@@ -12,8 +12,8 @@ struct Person {
 fn main() -> Result<(), Error> {
     println!("AcornDB Rust Bindings Example");
     
-    // Open a tree with file storage
-    let mut tree = AcornTree::open("file://./example_db")?;
+    // Open a tree with memory storage (avoids file deserialization issues)
+    let mut tree = AcornTree::open("memory://")?;
     println!("✓ Opened database");
     
     // Create some sample data

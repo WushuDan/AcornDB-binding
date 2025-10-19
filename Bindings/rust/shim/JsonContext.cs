@@ -1,18 +1,24 @@
-using System.Text.Json;
 using System.Text.Json.Serialization;
 
-/// <summary>
-/// JSON serialization context for NativeAOT compatibility.
-/// This provides source-generated serializers for types used in the FFI layer.
-/// </summary>
-[JsonSourceGenerationOptions(
-    WriteIndented = false,
-    PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
-    DefaultIgnoreCondition = JsonIgnoreCondition.Never,
-    IncludeFields = false)]
-[JsonSerializable(typeof(JsonElement))]
-[JsonSerializable(typeof(JsonDocument))]
+namespace AcornDB.Shim;
+
 [JsonSerializable(typeof(object))]
-internal partial class JsonContext : JsonSerializerContext
+[JsonSerializable(typeof(string))]
+[JsonSerializable(typeof(int))]
+[JsonSerializable(typeof(long))]
+[JsonSerializable(typeof(double))]
+[JsonSerializable(typeof(bool))]
+[JsonSerializable(typeof(System.Text.Json.JsonElement))]
+[JsonSerializable(typeof(System.Collections.Generic.Dictionary<string, object>))]
+[JsonSerializable(typeof(System.Collections.Generic.List<object>))]
+[JsonSerializable(typeof(System.Collections.Generic.List<string>))]
+[JsonSerializable(typeof(System.Collections.Generic.List<int>))]
+[JsonSerializable(typeof(System.Collections.Generic.List<double>))]
+[JsonSerializable(typeof(System.Collections.Generic.List<bool>))]
+[JsonSerializable(typeof(System.Collections.Generic.Dictionary<string, string>))]
+[JsonSerializable(typeof(System.Collections.Generic.Dictionary<string, int>))]
+[JsonSerializable(typeof(System.Collections.Generic.Dictionary<string, double>))]
+[JsonSerializable(typeof(System.Collections.Generic.Dictionary<string, bool>))]
+public partial class JsonContext : JsonSerializerContext
 {
 }
