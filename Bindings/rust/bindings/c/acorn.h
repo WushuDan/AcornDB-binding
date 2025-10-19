@@ -136,6 +136,9 @@ typedef uint64_t acorn_encryption_handle;
 // Compression support
 typedef uint64_t acorn_compression_handle;
 
+// Cache support
+typedef uint64_t acorn_cache_handle;
+
 // Create encryption provider from password
 ACORN_API int acorn_encryption_from_password(const char* password, const char* salt, acorn_encryption_handle* out_encryption);
 
@@ -187,6 +190,24 @@ ACORN_API int acorn_compression_close(acorn_compression_handle compression);
 
 // Open tree with compression only
 ACORN_API int acorn_open_tree_compressed(const char* storage_uri, acorn_compression_handle compression, acorn_tree_handle* out_tree);
+
+// Cache strategy creation
+ACORN_API int acorn_cache_lru(int max_size, acorn_cache_handle* out_cache);
+ACORN_API int acorn_cache_no_eviction(acorn_cache_handle* out_cache);
+
+// Cache operations
+ACORN_API int acorn_cache_reset(acorn_cache_handle cache);
+ACORN_API int acorn_cache_get_stats(acorn_cache_handle cache, int* out_tracked_items, int* out_max_size, double* out_utilization);
+
+// Cache configuration
+ACORN_API int acorn_cache_set_eviction_enabled(acorn_cache_handle cache, int enabled);
+ACORN_API int acorn_cache_is_eviction_enabled(acorn_cache_handle cache);
+
+// Close cache handle
+ACORN_API int acorn_cache_close(acorn_cache_handle cache);
+
+// Open tree with cache strategy
+ACORN_API int acorn_open_tree_with_cache(const char* storage_uri, acorn_cache_handle cache, acorn_tree_handle* out_tree);
 
 // Memory management for buffers allocated by shim
 ACORN_API void acorn_free_buf(acorn_buf* buf);

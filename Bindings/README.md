@@ -799,7 +799,7 @@ The bindings use Rust's `Result<T, Error>` type:
 ### Phase 2: Core AcornDB Features (Binding Existing Features)
 - [x] **Security & Encryption**: Bind AES-256 encryption, custom encryption providers, encrypted trunks
 - [x] **Compression**: Bind Gzip/Brotli compression, compressed trunks, layered security
-- [ ] **Advanced Caching**: Bind LRU cache, optimized LRU, no eviction, custom cache strategies
+- [x] **Advanced Caching**: Bind LRU cache, optimized LRU, no eviction, custom cache strategies
 - [ ] **Conflict Resolution**: Bind timestamp judge, version judge, local/remote wins judges, custom judges
 
 ### Phase 3: Advanced AcornDB Features (Binding Existing Features)
@@ -860,7 +860,7 @@ The core Rust bindings are **COMPLETE**! All major functionality has been implem
 **Phase 2: Core AcornDB Features**
 - ✅ **Security & Encryption**: Bind AES-256 encryption, custom providers, encrypted trunks
 - ✅ **Compression**: Bind Gzip/Brotli compression, compressed trunks, layered security
-- 🔄 **Advanced Caching**: Bind LRU cache, optimized LRU, custom cache strategies
+- ✅ **Advanced Caching**: Bind LRU cache, optimized LRU, custom cache strategies
 - 🔄 **Conflict Resolution**: Bind timestamp, version, local/remote wins judges
 
 **Phase 3: Advanced AcornDB Features**

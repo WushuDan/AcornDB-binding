@@ -738,6 +738,96 @@ internal static class AcornFacade
         public int SpaceSaved { get; set; }
     }
 
+    internal sealed class JsonCacheStrategy
+    {
+        private readonly ICacheStrategy<object> _cacheStrategy;
+
+        public JsonCacheStrategy(ICacheStrategy<object> cacheStrategy)
+        {
+            _cacheStrategy = cacheStrategy ?? throw new ArgumentNullException(nameof(cacheStrategy));
+        }
+
+        public void Reset()
+        {
+            try
+            {
+                _cacheStrategy.Reset();
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"Cache reset failed: {ex.Message}", ex);
+            }
+        }
+
+        public CacheStats GetStats()
+        {
+            try
+            {
+                if (_cacheStrategy is LRUCacheStrategy<object> lru)
+                {
+                    var stats = lru.GetStats();
+                    return new CacheStats
+                    {
+                        TrackedItems = stats.TrackedItems,
+                        MaxSize = stats.MaxSize,
+                        UtilizationPercentage = stats.UtilizationPercentage
+                    };
+                }
+                else if (_cacheStrategy is NoEvictionStrategy<object>)
+                {
+                    return new CacheStats
+                    {
+                        TrackedItems = 0, // NoEviction doesn't track items
+                        MaxSize = int.MaxValue, // Unlimited
+                        UtilizationPercentage = 0.0
+                    };
+                }
+                else
+                {
+                    return new CacheStats
+                    {
+                        TrackedItems = 0,
+                        MaxSize = 0,
+                        UtilizationPercentage = 0.0
+                    };
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"Failed to get cache stats: {ex.Message}", ex);
+            }
+        }
+
+        public bool IsEvictionEnabled
+        {
+            get
+            {
+                // LRU cache always has eviction enabled, NoEviction never does
+                return _cacheStrategy is LRUCacheStrategy<object>;
+            }
+        }
+
+        public string StrategyName
+        {
+            get
+            {
+                return _cacheStrategy switch
+                {
+                    LRUCacheStrategy<object> => "LRU",
+                    NoEvictionStrategy<object> => "NoEviction",
+                    _ => "Unknown"
+                };
+            }
+        }
+    }
+
+    internal sealed class CacheStats
+    {
+        public int TrackedItems { get; set; }
+        public int MaxSize { get; set; }
+        public double UtilizationPercentage { get; set; }
+    }
+
     // Factory methods for Encryption
     public static JsonEncryptionProvider CreateEncryptionFromPassword(string password, string salt)
     {
@@ -817,6 +907,64 @@ internal static class AcornFacade
         catch (Exception ex)
         {
             throw new InvalidOperationException($"Failed to create no compression: {ex.Message}", ex);
+        }
+    }
+
+    // Factory methods for Cache
+    public static JsonCacheStrategy CreateLRUCache(int maxSize)
+    {
+        try
+        {
+            var cacheStrategy = new LRUCacheStrategy<object>(maxSize);
+            return new JsonCacheStrategy(cacheStrategy);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException($"Failed to create LRU cache: {ex.Message}", ex);
+        }
+    }
+
+    public static JsonCacheStrategy CreateNoEvictionCache()
+    {
+        try
+        {
+            var cacheStrategy = new NoEvictionStrategy<object>();
+            return new JsonCacheStrategy(cacheStrategy);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException($"Failed to create no eviction cache: {ex.Message}", ex);
+        }
+    }
+
+    public static JsonTree OpenJsonTreeWithCache(string uri, JsonCacheStrategy cacheStrategy)
+    {
+        try
+        {
+            // Parse URI to determine storage type
+            ITrunk<object> baseTrunk;
+            if (uri.StartsWith("file://"))
+            {
+                var path = uri.Substring(7); // Remove "file://" prefix
+                baseTrunk = new FileTrunk<object>(path);
+            }
+            else if (uri.StartsWith("memory://"))
+            {
+                baseTrunk = new MemoryTrunk<object>();
+            }
+            else
+            {
+                // Default to file storage with the URI as the path
+                baseTrunk = new FileTrunk<object>(uri);
+            }
+
+            // Create tree with custom cache strategy
+            var tree = new Tree<object>(baseTrunk, cacheStrategy._cacheStrategy);
+            return new JsonTree(tree);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException($"Failed to open tree with cache strategy '{uri}': {ex.Message}", ex);
         }
     }
 

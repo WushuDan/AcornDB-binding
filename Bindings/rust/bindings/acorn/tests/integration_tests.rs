@@ -1,4 +1,4 @@
-use acorn::{AcornTree, AcornEncryption, AcornCompression, CompressionLevel, Error};
+use acorn::{AcornTree, AcornEncryption, AcornCompression, AcornCache, CompressionLevel, Error};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
@@ -895,6 +895,175 @@ mod integration_tests {
         let stats = compression.get_stats(&large_data, &compressed).expect("Failed to get stats");
         assert!(stats.ratio < 0.5); // Should compress to less than 50% of original size
         assert!(stats.space_saved > 1000); // Should save significant space
+    }
+
+    #[test]
+    fn test_lru_cache() {
+        let cache = AcornCache::lru(5).expect("Failed to create LRU cache");
+        
+        // Test initial stats
+        let stats = cache.get_stats().expect("Failed to get cache stats");
+        assert_eq!(stats.max_size, 5);
+        assert_eq!(stats.tracked_items, 0);
+        assert_eq!(stats.utilization_percentage, 0.0);
+        
+        // Test eviction enabled
+        let eviction_enabled = cache.is_eviction_enabled().expect("Failed to check eviction status");
+        assert!(eviction_enabled);
+        
+        // Test reset
+        cache.reset().expect("Failed to reset cache");
+        let stats_after_reset = cache.get_stats().expect("Failed to get stats after reset");
+        assert_eq!(stats_after_reset.tracked_items, 0);
+    }
+
+    #[test]
+    fn test_no_eviction_cache() {
+        let cache = AcornCache::no_eviction().expect("Failed to create no eviction cache");
+        
+        // Test initial stats
+        let stats = cache.get_stats().expect("Failed to get cache stats");
+        assert_eq!(stats.max_size, i32::MAX); // Unlimited
+        assert_eq!(stats.tracked_items, 0);
+        assert_eq!(stats.utilization_percentage, 0.0);
+        
+        // Test eviction disabled
+        let eviction_enabled = cache.is_eviction_enabled().expect("Failed to check eviction status");
+        assert!(!eviction_enabled);
+        
+        // Test reset (should be no-op)
+        cache.reset().expect("Failed to reset cache");
+    }
+
+    #[test]
+    fn test_cache_with_tree() {
+        let cache = AcornCache::lru(3).expect("Failed to create LRU cache");
+        let mut tree = AcornTree::open_with_cache("memory://cache_test", &cache).expect("Failed to open tree with cache");
+        
+        // Store test data
+        let test_data = TestData {
+            id: "cache-test".to_string(),
+            value: 123,
+            name: "Cache Test Item".to_string(),
+        };
+        
+        tree.stash("cache-test", &test_data).expect("Failed to stash in cached tree");
+        
+        // Retrieve test data
+        let retrieved: TestData = tree.crack("cache-test").expect("Failed to crack from cached tree");
+        assert_eq!(test_data, retrieved);
+        
+        // Store multiple items to test cache behavior
+        for i in 1..=5 {
+            let item = TestData {
+                id: format!("item-{}", i),
+                value: i * 10,
+                name: format!("Item {}", i),
+            };
+            tree.stash(&format!("item-{}", i), &item).expect("Failed to stash item");
+        }
+        
+        // List all items
+        let items = tree.list().expect("Failed to list items");
+        assert_eq!(items.len(), 6); // 1 original + 5 new items
+        
+        // Check cache stats
+        let stats = cache.get_stats().expect("Failed to get cache stats");
+        assert!(stats.tracked_items > 0);
+        assert!(stats.utilization_percentage > 0.0);
+    }
+
+    #[test]
+    fn test_cache_strategies_comparison() {
+        let lru_cache = AcornCache::lru(10).expect("Failed to create LRU cache");
+        let no_eviction_cache = AcornCache::no_eviction().expect("Failed to create no eviction cache");
+        
+        let mut lru_tree = AcornTree::open_with_cache("memory://lru_comparison", &lru_cache).expect("Failed to open LRU tree");
+        let mut no_eviction_tree = AcornTree::open_with_cache("memory://no_eviction_comparison", &no_eviction_cache).expect("Failed to open no eviction tree");
+        
+        // Store the same data in both trees
+        let test_items: Vec<TestData> = (1..=15)
+            .map(|i| TestData {
+                id: format!("item-{}", i),
+                value: i,
+                name: format!("Item {}", i),
+            })
+            .collect();
+        
+        for item in &test_items {
+            lru_tree.stash(&item.id, item).expect("Failed to stash in LRU tree");
+            no_eviction_tree.stash(&item.id, item).expect("Failed to stash in no eviction tree");
+        }
+        
+        // Check stats
+        let lru_stats = lru_cache.get_stats().expect("Failed to get LRU stats");
+        let no_eviction_stats = no_eviction_cache.get_stats().expect("Failed to get no eviction stats");
+        
+        println!("LRU cache stats: tracked={}, max={}, utilization={:.1}%", 
+                 lru_stats.tracked_items, lru_stats.max_size, lru_stats.utilization_percentage);
+        println!("No eviction cache stats: tracked={}, max={}, utilization={:.1}%", 
+                 no_eviction_stats.tracked_items, no_eviction_stats.max_size, no_eviction_stats.utilization_percentage);
+        
+        // Both should have tracked items
+        assert!(lru_stats.tracked_items > 0);
+        assert!(no_eviction_stats.tracked_items > 0);
+        
+        // LRU should have utilization percentage > 0
+        assert!(lru_stats.utilization_percentage > 0.0);
+        
+        // No eviction should have utilization percentage = 0 (unlimited)
+        assert_eq!(no_eviction_stats.utilization_percentage, 0.0);
+    }
+
+    #[test]
+    fn test_cache_error_handling() {
+        // Test invalid cache size
+        let result = AcornCache::lru(0);
+        assert!(result.is_err());
+        
+        let result = AcornCache::lru(-1);
+        assert!(result.is_err());
+        
+        // Test cache operations on valid cache
+        let cache = AcornCache::lru(10).expect("Failed to create cache");
+        
+        // Reset should work
+        cache.reset().expect("Failed to reset cache");
+        
+        // Stats should work
+        let stats = cache.get_stats().expect("Failed to get stats");
+        assert_eq!(stats.tracked_items, 0);
+    }
+
+    #[test]
+    fn test_cache_with_large_dataset() {
+        let cache = AcornCache::lru(5).expect("Failed to create small LRU cache");
+        let mut tree = AcornTree::open_with_cache("memory://large_dataset", &cache).expect("Failed to open tree");
+        
+        // Create large dataset
+        let large_dataset: Vec<TestData> = (1..=20)
+            .map(|i| TestData {
+                id: format!("large-item-{}", i),
+                value: i,
+                name: format!("Large Item {}", i),
+            })
+            .collect();
+        
+        // Store all items
+        for item in &large_dataset {
+            tree.stash(&item.id, item).expect("Failed to stash large item");
+        }
+        
+        // Check cache stats
+        let stats = cache.get_stats().expect("Failed to get cache stats");
+        assert!(stats.tracked_items > 0);
+        assert!(stats.utilization_percentage > 0.0);
+        
+        // Verify all items can be retrieved
+        for item in &large_dataset {
+            let retrieved: TestData = tree.crack(&item.id).expect("Failed to retrieve large item");
+            assert_eq!(item, &retrieved);
+        }
     }
 }
 

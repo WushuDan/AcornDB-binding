@@ -12,6 +12,7 @@ public static class NativeExports
     static readonly HandleTable<AcornFacade.JsonP2P> P2PConnections = new();
     static readonly HandleTable<AcornFacade.JsonEncryptionProvider> EncryptionProviders = new();
     static readonly HandleTable<AcornFacade.JsonCompressionProvider> CompressionProviders = new();
+    static readonly HandleTable<AcornFacade.JsonCacheStrategy> CacheProviders = new();
 
     [UnmanagedCallersOnly(EntryPoint = "acorn_open_tree")]
     public static int OpenTree(IntPtr uriUtf8, IntPtr handlePtr)
@@ -1053,6 +1054,110 @@ public static class NativeExports
             string uri = Utf8.In(uriUtf8);
             var compression = CompressionProviders.Get(compressionHandle);
             var tree = AcornFacade.OpenJsonTreeCompressed(uri, compression);
+            ulong handle = Trees.Add(tree);
+            unsafe { *(ulong*)handlePtr = handle; }
+            return 0;
+        } catch (Exception ex) { 
+            unsafe { *(ulong*)handlePtr = 0; }
+            Error.Set(ex); 
+            return -1; 
+        }
+    }
+
+    // Cache FFI functions
+    [UnmanagedCallersOnly(EntryPoint = "acorn_cache_lru")]
+    public static int CacheLRU(int maxSize, IntPtr handlePtr)
+    {
+        try {
+            var cache = AcornFacade.CreateLRUCache(maxSize);
+            ulong handle = CacheProviders.Add(cache);
+            unsafe { *(ulong*)handlePtr = handle; }
+            return 0;
+        } catch (Exception ex) { 
+            unsafe { *(ulong*)handlePtr = 0; }
+            Error.Set(ex); 
+            return -1; 
+        }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_cache_no_eviction")]
+    public static int CacheNoEviction(IntPtr handlePtr)
+    {
+        try {
+            var cache = AcornFacade.CreateNoEvictionCache();
+            ulong handle = CacheProviders.Add(cache);
+            unsafe { *(ulong*)handlePtr = handle; }
+            return 0;
+        } catch (Exception ex) { 
+            unsafe { *(ulong*)handlePtr = 0; }
+            Error.Set(ex); 
+            return -1; 
+        }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_cache_reset")]
+    public static int CacheReset(ulong cacheHandle)
+    {
+        try {
+            var cache = CacheProviders.Get(cacheHandle);
+            cache.Reset();
+            return 0;
+        } catch (Exception ex) { Error.Set(ex); return -1; }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_cache_get_stats")]
+    public static int CacheGetStats(ulong cacheHandle, IntPtr trackedItemsPtr, IntPtr maxSizePtr, IntPtr utilizationPtr)
+    {
+        try {
+            var cache = CacheProviders.Get(cacheHandle);
+            var stats = cache.GetStats();
+            
+            unsafe {
+                *(int*)trackedItemsPtr = stats.TrackedItems;
+                *(int*)maxSizePtr = stats.MaxSize;
+                *(double*)utilizationPtr = stats.UtilizationPercentage;
+            }
+            
+            return 0;
+        } catch (Exception ex) { Error.Set(ex); return -1; }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_cache_set_eviction_enabled")]
+    public static int CacheSetEvictionEnabled(ulong cacheHandle, int enabled)
+    {
+        try {
+            var cache = CacheProviders.Get(cacheHandle);
+            // Note: This is a no-op for most cache strategies as eviction is determined by strategy type
+            // LRU always has eviction enabled, NoEviction never does
+            return 0;
+        } catch (Exception ex) { Error.Set(ex); return -1; }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_cache_is_eviction_enabled")]
+    public static int CacheIsEvictionEnabled(ulong cacheHandle)
+    {
+        try {
+            var cache = CacheProviders.Get(cacheHandle);
+            return cache.IsEvictionEnabled ? 1 : 0;
+        } catch (Exception ex) { Error.Set(ex); return -1; }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_cache_close")]
+    public static int CacheClose(ulong cacheHandle)
+    {
+        try {
+            CacheProviders.Remove(cacheHandle, out _);
+            return 0;
+        } catch (Exception ex) { Error.Set(ex); return -1; }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_open_tree_with_cache")]
+    public static int OpenTreeWithCache(IntPtr uriUtf8, ulong cacheHandle, IntPtr handlePtr)
+    {
+        try {
+            string uri = Utf8.In(uriUtf8);
+            var cache = CacheProviders.Get(cacheHandle);
+            var tree = AcornFacade.OpenJsonTreeWithCache(uri, cache);
             ulong handle = Trees.Add(tree);
             unsafe { *(ulong*)handlePtr = handle; }
             return 0;

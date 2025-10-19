@@ -473,6 +473,189 @@ impl Drop for AcornCompression {
     }
 }
 
+/// Cache strategy for AcornDB
+pub struct AcornCache { h: acorn_cache_handle }
+
+/// Cache statistics
+#[derive(Debug, Clone)]
+pub struct CacheStats {
+    pub tracked_items: i32,
+    pub max_size: i32,
+    pub utilization_percentage: f64,
+}
+
+impl AcornCache {
+    /// Create an LRU (Least Recently Used) cache strategy
+    /// 
+    /// # Arguments
+    /// * `max_size` - Maximum number of items to keep in cache before eviction
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornCache, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let cache = AcornCache::lru(1000)?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn lru(max_size: i32) -> Result<Self> {
+        let mut h: acorn_cache_handle = 0;
+        let rc = unsafe { acorn_cache_lru(max_size, &mut h as *mut _) };
+        if rc == 0 { 
+            Ok(Self { h }) 
+        } else { 
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() })) 
+        }
+    }
+
+    /// Create a no-eviction cache strategy (unlimited cache)
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornCache, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let cache = AcornCache::no_eviction()?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn no_eviction() -> Result<Self> {
+        let mut h: acorn_cache_handle = 0;
+        let rc = unsafe { acorn_cache_no_eviction(&mut h as *mut _) };
+        if rc == 0 { 
+            Ok(Self { h }) 
+        } else { 
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() })) 
+        }
+    }
+
+    /// Reset the cache strategy state
+    /// 
+    /// # Returns
+    /// * `Ok(())` - If reset was successful
+    /// * `Err(Error)` - If reset failed
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornCache, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let cache = AcornCache::lru(1000)?;
+    /// cache.reset()?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn reset(&self) -> Result<()> {
+        let rc = unsafe { acorn_cache_reset(self.h) };
+        if rc == 0 {
+            Ok(())
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+
+    /// Get cache statistics
+    /// 
+    /// # Returns
+    /// * `Ok(CacheStats)` - Cache statistics
+    /// * `Err(Error)` - If the operation fails
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornCache, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let cache = AcornCache::lru(1000)?;
+    /// let stats = cache.get_stats()?;
+    /// println!("Tracked items: {}", stats.tracked_items);
+    /// println!("Max size: {}", stats.max_size);
+    /// println!("Utilization: {:.1}%", stats.utilization_percentage);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn get_stats(&self) -> Result<CacheStats> {
+        let mut tracked_items: i32 = 0;
+        let mut max_size: i32 = 0;
+        let mut utilization_percentage: f64 = 0.0;
+        
+        let rc = unsafe { 
+            acorn_cache_get_stats(
+                self.h,
+                &mut tracked_items as *mut _,
+                &mut max_size as *mut _,
+                &mut utilization_percentage as *mut _
+            ) 
+        };
+        
+        if rc == 0 {
+            Ok(CacheStats {
+                tracked_items,
+                max_size,
+                utilization_percentage,
+            })
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+
+    /// Check if eviction is enabled for this cache strategy
+    /// 
+    /// # Returns
+    /// * `true` - If eviction is enabled (LRU cache)
+    /// * `false` - If eviction is disabled (NoEviction cache)
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornCache, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let lru_cache = AcornCache::lru(1000)?;
+    /// assert!(lru_cache.is_eviction_enabled()?);
+    /// 
+    /// let no_eviction_cache = AcornCache::no_eviction()?;
+    /// assert!(!no_eviction_cache.is_eviction_enabled()?);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn is_eviction_enabled(&self) -> Result<bool> {
+        let rc = unsafe { acorn_cache_is_eviction_enabled(self.h) };
+        if rc >= 0 {
+            Ok(rc == 1)
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+
+    /// Set eviction enabled status (no-op for most strategies)
+    /// 
+    /// # Arguments
+    /// * `enabled` - Whether to enable eviction
+    /// 
+    /// # Note
+    /// This is a no-op for most cache strategies as eviction is determined by strategy type.
+    /// LRU cache always has eviction enabled, NoEviction cache never does.
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornCache, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let cache = AcornCache::lru(1000)?;
+    /// cache.set_eviction_enabled(true)?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn set_eviction_enabled(&self, enabled: bool) -> Result<()> {
+        let rc = unsafe { acorn_cache_set_eviction_enabled(self.h, if enabled { 1 } else { 0 }) };
+        if rc == 0 {
+            Ok(())
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+}
+
+impl Drop for AcornCache {
+    fn drop(&mut self) {
+        unsafe { acorn_cache_close(self.h); }
+    }
+}
+
 impl AcornTree {
     pub fn open(uri: &str) -> Result<Self> {
         let c = CString::new(uri).map_err(|e| Error::Acorn(format!("Invalid URI: {}", e)))?;
@@ -568,6 +751,43 @@ impl AcornTree {
         let c = CString::new(uri).map_err(|e| Error::Acorn(format!("Invalid URI: {}", e)))?;
         let mut h: acorn_tree_handle = 0;
         let rc = unsafe { acorn_open_tree_compressed(c.as_ptr(), compression.h, &mut h as *mut _) };
+        if rc == 0 { 
+            Ok(Self { h }) 
+        } else { 
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() })) 
+        }
+    }
+
+    /// Open a tree with a custom cache strategy
+    /// 
+    /// # Arguments
+    /// * `uri` - The storage URI (e.g., "file://./db", "memory://")
+    /// * `cache` - The cache strategy to use
+    /// 
+    /// # Returns
+    /// * `Ok(AcornTree)` - The opened tree
+    /// * `Err(Error)` - If opening fails
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornTree, AcornCache, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let cache = AcornCache::lru(1000)?;
+    /// let mut tree = AcornTree::open_with_cache("file://./cached_db", &cache)?;
+    /// 
+    /// // Store some data
+    /// tree.stash("key1", &"Hello, cached world!")?;
+    /// 
+    /// // Retrieve data
+    /// let value: String = tree.crack("key1")?;
+    /// assert_eq!(value, "Hello, cached world!");
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn open_with_cache(uri: &str, cache: &AcornCache) -> Result<Self> {
+        let c = CString::new(uri).map_err(|e| Error::Acorn(format!("Invalid URI: {}", e)))?;
+        let mut h: acorn_tree_handle = 0;
+        let rc = unsafe { acorn_open_tree_with_cache(c.as_ptr(), cache.h, &mut h as *mut _) };
         if rc == 0 { 
             Ok(Self { h }) 
         } else { 
