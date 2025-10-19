@@ -1,15 +1,17 @@
 using System;
+using System.Text.Json;
 using AcornDB;
 using AcornDB.Storage;
 
 internal static class AcornFacade
 {
-    // Real AcornDB integration using Tree<object> for JSON storage
+    // Real AcornDB integration using Tree<JsonElement> for JSON storage
+    // JsonElement is NativeAOT-compatible and can represent any JSON structure
     internal sealed class JsonTree
     {
-        private readonly Tree<object> _tree;
+        private readonly Tree<JsonElement> _tree;
 
-        public JsonTree(Tree<object> tree)
+        public JsonTree(Tree<JsonElement> tree)
         {
             _tree = tree;
         }
@@ -18,12 +20,9 @@ internal static class AcornFacade
         {
             try
             {
-                var jsonString = System.Text.Encoding.UTF8.GetString(json);
-                var obj = System.Text.Json.JsonSerializer.Deserialize<object>(jsonString);
-                if (obj != null)
-                {
-                    _tree.Stash(id, obj);
-                }
+                // Parse JSON bytes into JsonElement using source-generated context
+                var jsonElement = JsonSerializer.Deserialize(json, JsonContext.Default.JsonElement);
+                _tree.Stash(id, jsonElement);
             }
             catch (Exception ex)
             {
@@ -35,11 +34,11 @@ internal static class AcornFacade
         {
             try
             {
-                var obj = _tree.Crack(id);
-                if (obj == null) return null;
-                
-                var jsonString = System.Text.Json.JsonSerializer.Serialize(obj);
-                return System.Text.Encoding.UTF8.GetBytes(jsonString);
+                var element = _tree.Crack(id);
+                if (element.ValueKind == JsonValueKind.Undefined) return null;
+
+                // Serialize JsonElement back to bytes using source-generated context
+                return JsonSerializer.SerializeToUtf8Bytes(element, JsonContext.Default.JsonElement);
             }
             catch (Exception ex)
             {
@@ -63,7 +62,8 @@ internal static class AcornFacade
         {
             try
             {
-                return _tree.Crack(id) != null;
+                var element = _tree.Crack(id);
+                return element.ValueKind != JsonValueKind.Undefined;
             }
             catch
             {
@@ -92,18 +92,18 @@ internal static class AcornFacade
             if (uri.StartsWith("file://"))
             {
                 var path = uri.Substring(7); // Remove "file://" prefix
-                var tree = new Tree<object>(new FileTrunk<object>(path));
+                var tree = new Tree<JsonElement>(new FileTrunk<JsonElement>(path));
                 return new JsonTree(tree);
             }
             else if (uri.StartsWith("memory://"))
             {
-                var tree = new Tree<object>(new MemoryTrunk<object>());
+                var tree = new Tree<JsonElement>(new MemoryTrunk<JsonElement>());
                 return new JsonTree(tree);
             }
             else
             {
                 // Default to file storage with the URI as the path
-                var tree = new Tree<object>(new FileTrunk<object>(uri));
+                var tree = new Tree<JsonElement>(new FileTrunk<JsonElement>(uri));
                 return new JsonTree(tree);
             }
         }
