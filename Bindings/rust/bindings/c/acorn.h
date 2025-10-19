@@ -139,6 +139,9 @@ typedef uint64_t acorn_compression_handle;
 // Cache support
 typedef uint64_t acorn_cache_handle;
 
+// Conflict resolution support
+typedef uint64_t acorn_conflict_judge_handle;
+
 // Create encryption provider from password
 ACORN_API int acorn_encryption_from_password(const char* password, const char* salt, acorn_encryption_handle* out_encryption);
 
@@ -208,6 +211,22 @@ ACORN_API int acorn_cache_close(acorn_cache_handle cache);
 
 // Open tree with cache strategy
 ACORN_API int acorn_open_tree_with_cache(const char* storage_uri, acorn_cache_handle cache, acorn_tree_handle* out_tree);
+
+// Conflict resolution judge creation
+ACORN_API int acorn_conflict_judge_timestamp(acorn_conflict_judge_handle* out_judge);
+ACORN_API int acorn_conflict_judge_version(acorn_conflict_judge_handle* out_judge);
+ACORN_API int acorn_conflict_judge_local_wins(acorn_conflict_judge_handle* out_judge);
+ACORN_API int acorn_conflict_judge_remote_wins(acorn_conflict_judge_handle* out_judge);
+
+// Conflict resolution operations
+ACORN_API int acorn_conflict_judge_name(acorn_conflict_judge_handle judge, acorn_buf* out_name);
+ACORN_API int acorn_conflict_judge_resolve(acorn_conflict_judge_handle judge, const char* local_json, const char* incoming_json, acorn_buf* out_winner_json);
+
+// Close conflict judge handle
+ACORN_API int acorn_conflict_judge_close(acorn_conflict_judge_handle judge);
+
+// Open tree with conflict judge
+ACORN_API int acorn_open_tree_with_conflict_judge(const char* storage_uri, acorn_conflict_judge_handle judge, acorn_tree_handle* out_tree);
 
 // Memory management for buffers allocated by shim
 ACORN_API void acorn_free_buf(acorn_buf* buf);

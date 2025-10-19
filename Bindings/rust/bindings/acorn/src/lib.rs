@@ -656,6 +656,180 @@ impl Drop for AcornCache {
     }
 }
 
+/// Conflict resolution judge for AcornDB
+pub struct AcornConflictJudge { h: acorn_conflict_judge_handle }
+
+/// Conflict resolution strategies available in AcornDB
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConflictStrategy {
+    /// Last-write-wins based on timestamp (default)
+    Timestamp,
+    /// Higher version number wins
+    Version,
+    /// Local version always wins
+    LocalWins,
+    /// Remote version always wins
+    RemoteWins,
+}
+
+impl AcornConflictJudge {
+    /// Create a timestamp-based conflict judge (last-write-wins)
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornConflictJudge, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let judge = AcornConflictJudge::timestamp()?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn timestamp() -> Result<Self> {
+        let mut h: acorn_conflict_judge_handle = 0;
+        let rc = unsafe { acorn_conflict_judge_timestamp(&mut h as *mut _) };
+        if rc == 0 { 
+            Ok(Self { h }) 
+        } else { 
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() })) 
+        }
+    }
+
+    /// Create a version-based conflict judge
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornConflictJudge, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let judge = AcornConflictJudge::version()?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn version() -> Result<Self> {
+        let mut h: acorn_conflict_judge_handle = 0;
+        let rc = unsafe { acorn_conflict_judge_version(&mut h as *mut _) };
+        if rc == 0 { 
+            Ok(Self { h }) 
+        } else { 
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() })) 
+        }
+    }
+
+    /// Create a local-wins conflict judge
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornConflictJudge, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let judge = AcornConflictJudge::local_wins()?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn local_wins() -> Result<Self> {
+        let mut h: acorn_conflict_judge_handle = 0;
+        let rc = unsafe { acorn_conflict_judge_local_wins(&mut h as *mut _) };
+        if rc == 0 { 
+            Ok(Self { h }) 
+        } else { 
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() })) 
+        }
+    }
+
+    /// Create a remote-wins conflict judge
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornConflictJudge, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let judge = AcornConflictJudge::remote_wins()?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn remote_wins() -> Result<Self> {
+        let mut h: acorn_conflict_judge_handle = 0;
+        let rc = unsafe { acorn_conflict_judge_remote_wins(&mut h as *mut _) };
+        if rc == 0 { 
+            Ok(Self { h }) 
+        } else { 
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() })) 
+        }
+    }
+
+    /// Get the name of the conflict resolution strategy
+    /// 
+    /// # Returns
+    /// * `Ok(String)` - The name of the strategy
+    /// * `Err(Error)` - If the operation fails
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornConflictJudge, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let judge = AcornConflictJudge::timestamp()?;
+    /// let name = judge.name()?;
+    /// assert_eq!(name, "Timestamp");
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn name(&self) -> Result<String> {
+        let mut buf = acorn_buf { data: ptr::null_mut(), len: 0 };
+        let rc = unsafe { acorn_conflict_judge_name(self.h, &mut buf as *mut _) };
+        if rc == 0 {
+            let result = unsafe { 
+                std::slice::from_raw_parts(buf.data, buf.len as usize) 
+            };
+            let result_str = String::from_utf8_lossy(result).to_string();
+            unsafe { acorn_free_buf(&mut buf); }
+            Ok(result_str)
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+
+    /// Resolve a conflict between local and incoming data
+    /// 
+    /// # Arguments
+    /// * `local_json` - The local data as JSON
+    /// * `incoming_json` - The incoming data as JSON
+    /// 
+    /// # Returns
+    /// * `Ok(String)` - The winning data as JSON
+    /// * `Err(Error)` - If conflict resolution fails
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornConflictJudge, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let judge = AcornConflictJudge::timestamp()?;
+    /// let local = r#"{"id": "test", "value": "local", "timestamp": "2023-01-01T10:00:00Z"}"#;
+    /// let incoming = r#"{"id": "test", "value": "incoming", "timestamp": "2023-01-01T11:00:00Z"}"#;
+    /// let winner = judge.resolve_conflict(local, incoming)?;
+    /// println!("Winner: {}", winner);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn resolve_conflict(&self, local_json: &str, incoming_json: &str) -> Result<String> {
+        let local_c = CString::new(local_json).map_err(|e| Error::Acorn(format!("Invalid local JSON: {}", e)))?;
+        let incoming_c = CString::new(incoming_json).map_err(|e| Error::Acorn(format!("Invalid incoming JSON: {}", e)))?;
+        let mut buf = acorn_buf { data: ptr::null_mut(), len: 0 };
+        let rc = unsafe { acorn_conflict_judge_resolve(self.h, local_c.as_ptr(), incoming_c.as_ptr(), &mut buf as *mut _) };
+        if rc == 0 {
+            let result = unsafe { 
+                std::slice::from_raw_parts(buf.data, buf.len as usize) 
+            };
+            let result_str = String::from_utf8_lossy(result).to_string();
+            unsafe { acorn_free_buf(&mut buf); }
+            Ok(result_str)
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+}
+
+impl Drop for AcornConflictJudge {
+    fn drop(&mut self) {
+        unsafe { acorn_conflict_judge_close(self.h); }
+    }
+}
+
 impl AcornTree {
     pub fn open(uri: &str) -> Result<Self> {
         let c = CString::new(uri).map_err(|e| Error::Acorn(format!("Invalid URI: {}", e)))?;
@@ -788,6 +962,43 @@ impl AcornTree {
         let c = CString::new(uri).map_err(|e| Error::Acorn(format!("Invalid URI: {}", e)))?;
         let mut h: acorn_tree_handle = 0;
         let rc = unsafe { acorn_open_tree_with_cache(c.as_ptr(), cache.h, &mut h as *mut _) };
+        if rc == 0 { 
+            Ok(Self { h }) 
+        } else { 
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() })) 
+        }
+    }
+
+    /// Open a tree with a custom conflict resolution judge
+    /// 
+    /// # Arguments
+    /// * `uri` - The storage URI (e.g., "file://./db", "memory://")
+    /// * `judge` - The conflict resolution judge to use
+    /// 
+    /// # Returns
+    /// * `Ok(AcornTree)` - The opened tree
+    /// * `Err(Error)` - If opening fails
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornTree, AcornConflictJudge, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let judge = AcornConflictJudge::timestamp()?;
+    /// let mut tree = AcornTree::open_with_conflict_judge("file://./conflict_db", &judge)?;
+    /// 
+    /// // Store some data
+    /// tree.stash("key1", &"Hello, conflict resolution!")?;
+    /// 
+    /// // Retrieve data
+    /// let value: String = tree.crack("key1")?;
+    /// assert_eq!(value, "Hello, conflict resolution!");
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn open_with_conflict_judge(uri: &str, judge: &AcornConflictJudge) -> Result<Self> {
+        let c = CString::new(uri).map_err(|e| Error::Acorn(format!("Invalid URI: {}", e)))?;
+        let mut h: acorn_tree_handle = 0;
+        let rc = unsafe { acorn_open_tree_with_conflict_judge(c.as_ptr(), judge.h, &mut h as *mut _) };
         if rc == 0 { 
             Ok(Self { h }) 
         } else { 

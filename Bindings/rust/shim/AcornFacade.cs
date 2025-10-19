@@ -828,6 +828,52 @@ internal static class AcornFacade
         public double UtilizationPercentage { get; set; }
     }
 
+    internal sealed class JsonConflictJudge
+    {
+        private readonly IConflictJudge<object> _conflictJudge;
+
+        public JsonConflictJudge(IConflictJudge<object> conflictJudge)
+        {
+            _conflictJudge = conflictJudge ?? throw new ArgumentNullException(nameof(conflictJudge));
+        }
+
+        public string ResolveConflict(string localJson, string incomingJson)
+        {
+            try
+            {
+                var localNut = JsonConvert.DeserializeObject<Nut<object>>(localJson);
+                var incomingNut = JsonConvert.DeserializeObject<Nut<object>>(incomingJson);
+                
+                if (localNut == null || incomingNut == null)
+                {
+                    throw new InvalidOperationException("Failed to deserialize nuts");
+                }
+                
+                var winner = _conflictJudge.Judge(localNut, incomingNut);
+                return JsonConvert.SerializeObject(winner);
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"Conflict resolution failed: {ex.Message}", ex);
+            }
+        }
+
+        public string JudgeName
+        {
+            get
+            {
+                return _conflictJudge switch
+                {
+                    TimestampJudge<object> => "Timestamp",
+                    VersionJudge<object> => "Version",
+                    LocalWinsJudge<object> => "LocalWins",
+                    RemoteWinsJudge<object> => "RemoteWins",
+                    _ => "Unknown"
+                };
+            }
+        }
+    }
+
     // Factory methods for Encryption
     public static JsonEncryptionProvider CreateEncryptionFromPassword(string password, string salt)
     {
@@ -965,6 +1011,90 @@ internal static class AcornFacade
         catch (Exception ex)
         {
             throw new InvalidOperationException($"Failed to open tree with cache strategy '{uri}': {ex.Message}", ex);
+        }
+    }
+
+    // Factory methods for Conflict Resolution
+    public static JsonConflictJudge CreateTimestampJudge()
+    {
+        try
+        {
+            var judge = new TimestampJudge<object>();
+            return new JsonConflictJudge(judge);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException($"Failed to create timestamp judge: {ex.Message}", ex);
+        }
+    }
+
+    public static JsonConflictJudge CreateVersionJudge()
+    {
+        try
+        {
+            var judge = new VersionJudge<object>();
+            return new JsonConflictJudge(judge);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException($"Failed to create version judge: {ex.Message}", ex);
+        }
+    }
+
+    public static JsonConflictJudge CreateLocalWinsJudge()
+    {
+        try
+        {
+            var judge = new LocalWinsJudge<object>();
+            return new JsonConflictJudge(judge);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException($"Failed to create local wins judge: {ex.Message}", ex);
+        }
+    }
+
+    public static JsonConflictJudge CreateRemoteWinsJudge()
+    {
+        try
+        {
+            var judge = new RemoteWinsJudge<object>();
+            return new JsonConflictJudge(judge);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException($"Failed to create remote wins judge: {ex.Message}", ex);
+        }
+    }
+
+    public static JsonTree OpenJsonTreeWithConflictJudge(string uri, JsonConflictJudge conflictJudge)
+    {
+        try
+        {
+            // Parse URI to determine storage type
+            ITrunk<object> baseTrunk;
+            if (uri.StartsWith("file://"))
+            {
+                var path = uri.Substring(7); // Remove "file://" prefix
+                baseTrunk = new FileTrunk<object>(path);
+            }
+            else if (uri.StartsWith("memory://"))
+            {
+                baseTrunk = new MemoryTrunk<object>();
+            }
+            else
+            {
+                // Default to file storage with the URI as the path
+                baseTrunk = new FileTrunk<object>(uri);
+            }
+
+            // Create tree with custom conflict judge
+            var tree = new Tree<object>(baseTrunk, null, conflictJudge._conflictJudge);
+            return new JsonTree(tree);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException($"Failed to open tree with conflict judge '{uri}': {ex.Message}", ex);
         }
     }
 

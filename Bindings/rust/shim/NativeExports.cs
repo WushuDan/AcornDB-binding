@@ -13,6 +13,7 @@ public static class NativeExports
     static readonly HandleTable<AcornFacade.JsonEncryptionProvider> EncryptionProviders = new();
     static readonly HandleTable<AcornFacade.JsonCompressionProvider> CompressionProviders = new();
     static readonly HandleTable<AcornFacade.JsonCacheStrategy> CacheProviders = new();
+    static readonly HandleTable<AcornFacade.JsonConflictJudge> ConflictJudges = new();
 
     [UnmanagedCallersOnly(EntryPoint = "acorn_open_tree")]
     public static int OpenTree(IntPtr uriUtf8, IntPtr handlePtr)
@@ -1158,6 +1159,132 @@ public static class NativeExports
             string uri = Utf8.In(uriUtf8);
             var cache = CacheProviders.Get(cacheHandle);
             var tree = AcornFacade.OpenJsonTreeWithCache(uri, cache);
+            ulong handle = Trees.Add(tree);
+            unsafe { *(ulong*)handlePtr = handle; }
+            return 0;
+        } catch (Exception ex) { 
+            unsafe { *(ulong*)handlePtr = 0; }
+            Error.Set(ex); 
+            return -1; 
+        }
+    }
+
+    // Conflict Resolution FFI functions
+    [UnmanagedCallersOnly(EntryPoint = "acorn_conflict_judge_timestamp")]
+    public static int ConflictJudgeTimestamp(IntPtr handlePtr)
+    {
+        try {
+            var judge = AcornFacade.CreateTimestampJudge();
+            ulong handle = ConflictJudges.Add(judge);
+            unsafe { *(ulong*)handlePtr = handle; }
+            return 0;
+        } catch (Exception ex) { 
+            unsafe { *(ulong*)handlePtr = 0; }
+            Error.Set(ex); 
+            return -1; 
+        }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_conflict_judge_version")]
+    public static int ConflictJudgeVersion(IntPtr handlePtr)
+    {
+        try {
+            var judge = AcornFacade.CreateVersionJudge();
+            ulong handle = ConflictJudges.Add(judge);
+            unsafe { *(ulong*)handlePtr = handle; }
+            return 0;
+        } catch (Exception ex) { 
+            unsafe { *(ulong*)handlePtr = 0; }
+            Error.Set(ex); 
+            return -1; 
+        }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_conflict_judge_local_wins")]
+    public static int ConflictJudgeLocalWins(IntPtr handlePtr)
+    {
+        try {
+            var judge = AcornFacade.CreateLocalWinsJudge();
+            ulong handle = ConflictJudges.Add(judge);
+            unsafe { *(ulong*)handlePtr = handle; }
+            return 0;
+        } catch (Exception ex) { 
+            unsafe { *(ulong*)handlePtr = 0; }
+            Error.Set(ex); 
+            return -1; 
+        }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_conflict_judge_remote_wins")]
+    public static int ConflictJudgeRemoteWins(IntPtr handlePtr)
+    {
+        try {
+            var judge = AcornFacade.CreateRemoteWinsJudge();
+            ulong handle = ConflictJudges.Add(judge);
+            unsafe { *(ulong*)handlePtr = handle; }
+            return 0;
+        } catch (Exception ex) { 
+            unsafe { *(ulong*)handlePtr = 0; }
+            Error.Set(ex); 
+            return -1; 
+        }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_conflict_judge_name")]
+    public static int ConflictJudgeName(ulong judgeHandle, IntPtr nameBufPtr)
+    {
+        try {
+            var judge = ConflictJudges.Get(judgeHandle);
+            var nameBytes = System.Text.Encoding.UTF8.GetBytes(judge.JudgeName);
+            
+            unsafe {
+                var nameBuf = (AcornBuf*)nameBufPtr;
+                nameBuf->data = (byte*)Marshal.AllocHGlobal(nameBytes.Length);
+                Marshal.Copy(nameBytes, 0, (IntPtr)nameBuf->data, nameBytes.Length);
+                nameBuf->len = (nuint)nameBytes.Length;
+            }
+            
+            return 0;
+        } catch (Exception ex) { Error.Set(ex); return -1; }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_conflict_judge_resolve")]
+    public static int ConflictJudgeResolve(ulong judgeHandle, IntPtr localJsonUtf8, IntPtr incomingJsonUtf8, IntPtr winnerJsonBufPtr)
+    {
+        try {
+            var judge = ConflictJudges.Get(judgeHandle);
+            string localJson = Utf8.In(localJsonUtf8);
+            string incomingJson = Utf8.In(incomingJsonUtf8);
+            var winnerJson = judge.ResolveConflict(localJson, incomingJson);
+            var winnerBytes = System.Text.Encoding.UTF8.GetBytes(winnerJson);
+            
+            unsafe {
+                var winnerBuf = (AcornBuf*)winnerJsonBufPtr;
+                winnerBuf->data = (byte*)Marshal.AllocHGlobal(winnerBytes.Length);
+                Marshal.Copy(winnerBytes, 0, (IntPtr)winnerBuf->data, winnerBytes.Length);
+                winnerBuf->len = (nuint)winnerBytes.Length;
+            }
+            
+            return 0;
+        } catch (Exception ex) { Error.Set(ex); return -1; }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_conflict_judge_close")]
+    public static int ConflictJudgeClose(ulong judgeHandle)
+    {
+        try {
+            ConflictJudges.Remove(judgeHandle, out _);
+            return 0;
+        } catch (Exception ex) { Error.Set(ex); return -1; }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_open_tree_with_conflict_judge")]
+    public static int OpenTreeWithConflictJudge(IntPtr uriUtf8, ulong judgeHandle, IntPtr handlePtr)
+    {
+        try {
+            string uri = Utf8.In(uriUtf8);
+            var judge = ConflictJudges.Get(judgeHandle);
+            var tree = AcornFacade.OpenJsonTreeWithConflictJudge(uri, judge);
             ulong handle = Trees.Add(tree);
             unsafe { *(ulong*)handlePtr = handle; }
             return 0;

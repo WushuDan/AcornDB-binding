@@ -1,4 +1,4 @@
-use acorn::{AcornTree, AcornEncryption, AcornCompression, AcornCache, CompressionLevel, Error};
+use acorn::{AcornTree, AcornEncryption, AcornCompression, AcornCache, AcornConflictJudge, CompressionLevel, Error};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
@@ -1064,6 +1064,207 @@ mod integration_tests {
             let retrieved: TestData = tree.crack(&item.id).expect("Failed to retrieve large item");
             assert_eq!(item, &retrieved);
         }
+    }
+
+    #[test]
+    fn test_timestamp_conflict_judge() {
+        let judge = AcornConflictJudge::timestamp().expect("Failed to create timestamp judge");
+        
+        // Test judge name
+        let name = judge.name().expect("Failed to get judge name");
+        assert_eq!(name, "Timestamp");
+        
+        // Test conflict resolution with different timestamps
+        let local_json = r#"{"id": "test", "name": "Local", "timestamp": "2023-01-01T10:00:00Z"}"#;
+        let incoming_json = r#"{"id": "test", "name": "Incoming", "timestamp": "2023-01-01T11:00:00Z"}"#;
+        
+        let winner_json = judge.resolve_conflict(local_json, incoming_json).expect("Failed to resolve conflict");
+        let winner: serde_json::Value = serde_json::from_str(&winner_json).expect("Failed to parse winner JSON");
+        
+        // Timestamp judge should pick the incoming (later timestamp)
+        assert_eq!(winner["name"], "Incoming");
+        assert_eq!(winner["timestamp"], "2023-01-01T11:00:00Z");
+    }
+
+    #[test]
+    fn test_version_conflict_judge() {
+        let judge = AcornConflictJudge::version().expect("Failed to create version judge");
+        
+        // Test judge name
+        let name = judge.name().expect("Failed to get judge name");
+        assert_eq!(name, "Version");
+        
+        // Test conflict resolution with different versions
+        let local_json = r#"{"id": "test", "name": "Local", "version": 1, "timestamp": "2023-01-01T11:00:00Z"}"#;
+        let incoming_json = r#"{"id": "test", "name": "Incoming", "version": 2, "timestamp": "2023-01-01T10:00:00Z"}"#;
+        
+        let winner_json = judge.resolve_conflict(local_json, incoming_json).expect("Failed to resolve conflict");
+        let winner: serde_json::Value = serde_json::from_str(&winner_json).expect("Failed to parse winner JSON");
+        
+        // Version judge should pick the incoming (higher version)
+        assert_eq!(winner["name"], "Incoming");
+        assert_eq!(winner["version"], 2);
+    }
+
+    #[test]
+    fn test_local_wins_conflict_judge() {
+        let judge = AcornConflictJudge::local_wins().expect("Failed to create local wins judge");
+        
+        // Test judge name
+        let name = judge.name().expect("Failed to get judge name");
+        assert_eq!(name, "LocalWins");
+        
+        // Test conflict resolution
+        let local_json = r#"{"id": "test", "name": "Local", "timestamp": "2023-01-01T10:00:00Z"}"#;
+        let incoming_json = r#"{"id": "test", "name": "Incoming", "timestamp": "2023-01-01T11:00:00Z"}"#;
+        
+        let winner_json = judge.resolve_conflict(local_json, incoming_json).expect("Failed to resolve conflict");
+        let winner: serde_json::Value = serde_json::from_str(&winner_json).expect("Failed to parse winner JSON");
+        
+        // Local wins judge should always pick the local
+        assert_eq!(winner["name"], "Local");
+        assert_eq!(winner["timestamp"], "2023-01-01T10:00:00Z");
+    }
+
+    #[test]
+    fn test_remote_wins_conflict_judge() {
+        let judge = AcornConflictJudge::remote_wins().expect("Failed to create remote wins judge");
+        
+        // Test judge name
+        let name = judge.name().expect("Failed to get judge name");
+        assert_eq!(name, "RemoteWins");
+        
+        // Test conflict resolution
+        let local_json = r#"{"id": "test", "name": "Local", "timestamp": "2023-01-01T11:00:00Z"}"#;
+        let incoming_json = r#"{"id": "test", "name": "Incoming", "timestamp": "2023-01-01T10:00:00Z"}"#;
+        
+        let winner_json = judge.resolve_conflict(local_json, incoming_json).expect("Failed to resolve conflict");
+        let winner: serde_json::Value = serde_json::from_str(&winner_json).expect("Failed to parse winner JSON");
+        
+        // Remote wins judge should always pick the incoming
+        assert_eq!(winner["name"], "Incoming");
+        assert_eq!(winner["timestamp"], "2023-01-01T10:00:00Z");
+    }
+
+    #[test]
+    fn test_conflict_judge_with_tree() {
+        let judge = AcornConflictJudge::timestamp().expect("Failed to create timestamp judge");
+        let mut tree = AcornTree::open_with_conflict_judge("memory://conflict_test", &judge).expect("Failed to open tree with conflict judge");
+        
+        // Store test data
+        let test_data = TestData {
+            id: "conflict-test".to_string(),
+            value: 123,
+            name: "Conflict Test Item".to_string(),
+        };
+        
+        tree.stash("conflict-test", &test_data).expect("Failed to stash in tree with conflict judge");
+        
+        // Retrieve test data
+        let retrieved: TestData = tree.crack("conflict-test").expect("Failed to crack from tree with conflict judge");
+        assert_eq!(test_data, retrieved);
+        
+        // Store multiple items
+        for i in 1..=5 {
+            let item = TestData {
+                id: format!("conflict-item-{}", i),
+                value: i * 10,
+                name: format!("Conflict Item {}", i),
+            };
+            tree.stash(&format!("conflict-item-{}", i), &item).expect("Failed to stash conflict item");
+        }
+        
+        // List all items
+        let items = tree.list().expect("Failed to list items");
+        assert_eq!(items.len(), 6); // 1 original + 5 new items
+    }
+
+    #[test]
+    fn test_conflict_resolution_strategies_comparison() {
+        let timestamp_judge = AcornConflictJudge::timestamp().expect("Failed to create timestamp judge");
+        let version_judge = AcornConflictJudge::version().expect("Failed to create version judge");
+        let local_wins_judge = AcornConflictJudge::local_wins().expect("Failed to create local wins judge");
+        let remote_wins_judge = AcornConflictJudge::remote_wins().expect("Failed to create remote wins judge");
+        
+        // Test data with different timestamps and versions
+        let local_json = r#"{"id": "test", "name": "Local", "version": 1, "timestamp": "2023-01-01T10:00:00Z"}"#;
+        let incoming_json = r#"{"id": "test", "name": "Incoming", "version": 2, "timestamp": "2023-01-01T11:00:00Z"}"#;
+        
+        // Test timestamp judge (should pick incoming - later timestamp)
+        let timestamp_winner = timestamp_judge.resolve_conflict(local_json, incoming_json).expect("Failed to resolve with timestamp judge");
+        let timestamp_result: serde_json::Value = serde_json::from_str(&timestamp_winner).expect("Failed to parse timestamp result");
+        assert_eq!(timestamp_result["name"], "Incoming");
+        
+        // Test version judge (should pick incoming - higher version)
+        let version_winner = version_judge.resolve_conflict(local_json, incoming_json).expect("Failed to resolve with version judge");
+        let version_result: serde_json::Value = serde_json::from_str(&version_winner).expect("Failed to parse version result");
+        assert_eq!(version_result["name"], "Incoming");
+        
+        // Test local wins judge (should pick local)
+        let local_wins_winner = local_wins_judge.resolve_conflict(local_json, incoming_json).expect("Failed to resolve with local wins judge");
+        let local_wins_result: serde_json::Value = serde_json::from_str(&local_wins_winner).expect("Failed to parse local wins result");
+        assert_eq!(local_wins_result["name"], "Local");
+        
+        // Test remote wins judge (should pick incoming)
+        let remote_wins_winner = remote_wins_judge.resolve_conflict(local_json, incoming_json).expect("Failed to resolve with remote wins judge");
+        let remote_wins_result: serde_json::Value = serde_json::from_str(&remote_wins_winner).expect("Failed to parse remote wins result");
+        assert_eq!(remote_wins_result["name"], "Incoming");
+    }
+
+    #[test]
+    fn test_conflict_resolution_error_handling() {
+        let judge = AcornConflictJudge::timestamp().expect("Failed to create timestamp judge");
+        
+        // Test invalid JSON
+        let result = judge.resolve_conflict("invalid-json", r#"{"valid": "json"}"#);
+        assert!(result.is_err());
+        
+        // Test mismatched JSON structures
+        let result = judge.resolve_conflict(r#"{"id": "test"}"#, r#"{"different": "structure"}"#);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_conflict_resolution_with_complex_data() {
+        let judge = AcornConflictJudge::timestamp().expect("Failed to create timestamp judge");
+        
+        // Test with complex nested data
+        let local_complex = r#"{
+            "id": "complex",
+            "user": {
+                "name": "Local User",
+                "email": "local@example.com",
+                "preferences": {
+                    "theme": "dark",
+                    "notifications": true
+                }
+            },
+            "timestamp": "2023-01-01T10:00:00Z",
+            "version": 1
+        }"#;
+        
+        let incoming_complex = r#"{
+            "id": "complex",
+            "user": {
+                "name": "Incoming User",
+                "email": "incoming@example.com",
+                "preferences": {
+                    "theme": "light",
+                    "notifications": false
+                }
+            },
+            "timestamp": "2023-01-01T11:00:00Z",
+            "version": 1
+        }"#;
+        
+        let winner_json = judge.resolve_conflict(local_complex, incoming_complex).expect("Failed to resolve complex conflict");
+        let winner: serde_json::Value = serde_json::from_str(&winner_json).expect("Failed to parse complex winner");
+        
+        // Should pick the incoming (later timestamp)
+        assert_eq!(winner["user"]["name"], "Incoming User");
+        assert_eq!(winner["user"]["email"], "incoming@example.com");
+        assert_eq!(winner["user"]["preferences"]["theme"], "light");
+        assert_eq!(winner["timestamp"], "2023-01-01T11:00:00Z");
     }
 }
 
