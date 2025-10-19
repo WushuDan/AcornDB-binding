@@ -49,11 +49,59 @@ public static class NativeExports
             string id = Utf8.In(idUtf8);
             var bytes = tree.Crack(id);
             if (bytes is null) return 1; // not found
-            fixed (byte* p = bytes) {
-                var mem = (byte*)NativeMemory.Alloc((nuint)bytes.Length);
-                new ReadOnlySpan<byte>(p, bytes.Length).CopyTo(new Span<byte>(mem, bytes.Length));
-                outBuf = new AcornBuf { data = mem, len = (nuint)bytes.Length };
+            
+            // Allocate unmanaged memory and copy the data
+            var mem = (byte*)NativeMemory.Alloc((nuint)bytes.Length);
+            if (mem == null) {
+                Error.Set("Failed to allocate memory for JSON data");
+                return -1;
             }
+            
+            try {
+                fixed (byte* p = bytes) {
+                    new ReadOnlySpan<byte>(p, bytes.Length).CopyTo(new Span<byte>(mem, bytes.Length));
+                }
+                outBuf = new AcornBuf { data = mem, len = (nuint)bytes.Length };
+                return 0;
+            } catch {
+                // If copying fails, free the allocated memory
+                NativeMemory.Free(mem);
+                throw;
+            }
+        } catch (Exception ex) { 
+            Error.Set(ex); 
+            return -1; 
+        }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_delete")]
+    public static int Delete(ulong handle, IntPtr idUtf8)
+    {
+        try {
+            var tree = Trees.Get(handle);
+            string id = Utf8.In(idUtf8);
+            tree.Delete(id);
+            return 0;
+        } catch (Exception ex) { Error.Set(ex); return -1; }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_exists")]
+    public static int Exists(ulong handle, IntPtr idUtf8)
+    {
+        try {
+            var tree = Trees.Get(handle);
+            string id = Utf8.In(idUtf8);
+            return tree.Exists(id) ? 1 : 0;
+        } catch (Exception ex) { Error.Set(ex); return -1; }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_count")]
+    public static int Count(ulong handle, out nuint count)
+    {
+        count = 0;
+        try {
+            var tree = Trees.Get(handle);
+            count = (nuint)tree.Count();
             return 0;
         } catch (Exception ex) { Error.Set(ex); return -1; }
     }

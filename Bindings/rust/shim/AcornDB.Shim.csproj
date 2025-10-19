@@ -10,7 +10,8 @@
     <AssemblyName>acornshim</AssemblyName>
   </PropertyGroup>
   <ItemGroup>
-    <!-- TODO: replace with actual AcornDB project/package refs -->
+    <!-- Reference to the main AcornDB project -->
+    <ProjectReference Include="../../../AcornDB/AcornDB.csproj" />
     <PackageReference Include="System.Text.Json" Version="8.0.4" />
   </ItemGroup>
 </Project>

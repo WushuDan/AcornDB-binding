@@ -44,6 +44,10 @@ ACORN_API int acorn_crack_json(acorn_tree_handle tree,
 
 ACORN_API int acorn_delete(acorn_tree_handle tree, const char* id);
 
+// Additional utility functions
+ACORN_API int acorn_exists(acorn_tree_handle tree, const char* id);
+ACORN_API int acorn_count(acorn_tree_handle tree, size_t* out_count);
+
 // Iteration (point-in-time scan; iterator owns snapshot on shim side)
 ACORN_API int acorn_iter_start(acorn_tree_handle tree, const char* prefix, acorn_iter_handle* out_iter);
 ACORN_API int acorn_iter_next(acorn_iter_handle iter, acorn_buf* out_key, acorn_buf* out_json, int* out_done);
@@ -65,7 +69,9 @@ ACORN_API int acorn_sync_http(acorn_tree_handle tree, const char* url);
 ACORN_API void acorn_free_buf(acorn_buf* buf);
 
 // Last error (thread-local, null-terminated UTF-8 string). Pointer invalidated on next shim call.
+// Caller must free the returned string with acorn_free_error_string().
 ACORN_API const char* acorn_error_message(void);
+ACORN_API void acorn_free_error_string(const char* str);
 
 #ifdef __cplusplus
 }
