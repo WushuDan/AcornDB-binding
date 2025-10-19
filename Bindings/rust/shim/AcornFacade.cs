@@ -9,6 +9,9 @@ using AcornDB.Storage;
 using AcornDB.Shim;
 using AcornDB.Reactive;
 using AcornDB.Sync;
+using AcornDB.Security;
+using AcornDB.Compression;
+using System.IO.Compression;
 
 internal static class AcornFacade
 {
@@ -605,5 +608,170 @@ internal static class AcornFacade
     public static JsonP2P CreateP2P(JsonTree localTree, JsonTree remoteTree)
     {
         return new JsonP2P(localTree, remoteTree);
+    }
+
+    /// <summary>
+    /// Encryption provider wrapper for FFI
+    /// </summary>
+    internal sealed class JsonEncryptionProvider
+    {
+        private readonly IEncryptionProvider _encryption;
+
+        public JsonEncryptionProvider(IEncryptionProvider encryption)
+        {
+            _encryption = encryption ?? throw new ArgumentNullException(nameof(encryption));
+        }
+
+        public string Encrypt(string plaintext)
+        {
+            try
+            {
+                return _encryption.Encrypt(plaintext);
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"Failed to encrypt data: {ex.Message}", ex);
+            }
+        }
+
+        public string Decrypt(string ciphertext)
+        {
+            try
+            {
+                return _encryption.Decrypt(ciphertext);
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"Failed to decrypt data: {ex.Message}", ex);
+            }
+        }
+
+        public bool IsEnabled => _encryption.IsEnabled;
+
+        public string ExportKeyBase64()
+        {
+            if (_encryption is AesEncryptionProvider aes)
+            {
+                return aes.ExportKeyBase64();
+            }
+            throw new NotSupportedException("Key export not supported for this encryption provider");
+        }
+
+        public string ExportIVBase64()
+        {
+            if (_encryption is AesEncryptionProvider aes)
+            {
+                return aes.ExportIVBase64();
+            }
+            throw new NotSupportedException("IV export not supported for this encryption provider");
+        }
+    }
+
+    // Factory methods for Encryption
+    public static JsonEncryptionProvider CreateEncryptionFromPassword(string password, string salt)
+    {
+        try
+        {
+            var encryption = AesEncryptionProvider.FromPassword(password, salt);
+            return new JsonEncryptionProvider(encryption);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException($"Failed to create encryption from password: {ex.Message}", ex);
+        }
+    }
+
+    public static JsonEncryptionProvider CreateEncryptionFromKeyIV(string keyBase64, string ivBase64)
+    {
+        try
+        {
+            var key = Convert.FromBase64String(keyBase64);
+            var iv = Convert.FromBase64String(ivBase64);
+            var encryption = new AesEncryptionProvider(key, iv);
+            return new JsonEncryptionProvider(encryption);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException($"Failed to create encryption from key/IV: {ex.Message}", ex);
+        }
+    }
+
+    public static (string keyBase64, string ivBase64) GenerateKeyAndIV()
+    {
+        try
+        {
+            var (key, iv) = AesEncryptionProvider.GenerateKeyAndIV();
+            return (Convert.ToBase64String(key), Convert.ToBase64String(iv));
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException($"Failed to generate key and IV: {ex.Message}", ex);
+        }
+    }
+
+    public static JsonTree OpenJsonTreeEncrypted(string uri, JsonEncryptionProvider encryption)
+    {
+        try
+        {
+            // Parse URI to determine storage type
+            ITrunk<object> baseTrunk;
+            if (uri.StartsWith("file://"))
+            {
+                var path = uri.Substring(7); // Remove "file://" prefix
+                baseTrunk = new FileTrunk<object>(path);
+            }
+            else if (uri.StartsWith("memory://"))
+            {
+                baseTrunk = new MemoryTrunk<object>();
+            }
+            else
+            {
+                // Default to file storage with the URI as the path
+                baseTrunk = new FileTrunk<object>(uri);
+            }
+
+            // Wrap with encryption
+            var encryptedTrunk = new EncryptedTrunk<object>(baseTrunk, encryption._encryption);
+            var tree = new Tree<object>(encryptedTrunk);
+            return new JsonTree(tree);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException($"Failed to open encrypted tree with URI '{uri}': {ex.Message}", ex);
+        }
+    }
+
+    public static JsonTree OpenJsonTreeEncryptedCompressed(string uri, JsonEncryptionProvider encryption, CompressionLevel compressionLevel)
+    {
+        try
+        {
+            // Parse URI to determine storage type
+            ITrunk<object> baseTrunk;
+            if (uri.StartsWith("file://"))
+            {
+                var path = uri.Substring(7); // Remove "file://" prefix
+                baseTrunk = new FileTrunk<object>(path);
+            }
+            else if (uri.StartsWith("memory://"))
+            {
+                baseTrunk = new MemoryTrunk<object>();
+            }
+            else
+            {
+                // Default to file storage with the URI as the path
+                baseTrunk = new FileTrunk<object>(uri);
+            }
+
+            // Wrap with compression first, then encryption
+            var compressionProvider = new GzipCompressionProvider(compressionLevel);
+            var compressedTrunk = new CompressedTrunk<object>(baseTrunk, compressionProvider);
+            var encryptedTrunk = new EncryptedTrunk<object>(compressedTrunk, encryption._encryption);
+            var tree = new Tree<object>(encryptedTrunk);
+            return new JsonTree(tree);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException($"Failed to open encrypted compressed tree with URI '{uri}': {ex.Message}", ex);
+        }
     }
 }

@@ -130,6 +130,38 @@ ACORN_API int acorn_batch_delete(acorn_tree_handle tree,
                                   const char** ids,
                                   size_t count);
 
+// Encryption support
+typedef uint64_t acorn_encryption_handle;
+
+// Create encryption provider from password
+ACORN_API int acorn_encryption_from_password(const char* password, const char* salt, acorn_encryption_handle* out_encryption);
+
+// Create encryption provider from explicit key/IV (base64 encoded)
+ACORN_API int acorn_encryption_from_key_iv(const char* key_base64, const char* iv_base64, acorn_encryption_handle* out_encryption);
+
+// Generate random key and IV (for testing/new deployments)
+ACORN_API int acorn_encryption_generate_key_iv(acorn_buf* out_key_base64, acorn_buf* out_iv_base64);
+
+// Export key/IV as base64 (for backup/storage)
+ACORN_API int acorn_encryption_export_key(acorn_encryption_handle encryption, acorn_buf* out_key_base64);
+ACORN_API int acorn_encryption_export_iv(acorn_encryption_handle encryption, acorn_buf* out_iv_base64);
+
+// Encrypt/decrypt data
+ACORN_API int acorn_encryption_encrypt(acorn_encryption_handle encryption, const char* plaintext, acorn_buf* out_ciphertext);
+ACORN_API int acorn_encryption_decrypt(acorn_encryption_handle encryption, const char* ciphertext, acorn_buf* out_plaintext);
+
+// Check if encryption is enabled
+ACORN_API int acorn_encryption_is_enabled(acorn_encryption_handle encryption);
+
+// Close encryption handle
+ACORN_API int acorn_encryption_close(acorn_encryption_handle encryption);
+
+// Open tree with encryption
+ACORN_API int acorn_open_tree_encrypted(const char* storage_uri, acorn_encryption_handle encryption, acorn_tree_handle* out_tree);
+
+// Open tree with encryption and compression
+ACORN_API int acorn_open_tree_encrypted_compressed(const char* storage_uri, acorn_encryption_handle encryption, int compression_level, acorn_tree_handle* out_tree);
+
 // Memory management for buffers allocated by shim
 ACORN_API void acorn_free_buf(acorn_buf* buf);
 

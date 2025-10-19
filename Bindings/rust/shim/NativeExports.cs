@@ -10,6 +10,7 @@ public static class NativeExports
     static readonly HandleTable<AcornFacade.JsonTransaction> Transactions = new();
     static readonly HandleTable<AcornFacade.JsonMesh> Meshes = new();
     static readonly HandleTable<AcornFacade.JsonP2P> P2PConnections = new();
+    static readonly HandleTable<AcornFacade.JsonEncryptionProvider> EncryptionProviders = new();
 
     [UnmanagedCallersOnly(EntryPoint = "acorn_open_tree")]
     public static int OpenTree(IntPtr uriUtf8, IntPtr handlePtr)
@@ -688,5 +689,204 @@ public static class NativeExports
             P2PConnections.Remove(p2pHandle, out _);
             return 0;
         } catch (Exception ex) { Error.Set(ex); return -1; }
+    }
+
+    // Encryption support
+    [UnmanagedCallersOnly(EntryPoint = "acorn_encryption_from_password")]
+    public static int EncryptionFromPassword(IntPtr passwordUtf8, IntPtr saltUtf8, IntPtr handlePtr)
+    {
+        try {
+            string password = Utf8.In(passwordUtf8);
+            string salt = Utf8.In(saltUtf8);
+            var encryption = AcornFacade.CreateEncryptionFromPassword(password, salt);
+            ulong handle = EncryptionProviders.Add(encryption);
+            unsafe { *(ulong*)handlePtr = handle; }
+            return 0;
+        } catch (Exception ex) { 
+            unsafe { *(ulong*)handlePtr = 0; }
+            Error.Set(ex); 
+            return -1; 
+        }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_encryption_from_key_iv")]
+    public static int EncryptionFromKeyIV(IntPtr keyBase64Utf8, IntPtr ivBase64Utf8, IntPtr handlePtr)
+    {
+        try {
+            string keyBase64 = Utf8.In(keyBase64Utf8);
+            string ivBase64 = Utf8.In(ivBase64Utf8);
+            var encryption = AcornFacade.CreateEncryptionFromKeyIV(keyBase64, ivBase64);
+            ulong handle = EncryptionProviders.Add(encryption);
+            unsafe { *(ulong*)handlePtr = handle; }
+            return 0;
+        } catch (Exception ex) { 
+            unsafe { *(ulong*)handlePtr = 0; }
+            Error.Set(ex); 
+            return -1; 
+        }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_encryption_generate_key_iv")]
+    public static int EncryptionGenerateKeyIV(IntPtr keyBufPtr, IntPtr ivBufPtr)
+    {
+        try {
+            var (keyBase64, ivBase64) = AcornFacade.GenerateKeyAndIV();
+            
+            // Allocate and return key
+            var keyBytes = System.Text.Encoding.UTF8.GetBytes(keyBase64);
+            unsafe {
+                var keyBuf = (AcornBuf*)keyBufPtr;
+                keyBuf->data = (byte*)Marshal.AllocHGlobal(keyBytes.Length);
+                Marshal.Copy(keyBytes, 0, (IntPtr)keyBuf->data, keyBytes.Length);
+                keyBuf->len = (nuint)keyBytes.Length;
+            }
+            
+            // Allocate and return IV
+            var ivBytes = System.Text.Encoding.UTF8.GetBytes(ivBase64);
+            unsafe {
+                var ivBuf = (AcornBuf*)ivBufPtr;
+                ivBuf->data = (byte*)Marshal.AllocHGlobal(ivBytes.Length);
+                Marshal.Copy(ivBytes, 0, (IntPtr)ivBuf->data, ivBytes.Length);
+                ivBuf->len = (nuint)ivBytes.Length;
+            }
+            
+            return 0;
+        } catch (Exception ex) { Error.Set(ex); return -1; }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_encryption_export_key")]
+    public static int EncryptionExportKey(ulong encryptionHandle, IntPtr keyBufPtr)
+    {
+        try {
+            var encryption = EncryptionProviders.Get(encryptionHandle);
+            var keyBase64 = encryption.ExportKeyBase64();
+            var keyBytes = System.Text.Encoding.UTF8.GetBytes(keyBase64);
+            
+            unsafe {
+                var keyBuf = (AcornBuf*)keyBufPtr;
+                keyBuf->data = (byte*)Marshal.AllocHGlobal(keyBytes.Length);
+                Marshal.Copy(keyBytes, 0, (IntPtr)keyBuf->data, keyBytes.Length);
+                keyBuf->len = (nuint)keyBytes.Length;
+            }
+            
+            return 0;
+        } catch (Exception ex) { Error.Set(ex); return -1; }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_encryption_export_iv")]
+    public static int EncryptionExportIV(ulong encryptionHandle, IntPtr ivBufPtr)
+    {
+        try {
+            var encryption = EncryptionProviders.Get(encryptionHandle);
+            var ivBase64 = encryption.ExportIVBase64();
+            var ivBytes = System.Text.Encoding.UTF8.GetBytes(ivBase64);
+            
+            unsafe {
+                var ivBuf = (AcornBuf*)ivBufPtr;
+                ivBuf->data = (byte*)Marshal.AllocHGlobal(ivBytes.Length);
+                Marshal.Copy(ivBytes, 0, (IntPtr)ivBuf->data, ivBytes.Length);
+                ivBuf->len = (nuint)ivBytes.Length;
+            }
+            
+            return 0;
+        } catch (Exception ex) { Error.Set(ex); return -1; }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_encryption_encrypt")]
+    public static int EncryptionEncrypt(ulong encryptionHandle, IntPtr plaintextUtf8, IntPtr ciphertextBufPtr)
+    {
+        try {
+            var encryption = EncryptionProviders.Get(encryptionHandle);
+            string plaintext = Utf8.In(plaintextUtf8);
+            var ciphertext = encryption.Encrypt(plaintext);
+            var ciphertextBytes = System.Text.Encoding.UTF8.GetBytes(ciphertext);
+            
+            unsafe {
+                var ciphertextBuf = (AcornBuf*)ciphertextBufPtr;
+                ciphertextBuf->data = (byte*)Marshal.AllocHGlobal(ciphertextBytes.Length);
+                Marshal.Copy(ciphertextBytes, 0, (IntPtr)ciphertextBuf->data, ciphertextBytes.Length);
+                ciphertextBuf->len = (nuint)ciphertextBytes.Length;
+            }
+            
+            return 0;
+        } catch (Exception ex) { Error.Set(ex); return -1; }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_encryption_decrypt")]
+    public static int EncryptionDecrypt(ulong encryptionHandle, IntPtr ciphertextUtf8, IntPtr plaintextBufPtr)
+    {
+        try {
+            var encryption = EncryptionProviders.Get(encryptionHandle);
+            string ciphertext = Utf8.In(ciphertextUtf8);
+            var plaintext = encryption.Decrypt(ciphertext);
+            var plaintextBytes = System.Text.Encoding.UTF8.GetBytes(plaintext);
+            
+            unsafe {
+                var plaintextBuf = (AcornBuf*)plaintextBufPtr;
+                plaintextBuf->data = (byte*)Marshal.AllocHGlobal(plaintextBytes.Length);
+                Marshal.Copy(plaintextBytes, 0, (IntPtr)plaintextBuf->data, plaintextBytes.Length);
+                plaintextBuf->len = (nuint)plaintextBytes.Length;
+            }
+            
+            return 0;
+        } catch (Exception ex) { Error.Set(ex); return -1; }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_encryption_is_enabled")]
+    public static int EncryptionIsEnabled(ulong encryptionHandle)
+    {
+        try {
+            var encryption = EncryptionProviders.Get(encryptionHandle);
+            return encryption.IsEnabled ? 1 : 0;
+        } catch (Exception ex) { Error.Set(ex); return -1; }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_encryption_close")]
+    public static int EncryptionClose(ulong encryptionHandle)
+    {
+        try {
+            EncryptionProviders.Remove(encryptionHandle, out _);
+            return 0;
+        } catch (Exception ex) { Error.Set(ex); return -1; }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_open_tree_encrypted")]
+    public static int OpenTreeEncrypted(IntPtr uriUtf8, ulong encryptionHandle, IntPtr handlePtr)
+    {
+        try {
+            string uri = Utf8.In(uriUtf8);
+            var encryption = EncryptionProviders.Get(encryptionHandle);
+            var tree = AcornFacade.OpenJsonTreeEncrypted(uri, encryption);
+            ulong handle = Trees.Add(tree);
+            unsafe { *(ulong*)handlePtr = handle; }
+            return 0;
+        } catch (Exception ex) { 
+            unsafe { *(ulong*)handlePtr = 0; }
+            Error.Set(ex); 
+            return -1; 
+        }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_open_tree_encrypted_compressed")]
+    public static int OpenTreeEncryptedCompressed(IntPtr uriUtf8, ulong encryptionHandle, int compressionLevel, IntPtr handlePtr)
+    {
+        try {
+            string uri = Utf8.In(uriUtf8);
+            var encryption = EncryptionProviders.Get(encryptionHandle);
+            var compressionLevelEnum = compressionLevel switch {
+                0 => System.IO.Compression.CompressionLevel.Fastest,
+                1 => System.IO.Compression.CompressionLevel.Optimal,
+                2 => System.IO.Compression.CompressionLevel.SmallestSize,
+                _ => System.IO.Compression.CompressionLevel.Optimal
+            };
+            var tree = AcornFacade.OpenJsonTreeEncryptedCompressed(uri, encryption, compressionLevelEnum);
+            ulong handle = Trees.Add(tree);
+            unsafe { *(ulong*)handlePtr = handle; }
+            return 0;
+        } catch (Exception ex) { 
+            unsafe { *(ulong*)handlePtr = 0; }
+            Error.Set(ex); 
+            return -1; 
+        }
     }
 }

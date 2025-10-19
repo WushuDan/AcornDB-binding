@@ -1,4 +1,4 @@
-use acorn::{AcornTree, Error};
+use acorn::{AcornTree, AcornEncryption, Error};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
@@ -1147,6 +1147,151 @@ mod unit_tests {
         // Try to create P2P with invalid conflict direction
         let result = p2p.set_conflict_direction(999); // Invalid direction
         assert!(result.is_err());
+    }
+
+    // Encryption Tests
+    #[test]
+    fn test_password_based_encryption() {
+        let encryption = AcornEncryption::from_password("test-password", "test-salt").unwrap();
+        assert!(encryption.is_enabled().unwrap());
+        
+        let mut tree = AcornTree::open_encrypted("memory://", &encryption).unwrap();
+        
+        let test_data = TestData {
+            id: "encrypted-1".to_string(),
+            value: 123,
+            name: "Encrypted Test".to_string(),
+        };
+        
+        tree.stash("encrypted-1", &test_data).unwrap();
+        let retrieved: TestData = tree.crack("encrypted-1").unwrap();
+        assert_eq!(test_data, retrieved);
+    }
+
+    #[test]
+    fn test_key_iv_encryption() {
+        let (key, iv) = AcornEncryption::generate_key_iv().unwrap();
+        
+        let encryption = AcornEncryption::from_key_iv(&key, &iv).unwrap();
+        assert!(encryption.is_enabled().unwrap());
+        
+        let mut tree = AcornTree::open_encrypted("memory://", &encryption).unwrap();
+        
+        let test_data = TestData {
+            id: "key-iv-1".to_string(),
+            value: 456,
+            name: "Key IV Test".to_string(),
+        };
+        
+        tree.stash("key-iv-1", &test_data).unwrap();
+        let retrieved: TestData = tree.crack("key-iv-1").unwrap();
+        assert_eq!(test_data, retrieved);
+    }
+
+    #[test]
+    fn test_encryption_key_export() {
+        let encryption = AcornEncryption::from_password("export-test", "export-salt").unwrap();
+        
+        let exported_key = encryption.export_key().unwrap();
+        let exported_iv = encryption.export_iv().unwrap();
+        
+        // Create new encryption with exported key/IV
+        let new_encryption = AcornEncryption::from_key_iv(&exported_key, &exported_iv).unwrap();
+        
+        // Both should be able to encrypt/decrypt the same data
+        let plaintext = "Test encryption export";
+        let ciphertext1 = encryption.encrypt(plaintext).unwrap();
+        let ciphertext2 = new_encryption.encrypt(plaintext).unwrap();
+        
+        // Should produce different ciphertexts (due to different IVs in each encryption)
+        assert_ne!(ciphertext1, ciphertext2);
+        
+        // But both should decrypt correctly
+        let decrypted1 = encryption.decrypt(&ciphertext1).unwrap();
+        let decrypted2 = new_encryption.decrypt(&ciphertext2).unwrap();
+        
+        assert_eq!(plaintext, decrypted1);
+        assert_eq!(plaintext, decrypted2);
+    }
+
+    #[test]
+    fn test_direct_encryption_decryption() {
+        let encryption = AcornEncryption::from_password("direct-test", "direct-salt").unwrap();
+        
+        let test_strings = vec![
+            "Simple string",
+            "String with special chars: !@#$%^&*()",
+            "Unicode: 🚀🌟✨",
+            "Very long string with lots of text that should be encrypted properly and decrypted correctly without any issues",
+        ];
+        
+        for test_string in test_strings {
+            let encrypted = encryption.encrypt(test_string).unwrap();
+            let decrypted = encryption.decrypt(&encrypted).unwrap();
+            assert_eq!(test_string, decrypted);
+        }
+    }
+
+    #[test]
+    fn test_encrypted_compressed_tree() {
+        let encryption = AcornEncryption::from_password("compressed-test", "compressed-salt").unwrap();
+        
+        let mut tree = AcornTree::open_encrypted_compressed("memory://", &encryption, 1).unwrap(); // Optimal compression
+        
+        let large_data = ComplexData {
+            numbers: (1..1000).collect(),
+            text: "A".repeat(1000),
+            nested: Some(Box::new(ComplexData {
+                numbers: (1..100).collect(),
+                text: "B".repeat(100),
+                nested: None,
+            })),
+        };
+        
+        tree.stash("large-data", &large_data).unwrap();
+        let retrieved: ComplexData = tree.crack("large-data").unwrap();
+        assert_eq!(large_data, retrieved);
+    }
+
+    #[test]
+    fn test_encryption_error_handling() {
+        // Test invalid password (empty)
+        let result = AcornEncryption::from_password("", "salt");
+        assert!(result.is_err());
+        
+        // Test invalid key/IV (invalid base64)
+        let result = AcornEncryption::from_key_iv("invalid-base64!", "invalid-base64!");
+        assert!(result.is_err());
+        
+        // Test decryption with wrong encryption
+        let encryption1 = AcornEncryption::from_password("password1", "salt1").unwrap();
+        let encryption2 = AcornEncryption::from_password("password2", "salt2").unwrap();
+        
+        let plaintext = "Test data";
+        let encrypted = encryption1.encrypt(plaintext).unwrap();
+        
+        // Should fail to decrypt with different encryption
+        let result = encryption2.decrypt(&encrypted);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_encryption_with_different_compression_levels() {
+        let encryption = AcornEncryption::from_password("compression-test", "compression-salt").unwrap();
+        
+        let test_data = TestData {
+            id: "compression-test".to_string(),
+            value: 789,
+            name: "Compression Test".to_string(),
+        };
+        
+        // Test all compression levels
+        for compression_level in 0..3 {
+            let mut tree = AcornTree::open_encrypted_compressed("memory://", &encryption, compression_level).unwrap();
+            tree.stash("compression-test", &test_data).unwrap();
+            let retrieved: TestData = tree.crack("compression-test").unwrap();
+            assert_eq!(test_data, retrieved);
+        }
     }
 }
 

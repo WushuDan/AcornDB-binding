@@ -14,11 +14,241 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 pub struct AcornTree { h: acorn_tree_handle }
 
+/// Encryption provider for AcornDB
+pub struct AcornEncryption { h: acorn_encryption_handle }
+
+impl AcornEncryption {
+    /// Create an encryption provider from a password and salt using PBKDF2 key derivation
+    /// 
+    /// # Arguments
+    /// * `password` - The password to derive the encryption key from
+    /// * `salt` - The salt to use for key derivation (should be unique per database)
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornEncryption, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let encryption = AcornEncryption::from_password("my-secret-password", "my-unique-salt")?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn from_password(password: &str, salt: &str) -> Result<Self> {
+        let password_c = CString::new(password).map_err(|e| Error::Acorn(format!("Invalid password: {}", e)))?;
+        let salt_c = CString::new(salt).map_err(|e| Error::Acorn(format!("Invalid salt: {}", e)))?;
+        let mut h: acorn_encryption_handle = 0;
+        let rc = unsafe { acorn_encryption_from_password(password_c.as_ptr(), salt_c.as_ptr(), &mut h as *mut _) };
+        if rc == 0 { 
+            Ok(Self { h }) 
+        } else { 
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() })) 
+        }
+    }
+
+    /// Create an encryption provider from explicit key and IV (base64 encoded)
+    /// 
+    /// # Arguments
+    /// * `key_base64` - The encryption key encoded as base64 (must be 32 bytes)
+    /// * `iv_base64` - The initialization vector encoded as base64 (must be 16 bytes)
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornEncryption, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let encryption = AcornEncryption::from_key_iv("base64-key", "base64-iv")?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn from_key_iv(key_base64: &str, iv_base64: &str) -> Result<Self> {
+        let key_c = CString::new(key_base64).map_err(|e| Error::Acorn(format!("Invalid key: {}", e)))?;
+        let iv_c = CString::new(iv_base64).map_err(|e| Error::Acorn(format!("Invalid IV: {}", e)))?;
+        let mut h: acorn_encryption_handle = 0;
+        let rc = unsafe { acorn_encryption_from_key_iv(key_c.as_ptr(), iv_c.as_ptr(), &mut h as *mut _) };
+        if rc == 0 { 
+            Ok(Self { h }) 
+        } else { 
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() })) 
+        }
+    }
+
+    /// Generate a random key and IV for testing or new deployments
+    /// 
+    /// # Returns
+    /// A tuple of (key_base64, iv_base64) strings
+    /// 
+    /// # Warning
+    /// Store the returned key and IV securely - data cannot be decrypted without them!
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornEncryption, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let (key, iv) = AcornEncryption::generate_key_iv()?;
+    /// println!("Key: {}", key);
+    /// println!("IV: {}", iv);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn generate_key_iv() -> Result<(String, String)> {
+        let mut key_buf = acorn_buf { data: ptr::null_mut(), len: 0 };
+        let mut iv_buf = acorn_buf { data: ptr::null_mut(), len: 0 };
+        let rc = unsafe { acorn_encryption_generate_key_iv(&mut key_buf as *mut _, &mut iv_buf as *mut _) };
+        if rc != 0 {
+            return Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }));
+        }
+
+        // Convert buffers to strings
+        let key_slice = unsafe { std::slice::from_raw_parts(key_buf.data, key_buf.len) };
+        let iv_slice = unsafe { std::slice::from_raw_parts(iv_buf.data, iv_buf.len) };
+        
+        let key = String::from_utf8(key_slice.to_vec()).map_err(|e| Error::Acorn(format!("Invalid key UTF-8: {}", e)))?;
+        let iv = String::from_utf8(iv_slice.to_vec()).map_err(|e| Error::Acorn(format!("Invalid IV UTF-8: {}", e)))?;
+
+        // Free the buffers
+        unsafe { 
+            acorn_free_buf(&mut key_buf as *mut _);
+            acorn_free_buf(&mut iv_buf as *mut _);
+        }
+
+        Ok((key, iv))
+    }
+
+    /// Export the encryption key as a base64 string (for backup/storage)
+    pub fn export_key(&self) -> Result<String> {
+        let mut key_buf = acorn_buf { data: ptr::null_mut(), len: 0 };
+        let rc = unsafe { acorn_encryption_export_key(self.h, &mut key_buf as *mut _) };
+        if rc != 0 {
+            return Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }));
+        }
+
+        let key_slice = unsafe { std::slice::from_raw_parts(key_buf.data, key_buf.len) };
+        let key = String::from_utf8(key_slice.to_vec()).map_err(|e| Error::Acorn(format!("Invalid key UTF-8: {}", e)))?;
+
+        unsafe { acorn_free_buf(&mut key_buf as *mut _) };
+        Ok(key)
+    }
+
+    /// Export the initialization vector as a base64 string (for backup/storage)
+    pub fn export_iv(&self) -> Result<String> {
+        let mut iv_buf = acorn_buf { data: ptr::null_mut(), len: 0 };
+        let rc = unsafe { acorn_encryption_export_iv(self.h, &mut iv_buf as *mut _) };
+        if rc != 0 {
+            return Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }));
+        }
+
+        let iv_slice = unsafe { std::slice::from_raw_parts(iv_buf.data, iv_buf.len) };
+        let iv = String::from_utf8(iv_slice.to_vec()).map_err(|e| Error::Acorn(format!("Invalid IV UTF-8: {}", e)))?;
+
+        unsafe { acorn_free_buf(&mut iv_buf as *mut _) };
+        Ok(iv)
+    }
+
+    /// Encrypt plaintext data
+    pub fn encrypt(&self, plaintext: &str) -> Result<String> {
+        let plaintext_c = CString::new(plaintext).map_err(|e| Error::Acorn(format!("Invalid plaintext: {}", e)))?;
+        let mut ciphertext_buf = acorn_buf { data: ptr::null_mut(), len: 0 };
+        let rc = unsafe { acorn_encryption_encrypt(self.h, plaintext_c.as_ptr(), &mut ciphertext_buf as *mut _) };
+        if rc != 0 {
+            return Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }));
+        }
+
+        let ciphertext_slice = unsafe { std::slice::from_raw_parts(ciphertext_buf.data, ciphertext_buf.len) };
+        let ciphertext = String::from_utf8(ciphertext_slice.to_vec()).map_err(|e| Error::Acorn(format!("Invalid ciphertext UTF-8: {}", e)))?;
+
+        unsafe { acorn_free_buf(&mut ciphertext_buf as *mut _) };
+        Ok(ciphertext)
+    }
+
+    /// Decrypt ciphertext data
+    pub fn decrypt(&self, ciphertext: &str) -> Result<String> {
+        let ciphertext_c = CString::new(ciphertext).map_err(|e| Error::Acorn(format!("Invalid ciphertext: {}", e)))?;
+        let mut plaintext_buf = acorn_buf { data: ptr::null_mut(), len: 0 };
+        let rc = unsafe { acorn_encryption_decrypt(self.h, ciphertext_c.as_ptr(), &mut plaintext_buf as *mut _) };
+        if rc != 0 {
+            return Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }));
+        }
+
+        let plaintext_slice = unsafe { std::slice::from_raw_parts(plaintext_buf.data, plaintext_buf.len) };
+        let plaintext = String::from_utf8(plaintext_slice.to_vec()).map_err(|e| Error::Acorn(format!("Invalid plaintext UTF-8: {}", e)))?;
+
+        unsafe { acorn_free_buf(&mut plaintext_buf as *mut _) };
+        Ok(plaintext)
+    }
+
+    /// Check if encryption is enabled
+    pub fn is_enabled(&self) -> Result<bool> {
+        let rc = unsafe { acorn_encryption_is_enabled(self.h) };
+        if rc == -1 {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        } else {
+            Ok(rc == 1)
+        }
+    }
+}
+
+impl Drop for AcornEncryption {
+    fn drop(&mut self) {
+        unsafe { acorn_encryption_close(self.h); }
+    }
+}
+
 impl AcornTree {
     pub fn open(uri: &str) -> Result<Self> {
         let c = CString::new(uri).map_err(|e| Error::Acorn(format!("Invalid URI: {}", e)))?;
         let mut h: acorn_tree_handle = 0;
         let rc = unsafe { acorn_open_tree(c.as_ptr(), &mut h as *mut _) };
+        if rc == 0 { 
+            Ok(Self { h }) 
+        } else { 
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() })) 
+        }
+    }
+
+    /// Open a tree with encryption enabled
+    /// 
+    /// # Arguments
+    /// * `uri` - The storage URI (e.g., "file://./encrypted_db" or "memory://")
+    /// * `encryption` - The encryption provider to use
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornTree, AcornEncryption, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let encryption = AcornEncryption::from_password("my-password", "my-salt")?;
+    /// let tree = AcornTree::open_encrypted("file://./secure_db", &encryption)?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn open_encrypted(uri: &str, encryption: &AcornEncryption) -> Result<Self> {
+        let c = CString::new(uri).map_err(|e| Error::Acorn(format!("Invalid URI: {}", e)))?;
+        let mut h: acorn_tree_handle = 0;
+        let rc = unsafe { acorn_open_tree_encrypted(c.as_ptr(), encryption.h, &mut h as *mut _) };
+        if rc == 0 { 
+            Ok(Self { h }) 
+        } else { 
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() })) 
+        }
+    }
+
+    /// Open a tree with both encryption and compression enabled
+    /// 
+    /// # Arguments
+    /// * `uri` - The storage URI (e.g., "file://./secure_db" or "memory://")
+    /// * `encryption` - The encryption provider to use
+    /// * `compression_level` - Compression level (0=Fastest, 1=Optimal, 2=SmallestSize)
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornTree, AcornEncryption, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let encryption = AcornEncryption::from_password("my-password", "my-salt")?;
+    /// let tree = AcornTree::open_encrypted_compressed("file://./secure_db", &encryption, 1)?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn open_encrypted_compressed(uri: &str, encryption: &AcornEncryption, compression_level: i32) -> Result<Self> {
+        let c = CString::new(uri).map_err(|e| Error::Acorn(format!("Invalid URI: {}", e)))?;
+        let mut h: acorn_tree_handle = 0;
+        let rc = unsafe { acorn_open_tree_encrypted_compressed(c.as_ptr(), encryption.h, compression_level, &mut h as *mut _) };
         if rc == 0 { 
             Ok(Self { h }) 
         } else { 
