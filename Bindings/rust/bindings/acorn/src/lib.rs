@@ -830,6 +830,449 @@ impl Drop for AcornConflictJudge {
     }
 }
 
+/// Storage backend for AcornDB
+pub struct AcornStorage { h: acorn_storage_handle }
+
+/// Storage backend types available in AcornDB
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StorageType {
+    /// AWS S3 storage
+    S3,
+    /// Azure Blob Storage
+    AzureBlob,
+    /// SQLite database
+    SQLite,
+    /// PostgreSQL database
+    PostgreSQL,
+    /// MySQL database
+    MySQL,
+    /// SQL Server database
+    SQLServer,
+    /// Git repository storage
+    Git,
+}
+
+/// Storage backend information
+#[derive(Debug, Clone)]
+pub struct StorageInfo {
+    pub trunk_type: String,
+    pub supports_history: bool,
+    pub supports_sync: bool,
+    pub is_durable: bool,
+    pub supports_async: bool,
+    pub provider_name: String,
+    pub connection_info: String,
+}
+
+impl AcornStorage {
+    /// Create AWS S3 storage backend with explicit credentials
+    /// 
+    /// # Arguments
+    /// * `access_key` - AWS Access Key ID
+    /// * `secret_key` - AWS Secret Access Key
+    /// * `bucket_name` - S3 bucket name
+    /// * `region` - AWS region (default: "us-east-1")
+    /// * `prefix` - Optional prefix for all keys
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornStorage, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let storage = AcornStorage::s3("access_key", "secret_key", "my-bucket", "us-west-2", Some("prefix/"))?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn s3(access_key: &str, secret_key: &str, bucket_name: &str, region: &str, prefix: Option<&str>) -> Result<Self> {
+        let access_key_c = CString::new(access_key).map_err(|e| Error::Acorn(format!("Invalid access key: {}", e)))?;
+        let secret_key_c = CString::new(secret_key).map_err(|e| Error::Acorn(format!("Invalid secret key: {}", e)))?;
+        let bucket_name_c = CString::new(bucket_name).map_err(|e| Error::Acorn(format!("Invalid bucket name: {}", e)))?;
+        let region_c = CString::new(region).map_err(|e| Error::Acorn(format!("Invalid region: {}", e)))?;
+        let prefix_c = CString::new(prefix.unwrap_or("")).map_err(|e| Error::Acorn(format!("Invalid prefix: {}", e)))?;
+        
+        let mut h: acorn_storage_handle = 0;
+        let rc = unsafe { 
+            acorn_storage_s3(
+                access_key_c.as_ptr(), 
+                secret_key_c.as_ptr(), 
+                bucket_name_c.as_ptr(), 
+                region_c.as_ptr(), 
+                prefix_c.as_ptr(), 
+                &mut h as *mut _
+            ) 
+        };
+        if rc == 0 { 
+            Ok(Self { h }) 
+        } else { 
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() })) 
+        }
+    }
+
+    /// Create AWS S3 storage backend with default credential chain
+    /// 
+    /// # Arguments
+    /// * `bucket_name` - S3 bucket name
+    /// * `region` - AWS region (default: "us-east-1")
+    /// * `prefix` - Optional prefix for all keys
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornStorage, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let storage = AcornStorage::s3_default("my-bucket", "us-west-2", None)?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn s3_default(bucket_name: &str, region: &str, prefix: Option<&str>) -> Result<Self> {
+        let bucket_name_c = CString::new(bucket_name).map_err(|e| Error::Acorn(format!("Invalid bucket name: {}", e)))?;
+        let region_c = CString::new(region).map_err(|e| Error::Acorn(format!("Invalid region: {}", e)))?;
+        let prefix_c = CString::new(prefix.unwrap_or("")).map_err(|e| Error::Acorn(format!("Invalid prefix: {}", e)))?;
+        
+        let mut h: acorn_storage_handle = 0;
+        let rc = unsafe { 
+            acorn_storage_s3_default(
+                bucket_name_c.as_ptr(), 
+                region_c.as_ptr(), 
+                prefix_c.as_ptr(), 
+                &mut h as *mut _
+            ) 
+        };
+        if rc == 0 { 
+            Ok(Self { h }) 
+        } else { 
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() })) 
+        }
+    }
+
+    /// Create S3-compatible storage backend (MinIO, DigitalOcean Spaces, etc.)
+    /// 
+    /// # Arguments
+    /// * `access_key` - Access key
+    /// * `secret_key` - Secret key
+    /// * `bucket_name` - Bucket name
+    /// * `service_url` - Service endpoint URL
+    /// * `prefix` - Optional prefix for all keys
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornStorage, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let storage = AcornStorage::s3_compatible("access_key", "secret_key", "my-bucket", "https://nyc3.digitaloceanspaces.com", None)?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn s3_compatible(access_key: &str, secret_key: &str, bucket_name: &str, service_url: &str, prefix: Option<&str>) -> Result<Self> {
+        let access_key_c = CString::new(access_key).map_err(|e| Error::Acorn(format!("Invalid access key: {}", e)))?;
+        let secret_key_c = CString::new(secret_key).map_err(|e| Error::Acorn(format!("Invalid secret key: {}", e)))?;
+        let bucket_name_c = CString::new(bucket_name).map_err(|e| Error::Acorn(format!("Invalid bucket name: {}", e)))?;
+        let service_url_c = CString::new(service_url).map_err(|e| Error::Acorn(format!("Invalid service URL: {}", e)))?;
+        let prefix_c = CString::new(prefix.unwrap_or("")).map_err(|e| Error::Acorn(format!("Invalid prefix: {}", e)))?;
+        
+        let mut h: acorn_storage_handle = 0;
+        let rc = unsafe { 
+            acorn_storage_s3_compatible(
+                access_key_c.as_ptr(), 
+                secret_key_c.as_ptr(), 
+                bucket_name_c.as_ptr(), 
+                service_url_c.as_ptr(), 
+                prefix_c.as_ptr(), 
+                &mut h as *mut _
+            ) 
+        };
+        if rc == 0 { 
+            Ok(Self { h }) 
+        } else { 
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() })) 
+        }
+    }
+
+    /// Create Azure Blob Storage backend
+    /// 
+    /// # Arguments
+    /// * `connection_string` - Azure Storage connection string
+    /// * `container_name` - Blob container name
+    /// * `prefix` - Optional prefix for all keys
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornStorage, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let storage = AcornStorage::azure_blob("DefaultEndpointsProtocol=https;...", "my-container", None)?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn azure_blob(connection_string: &str, container_name: &str, prefix: Option<&str>) -> Result<Self> {
+        let connection_string_c = CString::new(connection_string).map_err(|e| Error::Acorn(format!("Invalid connection string: {}", e)))?;
+        let container_name_c = CString::new(container_name).map_err(|e| Error::Acorn(format!("Invalid container name: {}", e)))?;
+        let prefix_c = CString::new(prefix.unwrap_or("")).map_err(|e| Error::Acorn(format!("Invalid prefix: {}", e)))?;
+        
+        let mut h: acorn_storage_handle = 0;
+        let rc = unsafe { 
+            acorn_storage_azure_blob(
+                connection_string_c.as_ptr(), 
+                container_name_c.as_ptr(), 
+                prefix_c.as_ptr(), 
+                &mut h as *mut _
+            ) 
+        };
+        if rc == 0 { 
+            Ok(Self { h }) 
+        } else { 
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() })) 
+        }
+    }
+
+    /// Create SQLite storage backend
+    /// 
+    /// # Arguments
+    /// * `database_path` - Path to SQLite database file
+    /// * `table_name` - Optional custom table name
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornStorage, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let storage = AcornStorage::sqlite("./data/acorndb.db", Some("custom_table"))?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn sqlite(database_path: &str, table_name: Option<&str>) -> Result<Self> {
+        let database_path_c = CString::new(database_path).map_err(|e| Error::Acorn(format!("Invalid database path: {}", e)))?;
+        let table_name_c = CString::new(table_name.unwrap_or("")).map_err(|e| Error::Acorn(format!("Invalid table name: {}", e)))?;
+        
+        let mut h: acorn_storage_handle = 0;
+        let rc = unsafe { 
+            acorn_storage_sqlite(
+                database_path_c.as_ptr(), 
+                table_name_c.as_ptr(), 
+                &mut h as *mut _
+            ) 
+        };
+        if rc == 0 { 
+            Ok(Self { h }) 
+        } else { 
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() })) 
+        }
+    }
+
+    /// Create PostgreSQL storage backend
+    /// 
+    /// # Arguments
+    /// * `connection_string` - PostgreSQL connection string
+    /// * `table_name` - Optional custom table name
+    /// * `schema` - Database schema (default: "public")
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornStorage, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let storage = AcornStorage::postgresql("postgresql://user:pass@localhost/db", None, "public")?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn postgresql(connection_string: &str, table_name: Option<&str>, schema: &str) -> Result<Self> {
+        let connection_string_c = CString::new(connection_string).map_err(|e| Error::Acorn(format!("Invalid connection string: {}", e)))?;
+        let table_name_c = CString::new(table_name.unwrap_or("")).map_err(|e| Error::Acorn(format!("Invalid table name: {}", e)))?;
+        let schema_c = CString::new(schema).map_err(|e| Error::Acorn(format!("Invalid schema: {}", e)))?;
+        
+        let mut h: acorn_storage_handle = 0;
+        let rc = unsafe { 
+            acorn_storage_postgresql(
+                connection_string_c.as_ptr(), 
+                table_name_c.as_ptr(), 
+                schema_c.as_ptr(), 
+                &mut h as *mut _
+            ) 
+        };
+        if rc == 0 { 
+            Ok(Self { h }) 
+        } else { 
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() })) 
+        }
+    }
+
+    /// Create MySQL storage backend
+    /// 
+    /// # Arguments
+    /// * `connection_string` - MySQL connection string
+    /// * `table_name` - Optional custom table name
+    /// * `database` - Optional database name
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornStorage, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let storage = AcornStorage::mysql("Server=localhost;Database=acorndb;Uid=user;Pwd=pass;", None, None)?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn mysql(connection_string: &str, table_name: Option<&str>, database: Option<&str>) -> Result<Self> {
+        let connection_string_c = CString::new(connection_string).map_err(|e| Error::Acorn(format!("Invalid connection string: {}", e)))?;
+        let table_name_c = CString::new(table_name.unwrap_or("")).map_err(|e| Error::Acorn(format!("Invalid table name: {}", e)))?;
+        let database_c = CString::new(database.unwrap_or("")).map_err(|e| Error::Acorn(format!("Invalid database: {}", e)))?;
+        
+        let mut h: acorn_storage_handle = 0;
+        let rc = unsafe { 
+            acorn_storage_mysql(
+                connection_string_c.as_ptr(), 
+                table_name_c.as_ptr(), 
+                database_c.as_ptr(), 
+                &mut h as *mut _
+            ) 
+        };
+        if rc == 0 { 
+            Ok(Self { h }) 
+        } else { 
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() })) 
+        }
+    }
+
+    /// Create SQL Server storage backend
+    /// 
+    /// # Arguments
+    /// * `connection_string` - SQL Server connection string
+    /// * `table_name` - Optional custom table name
+    /// * `schema` - Database schema (default: "dbo")
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornStorage, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let storage = AcornStorage::sqlserver("Server=localhost;Database=acorndb;Integrated Security=true;", None, "dbo")?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn sqlserver(connection_string: &str, table_name: Option<&str>, schema: &str) -> Result<Self> {
+        let connection_string_c = CString::new(connection_string).map_err(|e| Error::Acorn(format!("Invalid connection string: {}", e)))?;
+        let table_name_c = CString::new(table_name.unwrap_or("")).map_err(|e| Error::Acorn(format!("Invalid table name: {}", e)))?;
+        let schema_c = CString::new(schema).map_err(|e| Error::Acorn(format!("Invalid schema: {}", e)))?;
+        
+        let mut h: acorn_storage_handle = 0;
+        let rc = unsafe { 
+            acorn_storage_sqlserver(
+                connection_string_c.as_ptr(), 
+                table_name_c.as_ptr(), 
+                schema_c.as_ptr(), 
+                &mut h as *mut _
+            ) 
+        };
+        if rc == 0 { 
+            Ok(Self { h }) 
+        } else { 
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() })) 
+        }
+    }
+
+    /// Create Git storage backend
+    /// 
+    /// # Arguments
+    /// * `repo_path` - Path to Git repository
+    /// * `author_name` - Git author name
+    /// * `author_email` - Git author email
+    /// * `auto_push` - Automatically push to remote after each commit
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornStorage, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let storage = AcornStorage::git("./my-repo", "AcornDB", "acorn@acorndb.dev", false)?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn git(repo_path: &str, author_name: &str, author_email: &str, auto_push: bool) -> Result<Self> {
+        let repo_path_c = CString::new(repo_path).map_err(|e| Error::Acorn(format!("Invalid repo path: {}", e)))?;
+        let author_name_c = CString::new(author_name).map_err(|e| Error::Acorn(format!("Invalid author name: {}", e)))?;
+        let author_email_c = CString::new(author_email).map_err(|e| Error::Acorn(format!("Invalid author email: {}", e)))?;
+        
+        let mut h: acorn_storage_handle = 0;
+        let rc = unsafe { 
+            acorn_storage_git(
+                repo_path_c.as_ptr(), 
+                author_name_c.as_ptr(), 
+                author_email_c.as_ptr(), 
+                if auto_push { 1 } else { 0 }, 
+                &mut h as *mut _
+            ) 
+        };
+        if rc == 0 { 
+            Ok(Self { h }) 
+        } else { 
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() })) 
+        }
+    }
+
+    /// Get storage backend information
+    /// 
+    /// # Returns
+    /// * `Ok(StorageInfo)` - Storage backend information
+    /// * `Err(Error)` - If the operation fails
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornStorage, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let storage = AcornStorage::sqlite("./test.db", None)?;
+    /// let info = storage.get_info()?;
+    /// println!("Provider: {}", info.provider_name);
+    /// println!("Durable: {}", info.is_durable);
+    /// println!("Supports History: {}", info.supports_history);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn get_info(&self) -> Result<StorageInfo> {
+        let mut buf = acorn_buf { data: ptr::null_mut(), len: 0 };
+        let rc = unsafe { acorn_storage_get_info(self.h, &mut buf as *mut _) };
+        if rc == 0 {
+            let result = unsafe { 
+                std::slice::from_raw_parts(buf.data, buf.len as usize) 
+            };
+            let result_str = String::from_utf8_lossy(result).to_string();
+            unsafe { acorn_free_buf(&mut buf); }
+            
+            // Parse JSON response
+            let info: StorageInfo = serde_json::from_str(&result_str)
+                .map_err(|e| Error::Acorn(format!("Failed to parse storage info: {}", e)))?;
+            Ok(info)
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+
+    /// Test storage backend connection
+    /// 
+    /// # Returns
+    /// * `Ok(bool)` - True if connection is successful
+    /// * `Err(Error)` - If the operation fails
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornStorage, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let storage = AcornStorage::sqlite("./test.db", None)?;
+    /// let is_connected = storage.test_connection()?;
+    /// if is_connected {
+    ///     println!("Storage connection successful!");
+    /// } else {
+    ///     println!("Storage connection failed!");
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn test_connection(&self) -> Result<bool> {
+        let rc = unsafe { acorn_storage_test_connection(self.h) };
+        if rc >= 0 {
+            Ok(rc == 1)
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+}
+
+impl Drop for AcornStorage {
+    fn drop(&mut self) {
+        unsafe { acorn_storage_close(self.h); }
+    }
+}
+
 impl AcornTree {
     pub fn open(uri: &str) -> Result<Self> {
         let c = CString::new(uri).map_err(|e| Error::Acorn(format!("Invalid URI: {}", e)))?;
@@ -999,6 +1442,41 @@ impl AcornTree {
         let c = CString::new(uri).map_err(|e| Error::Acorn(format!("Invalid URI: {}", e)))?;
         let mut h: acorn_tree_handle = 0;
         let rc = unsafe { acorn_open_tree_with_conflict_judge(c.as_ptr(), judge.h, &mut h as *mut _) };
+        if rc == 0 { 
+            Ok(Self { h }) 
+        } else { 
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() })) 
+        }
+    }
+
+    /// Open a tree with a custom storage backend
+    /// 
+    /// # Arguments
+    /// * `storage` - The storage backend to use
+    /// 
+    /// # Returns
+    /// * `Ok(AcornTree)` - The opened tree
+    /// * `Err(Error)` - If opening fails
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornTree, AcornStorage, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let storage = AcornStorage::sqlite("./test.db", None)?;
+    /// let mut tree = AcornTree::open_with_storage(&storage)?;
+    /// 
+    /// // Store some data
+    /// tree.stash("key1", &"Hello, storage backend!")?;
+    /// 
+    /// // Retrieve data
+    /// let value: String = tree.crack("key1")?;
+    /// assert_eq!(value, "Hello, storage backend!");
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn open_with_storage(storage: &AcornStorage) -> Result<Self> {
+        let mut h: acorn_tree_handle = 0;
+        let rc = unsafe { acorn_open_tree_with_storage(storage.h, &mut h as *mut _) };
         if rc == 0 { 
             Ok(Self { h }) 
         } else { 

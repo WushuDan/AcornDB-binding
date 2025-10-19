@@ -142,6 +142,9 @@ typedef uint64_t acorn_cache_handle;
 // Conflict resolution support
 typedef uint64_t acorn_conflict_judge_handle;
 
+// Storage backend support
+typedef uint64_t acorn_storage_handle;
+
 // Create encryption provider from password
 ACORN_API int acorn_encryption_from_password(const char* password, const char* salt, acorn_encryption_handle* out_encryption);
 
@@ -227,6 +230,27 @@ ACORN_API int acorn_conflict_judge_close(acorn_conflict_judge_handle judge);
 
 // Open tree with conflict judge
 ACORN_API int acorn_open_tree_with_conflict_judge(const char* storage_uri, acorn_conflict_judge_handle judge, acorn_tree_handle* out_tree);
+
+// Storage backend creation
+ACORN_API int acorn_storage_s3(const char* access_key, const char* secret_key, const char* bucket_name, const char* region, const char* prefix, acorn_storage_handle* out_storage);
+ACORN_API int acorn_storage_s3_default(const char* bucket_name, const char* region, const char* prefix, acorn_storage_handle* out_storage);
+ACORN_API int acorn_storage_s3_compatible(const char* access_key, const char* secret_key, const char* bucket_name, const char* service_url, const char* prefix, acorn_storage_handle* out_storage);
+ACORN_API int acorn_storage_azure_blob(const char* connection_string, const char* container_name, const char* prefix, acorn_storage_handle* out_storage);
+ACORN_API int acorn_storage_sqlite(const char* database_path, const char* table_name, acorn_storage_handle* out_storage);
+ACORN_API int acorn_storage_postgresql(const char* connection_string, const char* table_name, const char* schema, acorn_storage_handle* out_storage);
+ACORN_API int acorn_storage_mysql(const char* connection_string, const char* table_name, const char* database, acorn_storage_handle* out_storage);
+ACORN_API int acorn_storage_sqlserver(const char* connection_string, const char* table_name, const char* schema, acorn_storage_handle* out_storage);
+ACORN_API int acorn_storage_git(const char* repo_path, const char* author_name, const char* author_email, int auto_push, acorn_storage_handle* out_storage);
+
+// Storage backend operations
+ACORN_API int acorn_storage_get_info(acorn_storage_handle storage, acorn_buf* out_info);
+ACORN_API int acorn_storage_test_connection(acorn_storage_handle storage);
+
+// Close storage handle
+ACORN_API int acorn_storage_close(acorn_storage_handle storage);
+
+// Open tree with storage backend
+ACORN_API int acorn_open_tree_with_storage(acorn_storage_handle storage, acorn_tree_handle* out_tree);
 
 // Memory management for buffers allocated by shim
 ACORN_API void acorn_free_buf(acorn_buf* buf);

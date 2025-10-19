@@ -1195,4 +1195,225 @@ internal static class AcornFacade
             throw new InvalidOperationException($"Failed to open encrypted compressed tree with URI '{uri}': {ex.Message}", ex);
         }
     }
+
+    // Factory methods for Storage Backends
+    public static JsonStorageBackend CreateS3Storage(string accessKey, string secretKey, string bucketName, string region = "us-east-1", string? prefix = null)
+    {
+        try
+        {
+            var s3Provider = new AwsS3Provider(accessKey, secretKey, bucketName, region);
+            var cloudTrunk = new CloudTrunk<object>(s3Provider, prefix);
+            return new JsonStorageBackend(cloudTrunk);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException($"Failed to create S3 storage: {ex.Message}", ex);
+        }
+    }
+
+    public static JsonStorageBackend CreateS3StorageDefault(string bucketName, string region = "us-east-1", string? prefix = null)
+    {
+        try
+        {
+            var s3Provider = new AwsS3Provider(bucketName, region);
+            var cloudTrunk = new CloudTrunk<object>(s3Provider, prefix);
+            return new JsonStorageBackend(cloudTrunk);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException($"Failed to create S3 storage with default credentials: {ex.Message}", ex);
+        }
+    }
+
+    public static JsonStorageBackend CreateS3CompatibleStorage(string accessKey, string secretKey, string bucketName, string serviceUrl, string? prefix = null)
+    {
+        try
+        {
+            var s3Provider = new AwsS3Provider(accessKey, secretKey, bucketName, new Uri(serviceUrl));
+            var cloudTrunk = new CloudTrunk<object>(s3Provider, prefix);
+            return new JsonStorageBackend(cloudTrunk);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException($"Failed to create S3-compatible storage: {ex.Message}", ex);
+        }
+    }
+
+    public static JsonStorageBackend CreateAzureBlobStorage(string connectionString, string containerName, string? prefix = null)
+    {
+        try
+        {
+            var azureProvider = new AzureBlobProvider(connectionString, containerName);
+            azureProvider.EnsureContainerExistsAsync().GetAwaiter().GetResult();
+            var cloudTrunk = new CloudTrunk<object>(azureProvider, prefix);
+            return new JsonStorageBackend(cloudTrunk);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException($"Failed to create Azure Blob storage: {ex.Message}", ex);
+        }
+    }
+
+    public static JsonStorageBackend CreateSqliteStorage(string databasePath, string? tableName = null)
+    {
+        try
+        {
+            var sqliteTrunk = new SqliteTrunk<object>(databasePath, tableName);
+            return new JsonStorageBackend(sqliteTrunk);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException($"Failed to create SQLite storage: {ex.Message}", ex);
+        }
+    }
+
+    public static JsonStorageBackend CreatePostgreSQLStorage(string connectionString, string? tableName = null, string schema = "public")
+    {
+        try
+        {
+            var postgresTrunk = new PostgreSqlTrunk<object>(connectionString, tableName, schema);
+            return new JsonStorageBackend(postgresTrunk);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException($"Failed to create PostgreSQL storage: {ex.Message}", ex);
+        }
+    }
+
+    public static JsonStorageBackend CreateMySQLStorage(string connectionString, string? tableName = null, string? database = null)
+    {
+        try
+        {
+            var mysqlTrunk = new MySqlTrunk<object>(connectionString, tableName, database);
+            return new JsonStorageBackend(mysqlTrunk);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException($"Failed to create MySQL storage: {ex.Message}", ex);
+        }
+    }
+
+    public static JsonStorageBackend CreateSQLServerStorage(string connectionString, string? tableName = null, string schema = "dbo")
+    {
+        try
+        {
+            var sqlServerTrunk = new SqlServerTrunk<object>(connectionString, tableName, schema);
+            return new JsonStorageBackend(sqlServerTrunk);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException($"Failed to create SQL Server storage: {ex.Message}", ex);
+        }
+    }
+
+    public static JsonStorageBackend CreateGitStorage(string repoPath, string authorName = "AcornDB", string authorEmail = "acorn@acorndb.dev", bool autoPush = false)
+    {
+        try
+        {
+            var gitTrunk = new GitHubTrunk<object>(repoPath, authorName, authorEmail, autoPush);
+            return new JsonStorageBackend(gitTrunk);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException($"Failed to create Git storage: {ex.Message}", ex);
+        }
+    }
+
+    public static JsonTree OpenJsonTreeWithStorage(JsonStorageBackend storage)
+    {
+        try
+        {
+            var tree = new Tree<object>(storage._trunk);
+            return new JsonTree(tree);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException($"Failed to open tree with storage backend: {ex.Message}", ex);
+        }
+    }
+
+    internal sealed class JsonStorageBackend
+    {
+        private readonly ITrunk<object> _trunk;
+
+        public JsonStorageBackend(ITrunk<object> trunk)
+        {
+            _trunk = trunk ?? throw new ArgumentNullException(nameof(trunk));
+        }
+
+        public StorageInfo GetInfo()
+        {
+            try
+            {
+                var capabilities = _trunk.GetCapabilities();
+                return new StorageInfo
+                {
+                    TrunkType = capabilities.TrunkType,
+                    SupportsHistory = capabilities.SupportsHistory,
+                    SupportsSync = capabilities.SupportsSync,
+                    IsDurable = capabilities.IsDurable,
+                    SupportsAsync = capabilities.SupportsAsync,
+                    ProviderName = GetProviderName(),
+                    ConnectionInfo = GetConnectionInfo()
+                };
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"Failed to get storage info: {ex.Message}", ex);
+            }
+        }
+
+        public bool TestConnection()
+        {
+            try
+            {
+                // Try to load all items to test connection
+                var items = _trunk.LoadAll();
+                return true;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }
+
+        private string GetProviderName()
+        {
+            return _trunk switch
+            {
+                CloudTrunk<object> => "Cloud",
+                SqliteTrunk<object> => "SQLite",
+                PostgreSqlTrunk<object> => "PostgreSQL",
+                MySqlTrunk<object> => "MySQL",
+                SqlServerTrunk<object> => "SQL Server",
+                GitHubTrunk<object> => "Git",
+                _ => "Unknown"
+            };
+        }
+
+        private string GetConnectionInfo()
+        {
+            return _trunk switch
+            {
+                CloudTrunk<object> cloud => $"Cloud Storage",
+                SqliteTrunk<object> sqlite => $"SQLite Database",
+                PostgreSqlTrunk<object> postgres => $"PostgreSQL Database",
+                MySqlTrunk<object> mysql => $"MySQL Database",
+                SqlServerTrunk<object> sqlserver => $"SQL Server Database",
+                GitHubTrunk<object> git => $"Git Repository",
+                _ => "Unknown Storage"
+            };
+        }
+    }
+
+    internal sealed class StorageInfo
+    {
+        public string TrunkType { get; set; } = "";
+        public bool SupportsHistory { get; set; }
+        public bool SupportsSync { get; set; }
+        public bool IsDurable { get; set; }
+        public bool SupportsAsync { get; set; }
+        public string ProviderName { get; set; } = "";
+        public string ConnectionInfo { get; set; } = "";
+    }
 }

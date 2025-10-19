@@ -1,4 +1,4 @@
-use acorn::{AcornTree, AcornEncryption, AcornCompression, AcornCache, AcornConflictJudge, CompressionLevel, Error};
+use acorn::{AcornTree, AcornEncryption, AcornCompression, AcornCache, AcornConflictJudge, AcornStorage, CompressionLevel, Error};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
@@ -1265,6 +1265,174 @@ mod integration_tests {
         assert_eq!(winner["user"]["email"], "incoming@example.com");
         assert_eq!(winner["user"]["preferences"]["theme"], "light");
         assert_eq!(winner["timestamp"], "2023-01-01T11:00:00Z");
+    }
+
+    #[test]
+    fn test_sqlite_storage_backend() {
+        let storage = AcornStorage::sqlite("./test_sqlite.db", Some("test_table")).expect("Failed to create SQLite storage");
+        
+        // Test storage info
+        let info = storage.get_info().expect("Failed to get storage info");
+        assert_eq!(info.provider_name, "SQLite");
+        assert!(info.is_durable);
+        assert!(info.supports_sync);
+        assert!(!info.supports_history);
+        assert!(!info.supports_async);
+        
+        // Test connection
+        let is_connected = storage.test_connection().expect("Failed to test connection");
+        assert!(is_connected);
+        
+        // Test with tree
+        let mut tree = AcornTree::open_with_storage(&storage).expect("Failed to open tree with SQLite storage");
+        
+        let test_data = TestData {
+            id: "sqlite-test".to_string(),
+            value: 42,
+            name: "SQLite Test Item".to_string(),
+        };
+        
+        tree.stash("sqlite-test", &test_data).expect("Failed to stash in SQLite storage");
+        
+        let retrieved: TestData = tree.crack("sqlite-test").expect("Failed to crack from SQLite storage");
+        assert_eq!(test_data, retrieved);
+        
+        // Store multiple items
+        for i in 1..=3 {
+            let item = TestData {
+                id: format!("sqlite-item-{}", i),
+                value: i * 10,
+                name: format!("SQLite Item {}", i),
+            };
+            tree.stash(&format!("sqlite-item-{}", i), &item).expect("Failed to stash SQLite item");
+        }
+        
+        let items = tree.list().expect("Failed to list SQLite items");
+        assert_eq!(items.len(), 4); // 1 original + 3 new items
+    }
+
+    #[test]
+    fn test_storage_backend_info() {
+        let storage = AcornStorage::sqlite("./test_info.db", None).expect("Failed to create SQLite storage");
+        
+        let info = storage.get_info().expect("Failed to get storage info");
+        
+        // Verify SQLite-specific properties
+        assert_eq!(info.provider_name, "SQLite");
+        assert_eq!(info.trunk_type, "SQLite");
+        assert!(info.is_durable);
+        assert!(info.supports_sync);
+        assert!(!info.supports_history);
+        assert!(!info.supports_async);
+        assert!(!info.connection_info.is_empty());
+    }
+
+    #[test]
+    fn test_storage_backend_connection_test() {
+        let storage = AcornStorage::sqlite("./test_connection.db", None).expect("Failed to create SQLite storage");
+        
+        let is_connected = storage.test_connection().expect("Failed to test connection");
+        assert!(is_connected);
+    }
+
+    #[test]
+    fn test_storage_backend_with_tree() {
+        let storage = AcornStorage::sqlite("./test_tree.db", Some("custom_table")).expect("Failed to create SQLite storage");
+        let mut tree = AcornTree::open_with_storage(&storage).expect("Failed to open tree with storage");
+        
+        // Store test data
+        let test_data = TestData {
+            id: "storage-test".to_string(),
+            value: 123,
+            name: "Storage Test Item".to_string(),
+        };
+        
+        tree.stash("storage-test", &test_data).expect("Failed to stash in storage backend");
+        
+        // Retrieve test data
+        let retrieved: TestData = tree.crack("storage-test").expect("Failed to crack from storage backend");
+        assert_eq!(test_data, retrieved);
+        
+        // Store multiple items
+        for i in 1..=5 {
+            let item = TestData {
+                id: format!("storage-item-{}", i),
+                value: i * 20,
+                name: format!("Storage Item {}", i),
+            };
+            tree.stash(&format!("storage-item-{}", i), &item).expect("Failed to stash storage item");
+        }
+        
+        // List all items
+        let items = tree.list().expect("Failed to list items");
+        assert_eq!(items.len(), 6); // 1 original + 5 new items
+    }
+
+    #[test]
+    fn test_storage_backend_error_handling() {
+        // Test invalid database path
+        let result = AcornStorage::sqlite("/invalid/path/that/does/not/exist.db", None);
+        assert!(result.is_err());
+        
+        // Test invalid table name
+        let result = AcornStorage::sqlite("./test.db", Some("invalid-table-name!"));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_storage_backend_large_dataset() {
+        let storage = AcornStorage::sqlite("./test_large.db", None).expect("Failed to create SQLite storage");
+        let mut tree = AcornTree::open_with_storage(&storage).expect("Failed to open tree with storage");
+        
+        // Store a larger dataset
+        let large_dataset: Vec<TestData> = (1..=100)
+            .map(|i| TestData {
+                id: format!("large-item-{}", i),
+                value: i,
+                name: format!("Large Item {}", i),
+            })
+            .collect();
+        
+        for item in &large_dataset {
+            tree.stash(&item.id, item).expect("Failed to stash large item");
+        }
+        
+        // Verify all items can be retrieved
+        for item in &large_dataset {
+            let retrieved: TestData = tree.crack(&item.id).expect("Failed to retrieve large item");
+            assert_eq!(item, &retrieved);
+        }
+        
+        // Check total count
+        let items = tree.list().expect("Failed to list large dataset");
+        assert_eq!(items.len(), 100);
+    }
+
+    #[test]
+    fn test_storage_backend_persistence() {
+        let storage = AcornStorage::sqlite("./test_persistence.db", None).expect("Failed to create SQLite storage");
+        let mut tree = AcornTree::open_with_storage(&storage).expect("Failed to open tree with storage");
+        
+        // Store some data
+        let persistent_data = TestData {
+            id: "persistent-test".to_string(),
+            value: 999,
+            name: "Persistent Test Item".to_string(),
+        };
+        
+        tree.stash("persistent-test", &persistent_data).expect("Failed to stash persistent data");
+        
+        // Drop the tree and storage to simulate restart
+        drop(tree);
+        drop(storage);
+        
+        // Recreate storage and tree
+        let new_storage = AcornStorage::sqlite("./test_persistence.db", None).expect("Failed to recreate SQLite storage");
+        let new_tree = AcornTree::open_with_storage(&new_storage).expect("Failed to reopen tree with storage");
+        
+        // Verify data persisted
+        let retrieved: TestData = new_tree.crack("persistent-test").expect("Failed to retrieve persistent data");
+        assert_eq!(persistent_data, retrieved);
     }
 }
 

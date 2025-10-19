@@ -14,6 +14,7 @@ public static class NativeExports
     static readonly HandleTable<AcornFacade.JsonCompressionProvider> CompressionProviders = new();
     static readonly HandleTable<AcornFacade.JsonCacheStrategy> CacheProviders = new();
     static readonly HandleTable<AcornFacade.JsonConflictJudge> ConflictJudges = new();
+    static readonly HandleTable<AcornFacade.JsonStorageBackend> StorageProviders = new();
 
     [UnmanagedCallersOnly(EntryPoint = "acorn_open_tree")]
     public static int OpenTree(IntPtr uriUtf8, IntPtr handlePtr)
@@ -1285,6 +1286,244 @@ public static class NativeExports
             string uri = Utf8.In(uriUtf8);
             var judge = ConflictJudges.Get(judgeHandle);
             var tree = AcornFacade.OpenJsonTreeWithConflictJudge(uri, judge);
+            ulong handle = Trees.Add(tree);
+            unsafe { *(ulong*)handlePtr = handle; }
+            return 0;
+        } catch (Exception ex) { 
+            unsafe { *(ulong*)handlePtr = 0; }
+            Error.Set(ex); 
+            return -1; 
+        }
+    }
+
+    // Storage Backend FFI functions
+    [UnmanagedCallersOnly(EntryPoint = "acorn_storage_s3")]
+    public static int StorageS3(IntPtr accessKeyUtf8, IntPtr secretKeyUtf8, IntPtr bucketNameUtf8, IntPtr regionUtf8, IntPtr prefixUtf8, IntPtr handlePtr)
+    {
+        try {
+            string accessKey = Utf8.In(accessKeyUtf8);
+            string secretKey = Utf8.In(secretKeyUtf8);
+            string bucketName = Utf8.In(bucketNameUtf8);
+            string region = Utf8.In(regionUtf8);
+            string? prefix = Utf8.In(prefixUtf8);
+            if (string.IsNullOrEmpty(prefix)) prefix = null;
+            
+            var storage = AcornFacade.CreateS3Storage(accessKey, secretKey, bucketName, region, prefix);
+            ulong handle = StorageProviders.Add(storage);
+            unsafe { *(ulong*)handlePtr = handle; }
+            return 0;
+        } catch (Exception ex) { 
+            unsafe { *(ulong*)handlePtr = 0; }
+            Error.Set(ex); 
+            return -1; 
+        }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_storage_s3_default")]
+    public static int StorageS3Default(IntPtr bucketNameUtf8, IntPtr regionUtf8, IntPtr prefixUtf8, IntPtr handlePtr)
+    {
+        try {
+            string bucketName = Utf8.In(bucketNameUtf8);
+            string region = Utf8.In(regionUtf8);
+            string? prefix = Utf8.In(prefixUtf8);
+            if (string.IsNullOrEmpty(prefix)) prefix = null;
+            
+            var storage = AcornFacade.CreateS3StorageDefault(bucketName, region, prefix);
+            ulong handle = StorageProviders.Add(storage);
+            unsafe { *(ulong*)handlePtr = handle; }
+            return 0;
+        } catch (Exception ex) { 
+            unsafe { *(ulong*)handlePtr = 0; }
+            Error.Set(ex); 
+            return -1; 
+        }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_storage_s3_compatible")]
+    public static int StorageS3Compatible(IntPtr accessKeyUtf8, IntPtr secretKeyUtf8, IntPtr bucketNameUtf8, IntPtr serviceUrlUtf8, IntPtr prefixUtf8, IntPtr handlePtr)
+    {
+        try {
+            string accessKey = Utf8.In(accessKeyUtf8);
+            string secretKey = Utf8.In(secretKeyUtf8);
+            string bucketName = Utf8.In(bucketNameUtf8);
+            string serviceUrl = Utf8.In(serviceUrlUtf8);
+            string? prefix = Utf8.In(prefixUtf8);
+            if (string.IsNullOrEmpty(prefix)) prefix = null;
+            
+            var storage = AcornFacade.CreateS3CompatibleStorage(accessKey, secretKey, bucketName, serviceUrl, prefix);
+            ulong handle = StorageProviders.Add(storage);
+            unsafe { *(ulong*)handlePtr = handle; }
+            return 0;
+        } catch (Exception ex) { 
+            unsafe { *(ulong*)handlePtr = 0; }
+            Error.Set(ex); 
+            return -1; 
+        }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_storage_azure_blob")]
+    public static int StorageAzureBlob(IntPtr connectionStringUtf8, IntPtr containerNameUtf8, IntPtr prefixUtf8, IntPtr handlePtr)
+    {
+        try {
+            string connectionString = Utf8.In(connectionStringUtf8);
+            string containerName = Utf8.In(containerNameUtf8);
+            string? prefix = Utf8.In(prefixUtf8);
+            if (string.IsNullOrEmpty(prefix)) prefix = null;
+            
+            var storage = AcornFacade.CreateAzureBlobStorage(connectionString, containerName, prefix);
+            ulong handle = StorageProviders.Add(storage);
+            unsafe { *(ulong*)handlePtr = handle; }
+            return 0;
+        } catch (Exception ex) { 
+            unsafe { *(ulong*)handlePtr = 0; }
+            Error.Set(ex); 
+            return -1; 
+        }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_storage_sqlite")]
+    public static int StorageSqlite(IntPtr databasePathUtf8, IntPtr tableNameUtf8, IntPtr handlePtr)
+    {
+        try {
+            string databasePath = Utf8.In(databasePathUtf8);
+            string? tableName = Utf8.In(tableNameUtf8);
+            if (string.IsNullOrEmpty(tableName)) tableName = null;
+            
+            var storage = AcornFacade.CreateSqliteStorage(databasePath, tableName);
+            ulong handle = StorageProviders.Add(storage);
+            unsafe { *(ulong*)handlePtr = handle; }
+            return 0;
+        } catch (Exception ex) { 
+            unsafe { *(ulong*)handlePtr = 0; }
+            Error.Set(ex); 
+            return -1; 
+        }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_storage_postgresql")]
+    public static int StoragePostgreSQL(IntPtr connectionStringUtf8, IntPtr tableNameUtf8, IntPtr schemaUtf8, IntPtr handlePtr)
+    {
+        try {
+            string connectionString = Utf8.In(connectionStringUtf8);
+            string? tableName = Utf8.In(tableNameUtf8);
+            if (string.IsNullOrEmpty(tableName)) tableName = null;
+            string schema = Utf8.In(schemaUtf8);
+            
+            var storage = AcornFacade.CreatePostgreSQLStorage(connectionString, tableName, schema);
+            ulong handle = StorageProviders.Add(storage);
+            unsafe { *(ulong*)handlePtr = handle; }
+            return 0;
+        } catch (Exception ex) { 
+            unsafe { *(ulong*)handlePtr = 0; }
+            Error.Set(ex); 
+            return -1; 
+        }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_storage_mysql")]
+    public static int StorageMySQL(IntPtr connectionStringUtf8, IntPtr tableNameUtf8, IntPtr databaseUtf8, IntPtr handlePtr)
+    {
+        try {
+            string connectionString = Utf8.In(connectionStringUtf8);
+            string? tableName = Utf8.In(tableNameUtf8);
+            if (string.IsNullOrEmpty(tableName)) tableName = null;
+            string? database = Utf8.In(databaseUtf8);
+            if (string.IsNullOrEmpty(database)) database = null;
+            
+            var storage = AcornFacade.CreateMySQLStorage(connectionString, tableName, database);
+            ulong handle = StorageProviders.Add(storage);
+            unsafe { *(ulong*)handlePtr = handle; }
+            return 0;
+        } catch (Exception ex) { 
+            unsafe { *(ulong*)handlePtr = 0; }
+            Error.Set(ex); 
+            return -1; 
+        }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_storage_sqlserver")]
+    public static int StorageSQLServer(IntPtr connectionStringUtf8, IntPtr tableNameUtf8, IntPtr schemaUtf8, IntPtr handlePtr)
+    {
+        try {
+            string connectionString = Utf8.In(connectionStringUtf8);
+            string? tableName = Utf8.In(tableNameUtf8);
+            if (string.IsNullOrEmpty(tableName)) tableName = null;
+            string schema = Utf8.In(schemaUtf8);
+            
+            var storage = AcornFacade.CreateSQLServerStorage(connectionString, tableName, schema);
+            ulong handle = StorageProviders.Add(storage);
+            unsafe { *(ulong*)handlePtr = handle; }
+            return 0;
+        } catch (Exception ex) { 
+            unsafe { *(ulong*)handlePtr = 0; }
+            Error.Set(ex); 
+            return -1; 
+        }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_storage_git")]
+    public static int StorageGit(IntPtr repoPathUtf8, IntPtr authorNameUtf8, IntPtr authorEmailUtf8, int autoPush, IntPtr handlePtr)
+    {
+        try {
+            string repoPath = Utf8.In(repoPathUtf8);
+            string authorName = Utf8.In(authorNameUtf8);
+            string authorEmail = Utf8.In(authorEmailUtf8);
+            
+            var storage = AcornFacade.CreateGitStorage(repoPath, authorName, authorEmail, autoPush == 1);
+            ulong handle = StorageProviders.Add(storage);
+            unsafe { *(ulong*)handlePtr = handle; }
+            return 0;
+        } catch (Exception ex) { 
+            unsafe { *(ulong*)handlePtr = 0; }
+            Error.Set(ex); 
+            return -1; 
+        }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_storage_get_info")]
+    public static int StorageGetInfo(ulong storageHandle, IntPtr infoBufPtr)
+    {
+        try {
+            var storage = StorageProviders.Get(storageHandle);
+            var info = storage.GetInfo();
+            var infoJson = JsonConvert.SerializeObject(info);
+            var infoBytes = System.Text.Encoding.UTF8.GetBytes(infoJson);
+            
+            unsafe {
+                var infoBuf = (AcornBuf*)infoBufPtr;
+                infoBuf->data = (byte*)Marshal.AllocHGlobal(infoBytes.Length);
+                Marshal.Copy(infoBytes, 0, (IntPtr)infoBuf->data, infoBytes.Length);
+                infoBuf->len = (nuint)infoBytes.Length;
+            }
+            
+            return 0;
+        } catch (Exception ex) { Error.Set(ex); return -1; }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_storage_test_connection")]
+    public static int StorageTestConnection(ulong storageHandle)
+    {
+        try {
+            var storage = StorageProviders.Get(storageHandle);
+            return storage.TestConnection() ? 1 : 0;
+        } catch (Exception ex) { Error.Set(ex); return -1; }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_storage_close")]
+    public static int StorageClose(ulong storageHandle)
+    {
+        try {
+            StorageProviders.Remove(storageHandle, out _);
+            return 0;
+        } catch (Exception ex) { Error.Set(ex); return -1; }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_open_tree_with_storage")]
+    public static int OpenTreeWithStorage(ulong storageHandle, IntPtr handlePtr)
+    {
+        try {
+            var storage = StorageProviders.Get(storageHandle);
+            var tree = AcornFacade.OpenJsonTreeWithStorage(storage);
             ulong handle = Trees.Add(tree);
             unsafe { *(ulong*)handlePtr = handle; }
             return 0;
