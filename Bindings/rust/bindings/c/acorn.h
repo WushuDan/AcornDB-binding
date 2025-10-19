@@ -133,6 +133,9 @@ ACORN_API int acorn_batch_delete(acorn_tree_handle tree,
 // Encryption support
 typedef uint64_t acorn_encryption_handle;
 
+// Compression support
+typedef uint64_t acorn_compression_handle;
+
 // Create encryption provider from password
 ACORN_API int acorn_encryption_from_password(const char* password, const char* salt, acorn_encryption_handle* out_encryption);
 
@@ -161,6 +164,29 @@ ACORN_API int acorn_open_tree_encrypted(const char* storage_uri, acorn_encryptio
 
 // Open tree with encryption and compression
 ACORN_API int acorn_open_tree_encrypted_compressed(const char* storage_uri, acorn_encryption_handle encryption, int compression_level, acorn_tree_handle* out_tree);
+
+// Compression provider creation
+ACORN_API int acorn_compression_gzip(int compression_level, acorn_compression_handle* out_compression);
+ACORN_API int acorn_compression_brotli(int compression_level, acorn_compression_handle* out_compression);
+ACORN_API int acorn_compression_none(acorn_compression_handle* out_compression);
+
+// Compression operations
+ACORN_API int acorn_compression_compress(acorn_compression_handle compression, const char* data, acorn_buf* out_compressed);
+ACORN_API int acorn_compression_decompress(acorn_compression_handle compression, const char* compressed_data, acorn_buf* out_data);
+
+// Compression info
+ACORN_API int acorn_compression_is_enabled(acorn_compression_handle compression);
+ACORN_API int acorn_compression_algorithm_name(acorn_compression_handle compression, acorn_buf* out_name);
+
+// Compression statistics
+ACORN_API int acorn_compression_get_stats(acorn_compression_handle compression, const char* original_data, const char* compressed_data, 
+                                          int* out_original_size, int* out_compressed_size, double* out_ratio, int* out_space_saved);
+
+// Close compression handle
+ACORN_API int acorn_compression_close(acorn_compression_handle compression);
+
+// Open tree with compression only
+ACORN_API int acorn_open_tree_compressed(const char* storage_uri, acorn_compression_handle compression, acorn_tree_handle* out_tree);
 
 // Memory management for buffers allocated by shim
 ACORN_API void acorn_free_buf(acorn_buf* buf);

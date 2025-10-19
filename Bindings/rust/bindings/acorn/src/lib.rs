@@ -191,6 +191,288 @@ impl Drop for AcornEncryption {
     }
 }
 
+/// Compression provider for AcornDB
+pub struct AcornCompression { h: acorn_compression_handle }
+
+/// Compression levels available in AcornDB
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CompressionLevel {
+    /// Fastest compression (least CPU usage, larger output)
+    Fastest = 0,
+    /// Optimal balance of speed and compression ratio
+    Optimal = 1,
+    /// Smallest size (most CPU usage, smallest output)
+    SmallestSize = 2,
+}
+
+/// Compression statistics
+#[derive(Debug, Clone)]
+pub struct CompressionStats {
+    pub original_size: i32,
+    pub compressed_size: i32,
+    pub ratio: f64,
+    pub space_saved: i32,
+}
+
+impl AcornCompression {
+    /// Create a Gzip compression provider
+    /// 
+    /// # Arguments
+    /// * `level` - The compression level to use
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornCompression, CompressionLevel, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let compression = AcornCompression::gzip(CompressionLevel::Optimal)?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn gzip(level: CompressionLevel) -> Result<Self> {
+        let mut h: acorn_compression_handle = 0;
+        let rc = unsafe { acorn_compression_gzip(level as i32, &mut h as *mut _) };
+        if rc == 0 { 
+            Ok(Self { h }) 
+        } else { 
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() })) 
+        }
+    }
+
+    /// Create a Brotli compression provider
+    /// 
+    /// # Arguments
+    /// * `level` - The compression level to use
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornCompression, CompressionLevel, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let compression = AcornCompression::brotli(CompressionLevel::Optimal)?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn brotli(level: CompressionLevel) -> Result<Self> {
+        let mut h: acorn_compression_handle = 0;
+        let rc = unsafe { acorn_compression_brotli(level as i32, &mut h as *mut _) };
+        if rc == 0 { 
+            Ok(Self { h }) 
+        } else { 
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() })) 
+        }
+    }
+
+    /// Create a no-op compression provider (passes data through unchanged)
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornCompression, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let compression = AcornCompression::none()?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn none() -> Result<Self> {
+        let mut h: acorn_compression_handle = 0;
+        let rc = unsafe { acorn_compression_none(&mut h as *mut _) };
+        if rc == 0 { 
+            Ok(Self { h }) 
+        } else { 
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() })) 
+        }
+    }
+
+    /// Compress data
+    /// 
+    /// # Arguments
+    /// * `data` - The data to compress
+    /// 
+    /// # Returns
+    /// * `Ok(String)` - The compressed data as a base64-encoded string
+    /// * `Err(Error)` - If compression fails
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornCompression, CompressionLevel, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let compression = AcornCompression::gzip(CompressionLevel::Optimal)?;
+    /// let compressed = compression.compress("Hello, world!")?;
+    /// println!("Compressed: {}", compressed);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn compress(&self, data: &str) -> Result<String> {
+        let data_c = CString::new(data).map_err(|e| Error::Acorn(format!("Invalid data: {}", e)))?;
+        let mut buf = acorn_buf { data: ptr::null_mut(), len: 0 };
+        let rc = unsafe { acorn_compression_compress(self.h, data_c.as_ptr(), &mut buf as *mut _) };
+        if rc == 0 {
+            let result = unsafe { 
+                std::slice::from_raw_parts(buf.data, buf.len as usize) 
+            };
+            let result_str = String::from_utf8_lossy(result).to_string();
+            unsafe { acorn_free_buf(&mut buf); }
+            Ok(result_str)
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+
+    /// Decompress data
+    /// 
+    /// # Arguments
+    /// * `compressed_data` - The compressed data as a base64-encoded string
+    /// 
+    /// # Returns
+    /// * `Ok(String)` - The decompressed data
+    /// * `Err(Error)` - If decompression fails
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornCompression, CompressionLevel, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let compression = AcornCompression::gzip(CompressionLevel::Optimal)?;
+    /// let compressed = compression.compress("Hello, world!")?;
+    /// let decompressed = compression.decompress(&compressed)?;
+    /// assert_eq!(decompressed, "Hello, world!");
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn decompress(&self, compressed_data: &str) -> Result<String> {
+        let compressed_c = CString::new(compressed_data).map_err(|e| Error::Acorn(format!("Invalid compressed data: {}", e)))?;
+        let mut buf = acorn_buf { data: ptr::null_mut(), len: 0 };
+        let rc = unsafe { acorn_compression_decompress(self.h, compressed_c.as_ptr(), &mut buf as *mut _) };
+        if rc == 0 {
+            let result = unsafe { 
+                std::slice::from_raw_parts(buf.data, buf.len as usize) 
+            };
+            let result_str = String::from_utf8_lossy(result).to_string();
+            unsafe { acorn_free_buf(&mut buf); }
+            Ok(result_str)
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+
+    /// Check if compression is enabled
+    /// 
+    /// # Returns
+    /// * `true` - If compression is enabled
+    /// * `false` - If compression is disabled (no-op provider)
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornCompression, CompressionLevel, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let compression = AcornCompression::gzip(CompressionLevel::Optimal)?;
+    /// assert!(compression.is_enabled()?);
+    /// 
+    /// let no_compression = AcornCompression::none()?;
+    /// assert!(!no_compression.is_enabled()?);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn is_enabled(&self) -> Result<bool> {
+        let rc = unsafe { acorn_compression_is_enabled(self.h) };
+        if rc >= 0 {
+            Ok(rc == 1)
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+
+    /// Get the algorithm name
+    /// 
+    /// # Returns
+    /// * `Ok(String)` - The name of the compression algorithm
+    /// * `Err(Error)` - If the operation fails
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornCompression, CompressionLevel, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let compression = AcornCompression::gzip(CompressionLevel::Optimal)?;
+    /// let algorithm = compression.algorithm_name()?;
+    /// assert_eq!(algorithm, "Gzip");
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn algorithm_name(&self) -> Result<String> {
+        let mut buf = acorn_buf { data: ptr::null_mut(), len: 0 };
+        let rc = unsafe { acorn_compression_algorithm_name(self.h, &mut buf as *mut _) };
+        if rc == 0 {
+            let result = unsafe { 
+                std::slice::from_raw_parts(buf.data, buf.len as usize) 
+            };
+            let result_str = String::from_utf8_lossy(result).to_string();
+            unsafe { acorn_free_buf(&mut buf); }
+            Ok(result_str)
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+
+    /// Get compression statistics
+    /// 
+    /// # Arguments
+    /// * `original_data` - The original uncompressed data
+    /// * `compressed_data` - The compressed data as a base64-encoded string
+    /// 
+    /// # Returns
+    /// * `Ok(CompressionStats)` - Compression statistics
+    /// * `Err(Error)` - If the operation fails
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornCompression, CompressionLevel, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let compression = AcornCompression::gzip(CompressionLevel::Optimal)?;
+    /// let original = "Hello, world!";
+    /// let compressed = compression.compress(original)?;
+    /// let stats = compression.get_stats(original, &compressed)?;
+    /// println!("Compression ratio: {:.2}", stats.ratio);
+    /// println!("Space saved: {} bytes", stats.space_saved);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn get_stats(&self, original_data: &str, compressed_data: &str) -> Result<CompressionStats> {
+        let original_c = CString::new(original_data).map_err(|e| Error::Acorn(format!("Invalid original data: {}", e)))?;
+        let compressed_c = CString::new(compressed_data).map_err(|e| Error::Acorn(format!("Invalid compressed data: {}", e)))?;
+        
+        let mut original_size: i32 = 0;
+        let mut compressed_size: i32 = 0;
+        let mut ratio: f64 = 0.0;
+        let mut space_saved: i32 = 0;
+        
+        let rc = unsafe { 
+            acorn_compression_get_stats(
+                self.h, 
+                original_c.as_ptr(), 
+                compressed_c.as_ptr(),
+                &mut original_size as *mut _,
+                &mut compressed_size as *mut _,
+                &mut ratio as *mut _,
+                &mut space_saved as *mut _
+            ) 
+        };
+        
+        if rc == 0 {
+            Ok(CompressionStats {
+                original_size,
+                compressed_size,
+                ratio,
+                space_saved,
+            })
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+}
+
+impl Drop for AcornCompression {
+    fn drop(&mut self) {
+        unsafe { acorn_compression_close(self.h); }
+    }
+}
+
 impl AcornTree {
     pub fn open(uri: &str) -> Result<Self> {
         let c = CString::new(uri).map_err(|e| Error::Acorn(format!("Invalid URI: {}", e)))?;
@@ -249,6 +531,43 @@ impl AcornTree {
         let c = CString::new(uri).map_err(|e| Error::Acorn(format!("Invalid URI: {}", e)))?;
         let mut h: acorn_tree_handle = 0;
         let rc = unsafe { acorn_open_tree_encrypted_compressed(c.as_ptr(), encryption.h, compression_level, &mut h as *mut _) };
+        if rc == 0 { 
+            Ok(Self { h }) 
+        } else { 
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() })) 
+        }
+    }
+
+    /// Open a tree with compression only
+    /// 
+    /// # Arguments
+    /// * `uri` - The storage URI (e.g., "file://./db", "memory://")
+    /// * `compression` - The compression provider to use
+    /// 
+    /// # Returns
+    /// * `Ok(AcornTree)` - The opened tree
+    /// * `Err(Error)` - If opening fails
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornTree, AcornCompression, CompressionLevel, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let compression = AcornCompression::gzip(CompressionLevel::Optimal)?;
+    /// let mut tree = AcornTree::open_compressed("file://./compressed_db", &compression)?;
+    /// 
+    /// // Store some data
+    /// tree.stash("key1", &"Hello, compressed world!")?;
+    /// 
+    /// // Retrieve data
+    /// let value: String = tree.crack("key1")?;
+    /// assert_eq!(value, "Hello, compressed world!");
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn open_compressed(uri: &str, compression: &AcornCompression) -> Result<Self> {
+        let c = CString::new(uri).map_err(|e| Error::Acorn(format!("Invalid URI: {}", e)))?;
+        let mut h: acorn_tree_handle = 0;
+        let rc = unsafe { acorn_open_tree_compressed(c.as_ptr(), compression.h, &mut h as *mut _) };
         if rc == 0 { 
             Ok(Self { h }) 
         } else { 

@@ -667,6 +667,77 @@ internal static class AcornFacade
         }
     }
 
+    internal sealed class JsonCompressionProvider
+    {
+        private readonly ICompressionProvider _compression;
+
+        public JsonCompressionProvider(ICompressionProvider compression)
+        {
+            _compression = compression ?? throw new ArgumentNullException(nameof(compression));
+        }
+
+        public string Compress(string data)
+        {
+            try
+            {
+                var bytes = Encoding.UTF8.GetBytes(data);
+                var compressed = _compression.Compress(bytes);
+                return Convert.ToBase64String(compressed);
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"Compression failed: {ex.Message}", ex);
+            }
+        }
+
+        public string Decompress(string compressedData)
+        {
+            try
+            {
+                var compressedBytes = Convert.FromBase64String(compressedData);
+                var decompressed = _compression.Decompress(compressedBytes);
+                return Encoding.UTF8.GetString(decompressed);
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"Decompression failed: {ex.Message}", ex);
+            }
+        }
+
+        public bool IsEnabled => _compression.IsEnabled;
+
+        public string AlgorithmName => _compression.AlgorithmName;
+
+        public CompressionStats GetStats(string originalData, string compressedData)
+        {
+            try
+            {
+                var originalBytes = Encoding.UTF8.GetBytes(originalData);
+                var compressedBytes = Convert.FromBase64String(compressedData);
+                
+                return new CompressionStats
+                {
+                    OriginalSize = originalBytes.Length,
+                    CompressedSize = compressedBytes.Length,
+                    Ratio = originalBytes.Length > 0 ? (double)compressedBytes.Length / originalBytes.Length : 1.0,
+                    SpaceSaved = originalBytes.Length - compressedBytes.Length
+                };
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"Stats calculation failed: {ex.Message}", ex);
+            }
+        }
+    }
+
+    internal sealed class CompressionStats
+    {
+        public int OriginalSize { get; set; }
+        public int CompressedSize { get; set; }
+        public double Ratio { get; set; }
+        public int SpaceSaved { get; set; }
+    }
+
     // Factory methods for Encryption
     public static JsonEncryptionProvider CreateEncryptionFromPassword(string password, string salt)
     {
@@ -706,6 +777,78 @@ internal static class AcornFacade
         catch (Exception ex)
         {
             throw new InvalidOperationException($"Failed to generate key and IV: {ex.Message}", ex);
+        }
+    }
+
+    // Factory methods for Compression
+    public static JsonCompressionProvider CreateGzipCompression(CompressionLevel compressionLevel)
+    {
+        try
+        {
+            var compression = new GzipCompressionProvider(compressionLevel);
+            return new JsonCompressionProvider(compression);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException($"Failed to create Gzip compression: {ex.Message}", ex);
+        }
+    }
+
+    public static JsonCompressionProvider CreateBrotliCompression(CompressionLevel compressionLevel)
+    {
+        try
+        {
+            var compression = new BrotliCompressionProvider(compressionLevel);
+            return new JsonCompressionProvider(compression);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException($"Failed to create Brotli compression: {ex.Message}", ex);
+        }
+    }
+
+    public static JsonCompressionProvider CreateNoCompression()
+    {
+        try
+        {
+            var compression = new NoCompressionProvider();
+            return new JsonCompressionProvider(compression);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException($"Failed to create no compression: {ex.Message}", ex);
+        }
+    }
+
+    public static JsonTree OpenJsonTreeCompressed(string uri, JsonCompressionProvider compression)
+    {
+        try
+        {
+            // Parse URI to determine storage type
+            ITrunk<object> baseTrunk;
+            if (uri.StartsWith("file://"))
+            {
+                var path = uri.Substring(7); // Remove "file://" prefix
+                baseTrunk = new FileTrunk<object>(path);
+            }
+            else if (uri.StartsWith("memory://"))
+            {
+                baseTrunk = new MemoryTrunk<object>();
+            }
+            else
+            {
+                // Default to file storage with the URI as the path
+                baseTrunk = new FileTrunk<object>(uri);
+            }
+
+            // Wrap with compression
+            var compressedTrunk = new CompressedTrunk<object>(baseTrunk, compression._compression);
+            var tree = new Tree<object>(compressedTrunk);
+            return new JsonTree(tree);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException($"Failed to open compressed tree with URI '{uri}': {ex.Message}", ex);
         }
     }
 

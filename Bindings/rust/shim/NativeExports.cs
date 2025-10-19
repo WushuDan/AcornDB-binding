@@ -11,6 +11,7 @@ public static class NativeExports
     static readonly HandleTable<AcornFacade.JsonMesh> Meshes = new();
     static readonly HandleTable<AcornFacade.JsonP2P> P2PConnections = new();
     static readonly HandleTable<AcornFacade.JsonEncryptionProvider> EncryptionProviders = new();
+    static readonly HandleTable<AcornFacade.JsonCompressionProvider> CompressionProviders = new();
 
     [UnmanagedCallersOnly(EntryPoint = "acorn_open_tree")]
     public static int OpenTree(IntPtr uriUtf8, IntPtr handlePtr)
@@ -880,6 +881,178 @@ public static class NativeExports
                 _ => System.IO.Compression.CompressionLevel.Optimal
             };
             var tree = AcornFacade.OpenJsonTreeEncryptedCompressed(uri, encryption, compressionLevelEnum);
+            ulong handle = Trees.Add(tree);
+            unsafe { *(ulong*)handlePtr = handle; }
+            return 0;
+        } catch (Exception ex) { 
+            unsafe { *(ulong*)handlePtr = 0; }
+            Error.Set(ex); 
+            return -1; 
+        }
+    }
+
+    // Compression FFI functions
+    [UnmanagedCallersOnly(EntryPoint = "acorn_compression_gzip")]
+    public static int CompressionGzip(int compressionLevel, IntPtr handlePtr)
+    {
+        try {
+            var compressionLevelEnum = compressionLevel switch {
+                0 => System.IO.Compression.CompressionLevel.Fastest,
+                1 => System.IO.Compression.CompressionLevel.Optimal,
+                2 => System.IO.Compression.CompressionLevel.SmallestSize,
+                _ => System.IO.Compression.CompressionLevel.Optimal
+            };
+            var compression = AcornFacade.CreateGzipCompression(compressionLevelEnum);
+            ulong handle = CompressionProviders.Add(compression);
+            unsafe { *(ulong*)handlePtr = handle; }
+            return 0;
+        } catch (Exception ex) { 
+            unsafe { *(ulong*)handlePtr = 0; }
+            Error.Set(ex); 
+            return -1; 
+        }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_compression_brotli")]
+    public static int CompressionBrotli(int compressionLevel, IntPtr handlePtr)
+    {
+        try {
+            var compressionLevelEnum = compressionLevel switch {
+                0 => System.IO.Compression.CompressionLevel.Fastest,
+                1 => System.IO.Compression.CompressionLevel.Optimal,
+                2 => System.IO.Compression.CompressionLevel.SmallestSize,
+                _ => System.IO.Compression.CompressionLevel.Optimal
+            };
+            var compression = AcornFacade.CreateBrotliCompression(compressionLevelEnum);
+            ulong handle = CompressionProviders.Add(compression);
+            unsafe { *(ulong*)handlePtr = handle; }
+            return 0;
+        } catch (Exception ex) { 
+            unsafe { *(ulong*)handlePtr = 0; }
+            Error.Set(ex); 
+            return -1; 
+        }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_compression_none")]
+    public static int CompressionNone(IntPtr handlePtr)
+    {
+        try {
+            var compression = AcornFacade.CreateNoCompression();
+            ulong handle = CompressionProviders.Add(compression);
+            unsafe { *(ulong*)handlePtr = handle; }
+            return 0;
+        } catch (Exception ex) { 
+            unsafe { *(ulong*)handlePtr = 0; }
+            Error.Set(ex); 
+            return -1; 
+        }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_compression_compress")]
+    public static int CompressionCompress(ulong compressionHandle, IntPtr dataUtf8, IntPtr compressedBufPtr)
+    {
+        try {
+            var compression = CompressionProviders.Get(compressionHandle);
+            string data = Utf8.In(dataUtf8);
+            var compressed = compression.Compress(data);
+            var compressedBytes = System.Text.Encoding.UTF8.GetBytes(compressed);
+            
+            unsafe {
+                var compressedBuf = (AcornBuf*)compressedBufPtr;
+                compressedBuf->data = (byte*)Marshal.AllocHGlobal(compressedBytes.Length);
+                Marshal.Copy(compressedBytes, 0, (IntPtr)compressedBuf->data, compressedBytes.Length);
+                compressedBuf->len = (nuint)compressedBytes.Length;
+            }
+            
+            return 0;
+        } catch (Exception ex) { Error.Set(ex); return -1; }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_compression_decompress")]
+    public static int CompressionDecompress(ulong compressionHandle, IntPtr compressedDataUtf8, IntPtr dataBufPtr)
+    {
+        try {
+            var compression = CompressionProviders.Get(compressionHandle);
+            string compressedData = Utf8.In(compressedDataUtf8);
+            var data = compression.Decompress(compressedData);
+            var dataBytes = System.Text.Encoding.UTF8.GetBytes(data);
+            
+            unsafe {
+                var dataBuf = (AcornBuf*)dataBufPtr;
+                dataBuf->data = (byte*)Marshal.AllocHGlobal(dataBytes.Length);
+                Marshal.Copy(dataBytes, 0, (IntPtr)dataBuf->data, dataBytes.Length);
+                dataBuf->len = (nuint)dataBytes.Length;
+            }
+            
+            return 0;
+        } catch (Exception ex) { Error.Set(ex); return -1; }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_compression_is_enabled")]
+    public static int CompressionIsEnabled(ulong compressionHandle)
+    {
+        try {
+            var compression = CompressionProviders.Get(compressionHandle);
+            return compression.IsEnabled ? 1 : 0;
+        } catch (Exception ex) { Error.Set(ex); return -1; }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_compression_algorithm_name")]
+    public static int CompressionAlgorithmName(ulong compressionHandle, IntPtr nameBufPtr)
+    {
+        try {
+            var compression = CompressionProviders.Get(compressionHandle);
+            var nameBytes = System.Text.Encoding.UTF8.GetBytes(compression.AlgorithmName);
+            
+            unsafe {
+                var nameBuf = (AcornBuf*)nameBufPtr;
+                nameBuf->data = (byte*)Marshal.AllocHGlobal(nameBytes.Length);
+                Marshal.Copy(nameBytes, 0, (IntPtr)nameBuf->data, nameBytes.Length);
+                nameBuf->len = (nuint)nameBytes.Length;
+            }
+            
+            return 0;
+        } catch (Exception ex) { Error.Set(ex); return -1; }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_compression_get_stats")]
+    public static int CompressionGetStats(ulong compressionHandle, IntPtr originalDataUtf8, IntPtr compressedDataUtf8, 
+                                         IntPtr originalSizePtr, IntPtr compressedSizePtr, IntPtr ratioPtr, IntPtr spaceSavedPtr)
+    {
+        try {
+            var compression = CompressionProviders.Get(compressionHandle);
+            string originalData = Utf8.In(originalDataUtf8);
+            string compressedData = Utf8.In(compressedDataUtf8);
+            var stats = compression.GetStats(originalData, compressedData);
+            
+            unsafe {
+                *(int*)originalSizePtr = stats.OriginalSize;
+                *(int*)compressedSizePtr = stats.CompressedSize;
+                *(double*)ratioPtr = stats.Ratio;
+                *(int*)spaceSavedPtr = stats.SpaceSaved;
+            }
+            
+            return 0;
+        } catch (Exception ex) { Error.Set(ex); return -1; }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_compression_close")]
+    public static int CompressionClose(ulong compressionHandle)
+    {
+        try {
+            CompressionProviders.Remove(compressionHandle, out _);
+            return 0;
+        } catch (Exception ex) { Error.Set(ex); return -1; }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_open_tree_compressed")]
+    public static int OpenTreeCompressed(IntPtr uriUtf8, ulong compressionHandle, IntPtr handlePtr)
+    {
+        try {
+            string uri = Utf8.In(uriUtf8);
+            var compression = CompressionProviders.Get(compressionHandle);
+            var tree = AcornFacade.OpenJsonTreeCompressed(uri, compression);
             ulong handle = Trees.Add(tree);
             unsafe { *(ulong*)handlePtr = handle; }
             return 0;

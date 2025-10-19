@@ -1,4 +1,4 @@
-use acorn::{AcornTree, AcornEncryption, Error};
+use acorn::{AcornTree, AcornEncryption, AcornCompression, CompressionLevel, Error};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
@@ -737,6 +737,164 @@ mod integration_tests {
             .collect()
             .unwrap();
         assert_eq!(greek_letters.len(), 3); // Alpha, Gamma, and Delta
+    }
+
+    #[test]
+    fn test_gzip_compression() {
+        let compression = AcornCompression::gzip(CompressionLevel::Optimal).expect("Failed to create Gzip compression");
+        
+        // Test basic compression/decompression
+        let original = "Hello, world! This is a test of compression.";
+        let compressed = compression.compress(original).expect("Failed to compress");
+        let decompressed = compression.decompress(&compressed).expect("Failed to decompress");
+        assert_eq!(original, decompressed);
+        
+        // Test compression stats
+        let stats = compression.get_stats(original, &compressed).expect("Failed to get stats");
+        assert!(stats.compressed_size < stats.original_size);
+        assert!(stats.ratio < 1.0);
+        assert!(stats.space_saved > 0);
+        
+        // Test algorithm name
+        let algorithm = compression.algorithm_name().expect("Failed to get algorithm name");
+        assert_eq!(algorithm, "Gzip");
+        
+        // Test enabled status
+        let enabled = compression.is_enabled().expect("Failed to check enabled status");
+        assert!(enabled);
+    }
+
+    #[test]
+    fn test_brotli_compression() {
+        let compression = AcornCompression::brotli(CompressionLevel::SmallestSize).expect("Failed to create Brotli compression");
+        
+        // Test basic compression/decompression
+        let original = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. ".repeat(5);
+        let compressed = compression.compress(&original).expect("Failed to compress");
+        let decompressed = compression.decompress(&compressed).expect("Failed to decompress");
+        assert_eq!(original, decompressed);
+        
+        // Test compression stats
+        let stats = compression.get_stats(&original, &compressed).expect("Failed to get stats");
+        assert!(stats.compressed_size < stats.original_size);
+        assert!(stats.ratio < 1.0);
+        assert!(stats.space_saved > 0);
+        
+        // Test algorithm name
+        let algorithm = compression.algorithm_name().expect("Failed to get algorithm name");
+        assert_eq!(algorithm, "Brotli");
+        
+        // Test enabled status
+        let enabled = compression.is_enabled().expect("Failed to check enabled status");
+        assert!(enabled);
+    }
+
+    #[test]
+    fn test_no_compression() {
+        let compression = AcornCompression::none().expect("Failed to create no compression");
+        
+        // Test basic compression/decompression (should pass through unchanged)
+        let original = "Hello, world!";
+        let compressed = compression.compress(original).expect("Failed to compress");
+        let decompressed = compression.decompress(&compressed).expect("Failed to decompress");
+        assert_eq!(original, decompressed);
+        
+        // Test algorithm name
+        let algorithm = compression.algorithm_name().expect("Failed to get algorithm name");
+        assert_eq!(algorithm, "None");
+        
+        // Test enabled status (should be false)
+        let enabled = compression.is_enabled().expect("Failed to check enabled status");
+        assert!(!enabled);
+    }
+
+    #[test]
+    fn test_compression_levels() {
+        let fastest = AcornCompression::gzip(CompressionLevel::Fastest).expect("Failed to create fastest compression");
+        let optimal = AcornCompression::gzip(CompressionLevel::Optimal).expect("Failed to create optimal compression");
+        let smallest = AcornCompression::gzip(CompressionLevel::SmallestSize).expect("Failed to create smallest compression");
+        
+        let test_data = "This is a test of different compression levels. ".repeat(10);
+        
+        let fastest_compressed = fastest.compress(&test_data).expect("Failed to compress with fastest");
+        let optimal_compressed = optimal.compress(&test_data).expect("Failed to compress with optimal");
+        let smallest_compressed = smallest.compress(&test_data).expect("Failed to compress with smallest");
+        
+        let fastest_stats = fastest.get_stats(&test_data, &fastest_compressed).expect("Failed to get fastest stats");
+        let optimal_stats = optimal.get_stats(&test_data, &optimal_compressed).expect("Failed to get optimal stats");
+        let smallest_stats = smallest.get_stats(&test_data, &smallest_compressed).expect("Failed to get smallest stats");
+        
+        // Smallest should generally compress better than optimal, which should compress better than fastest
+        // (though this isn't guaranteed for all data)
+        println!("Fastest: {} bytes, Optimal: {} bytes, Smallest: {} bytes", 
+                 fastest_stats.compressed_size, optimal_stats.compressed_size, smallest_stats.compressed_size);
+        
+        // All should be able to decompress correctly
+        assert_eq!(test_data, fastest.decompress(&fastest_compressed).expect("Failed to decompress fastest"));
+        assert_eq!(test_data, optimal.decompress(&optimal_compressed).expect("Failed to decompress optimal"));
+        assert_eq!(test_data, smallest.decompress(&smallest_compressed).expect("Failed to decompress smallest"));
+    }
+
+    #[test]
+    fn test_compressed_tree_storage() {
+        let compression = AcornCompression::gzip(CompressionLevel::Optimal).expect("Failed to create compression");
+        let mut tree = AcornTree::open_compressed("memory://compressed_test", &compression).expect("Failed to open compressed tree");
+        
+        // Store test data
+        let test_data = TestData {
+            id: "compressed-test".to_string(),
+            value: 123,
+            name: "Compressed Test Item".to_string(),
+        };
+        
+        tree.stash("compressed-test", &test_data).expect("Failed to stash in compressed tree");
+        
+        // Retrieve test data
+        let retrieved: TestData = tree.crack("compressed-test").expect("Failed to crack from compressed tree");
+        assert_eq!(test_data, retrieved);
+        
+        // Store multiple items
+        for i in 1..=5 {
+            let item = TestData {
+                id: format!("item-{}", i),
+                value: i * 10,
+                name: format!("Item {}", i),
+            };
+            tree.stash(&format!("item-{}", i), &item).expect("Failed to stash item");
+        }
+        
+        // List all items
+        let items = tree.list().expect("Failed to list items");
+        assert_eq!(items.len(), 6); // 1 original + 5 new items
+    }
+
+    #[test]
+    fn test_compression_error_handling() {
+        let compression = AcornCompression::gzip(CompressionLevel::Optimal).expect("Failed to create compression");
+        
+        // Test decompression of invalid data
+        let result = compression.decompress("invalid-base64-data");
+        assert!(result.is_err());
+        
+        // Test stats with mismatched data
+        let result = compression.get_stats("original", "different-compressed");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_compression_with_large_data() {
+        let compression = AcornCompression::gzip(CompressionLevel::Optimal).expect("Failed to create compression");
+        
+        // Create large test data
+        let large_data = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. ".repeat(100);
+        let compressed = compression.compress(&large_data).expect("Failed to compress large data");
+        let decompressed = compression.decompress(&compressed).expect("Failed to decompress large data");
+        assert_eq!(large_data, decompressed);
+        
+        // Test compression ratio
+        let stats = compression.get_stats(&large_data, &compressed).expect("Failed to get stats");
+        assert!(stats.ratio < 0.5); // Should compress to less than 50% of original size
+        assert!(stats.space_saved > 1000); // Should save significant space
     }
 }
 
