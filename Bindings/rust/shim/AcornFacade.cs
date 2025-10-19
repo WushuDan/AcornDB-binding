@@ -8,6 +8,7 @@ using AcornDB.Transaction;
 using AcornDB.Storage;
 using AcornDB.Shim;
 using AcornDB.Reactive;
+using AcornDB.Sync;
 
 internal static class AcornFacade
 {
@@ -15,7 +16,7 @@ internal static class AcornFacade
     // This avoids JsonElement serialization issues with Newtonsoft.Json
     internal sealed class JsonTree
     {
-        private readonly Tree<object> _tree;
+        internal readonly Tree<object> _tree;
 
         public JsonTree(Tree<object> tree)
         {
@@ -398,5 +399,211 @@ internal static class AcornFacade
                 throw new InvalidOperationException($"Failed to rollback transaction: {ex.Message}", ex);
             }
         }
+    }
+
+    /// <summary>
+    /// JSON-compatible mesh coordinator for advanced sync operations
+    /// </summary>
+    internal sealed class JsonMesh
+    {
+        private readonly MeshCoordinator<object> _meshCoordinator;
+
+        public JsonMesh()
+        {
+            _meshCoordinator = new MeshCoordinator<object>();
+        }
+
+        public void AddNode(string nodeId, JsonTree tree)
+        {
+            try
+            {
+                _meshCoordinator.AddNode(nodeId, tree._tree);
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"Failed to add node '{nodeId}' to mesh: {ex.Message}", ex);
+            }
+        }
+
+        public void ConnectNodes(string nodeA, string nodeB)
+        {
+            try
+            {
+                _meshCoordinator.ConnectNodes(nodeA, nodeB);
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"Failed to connect nodes '{nodeA}' and '{nodeB}': {ex.Message}", ex);
+            }
+        }
+
+        public void CreateFullMesh()
+        {
+            try
+            {
+                _meshCoordinator.CreateFullMesh();
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"Failed to create full mesh: {ex.Message}", ex);
+            }
+        }
+
+        public void CreateRing()
+        {
+            try
+            {
+                _meshCoordinator.CreateRing();
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"Failed to create ring topology: {ex.Message}", ex);
+            }
+        }
+
+        public void CreateStar(string hubNodeId)
+        {
+            try
+            {
+                _meshCoordinator.CreateStar(hubNodeId);
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"Failed to create star topology with hub '{hubNodeId}': {ex.Message}", ex);
+            }
+        }
+
+        public void SynchronizeAll()
+        {
+            try
+            {
+                _meshCoordinator.SynchronizeAll();
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"Failed to synchronize mesh: {ex.Message}", ex);
+            }
+        }
+    }
+
+    /// <summary>
+    /// JSON-compatible peer-to-peer sync connection
+    /// </summary>
+    internal sealed class JsonP2P
+    {
+        private readonly Tree<object> _localTree;
+        private readonly Tree<object> _remoteTree;
+        private SyncMode _syncMode = SyncMode.Bidirectional;
+        private ConflictDirection _conflictDirection = ConflictDirection.UseJudge;
+
+        public JsonP2P(JsonTree localTree, JsonTree remoteTree)
+        {
+            _localTree = localTree._tree;
+            _remoteTree = remoteTree._tree;
+        }
+
+        public void SyncBidirectional()
+        {
+            try
+            {
+                if (_syncMode == SyncMode.Disabled) return;
+
+                // Create bidirectional sync using InProcessBranch
+                var localBranch = new InProcessBranch<object>(_localTree);
+                var remoteBranch = new InProcessBranch<object>(_remoteTree);
+
+                // Sync local -> remote
+                if (_syncMode == SyncMode.Bidirectional || _syncMode == SyncMode.PushOnly)
+                {
+                    foreach (var nut in _localTree.ExportChanges())
+                    {
+                        remoteBranch.TryPush(nut.Id, nut);
+                    }
+                }
+
+                // Sync remote -> local
+                if (_syncMode == SyncMode.Bidirectional || _syncMode == SyncMode.PullOnly)
+                {
+                    foreach (var nut in _remoteTree.ExportChanges())
+                    {
+                        localBranch.TryPush(nut.Id, nut);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"Failed to sync bidirectionally: {ex.Message}", ex);
+            }
+        }
+
+        public void SyncPushOnly()
+        {
+            try
+            {
+                if (_syncMode == SyncMode.Disabled || _syncMode == SyncMode.PullOnly) return;
+
+                var remoteBranch = new InProcessBranch<object>(_localTree);
+                foreach (var nut in _localTree.ExportChanges())
+                {
+                    remoteBranch.TryPush(nut.Id, nut);
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"Failed to sync push-only: {ex.Message}", ex);
+            }
+        }
+
+        public void SyncPullOnly()
+        {
+            try
+            {
+                if (_syncMode == SyncMode.Disabled || _syncMode == SyncMode.PushOnly) return;
+
+                var localBranch = new InProcessBranch<object>(_remoteTree);
+                foreach (var nut in _remoteTree.ExportChanges())
+                {
+                    localBranch.TryPush(nut.Id, nut);
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"Failed to sync pull-only: {ex.Message}", ex);
+            }
+        }
+
+        public void SetSyncMode(int syncMode)
+        {
+            _syncMode = syncMode switch
+            {
+                0 => SyncMode.Bidirectional,
+                1 => SyncMode.PushOnly,
+                2 => SyncMode.PullOnly,
+                3 => SyncMode.Disabled,
+                _ => throw new ArgumentException($"Invalid sync mode: {syncMode}")
+            };
+        }
+
+        public void SetConflictDirection(int conflictDirection)
+        {
+            _conflictDirection = conflictDirection switch
+            {
+                0 => ConflictDirection.UseJudge,
+                1 => ConflictDirection.PreferLocal,
+                2 => ConflictDirection.PreferRemote,
+                _ => throw new ArgumentException($"Invalid conflict direction: {conflictDirection}")
+            };
+        }
+    }
+
+    // Factory methods for Advanced Sync
+    public static JsonMesh CreateMesh()
+    {
+        return new JsonMesh();
+    }
+
+    public static JsonP2P CreateP2P(JsonTree localTree, JsonTree remoteTree)
+    {
+        return new JsonP2P(localTree, remoteTree);
     }
 }

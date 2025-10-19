@@ -341,6 +341,48 @@ impl AcornTree {
             Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
+
+    /// Create a new mesh coordinator for advanced synchronization.
+    /// 
+    /// # Example
+    /// 
+    /// ```rust
+    /// use acorn::AcornTree;
+    /// 
+    /// let mesh = AcornTree::create_mesh()?;
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn create_mesh() -> Result<AcornMesh> {
+        let mut h: acorn_mesh_handle = 0;
+        let rc = unsafe { acorn_mesh_create(&mut h as *mut _) };
+        if rc == 0 {
+            Ok(AcornMesh { h })
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+
+    /// Create a peer-to-peer sync connection with another tree.
+    /// 
+    /// # Example
+    /// 
+    /// ```rust
+    /// use acorn::AcornTree;
+    /// 
+    /// let tree1 = AcornTree::open("memory://")?;
+    /// let tree2 = AcornTree::open("memory://")?;
+    /// let p2p = AcornTree::create_p2p(&tree1, &tree2)?;
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn create_p2p(local_tree: &AcornTree, remote_tree: &AcornTree) -> Result<AcornP2P> {
+        let mut h: acorn_p2p_handle = 0;
+        let rc = unsafe { acorn_p2p_create(local_tree.h, remote_tree.h, &mut h as *mut _) };
+        if rc == 0 {
+            Ok(AcornP2P { h })
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
 }
 
 impl Drop for AcornTree {
@@ -357,6 +399,18 @@ pub struct AcornIterator {
 /// Provides snapshot isolation and rollback capabilities.
 pub struct AcornTransaction {
     h: acorn_transaction_handle,
+}
+
+/// Mesh coordinator for advanced synchronization across multiple trees.
+/// Supports various network topologies like full mesh, ring, and star.
+pub struct AcornMesh {
+    h: acorn_mesh_handle,
+}
+
+/// Peer-to-peer synchronization connection between two trees.
+/// Supports bidirectional, push-only, and pull-only sync modes.
+pub struct AcornP2P {
+    h: acorn_p2p_handle,
 }
 
 impl AcornTransaction {
@@ -461,6 +515,271 @@ impl AcornTransaction {
 impl Drop for AcornTransaction {
     fn drop(&mut self) {
         unsafe { acorn_transaction_close(self.h); }
+    }
+}
+
+impl AcornMesh {
+    /// Add a tree node to the mesh with the given ID.
+    /// 
+    /// # Example
+    /// 
+    /// ```rust
+    /// use acorn::AcornTree;
+    /// 
+    /// let mesh = AcornTree::create_mesh()?;
+    /// let tree = AcornTree::open("memory://")?;
+    /// mesh.add_node("node1", &tree)?;
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn add_node(&self, node_id: &str, tree: &AcornTree) -> Result<()> {
+        let idc = CString::new(node_id).map_err(|e| Error::Acorn(format!("Invalid node ID: {}", e)))?;
+        let rc = unsafe { acorn_mesh_add_node(self.h, idc.as_ptr(), tree.h) };
+        if rc == 0 {
+            Ok(())
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+
+    /// Connect two nodes in the mesh for bidirectional synchronization.
+    /// 
+    /// # Example
+    /// 
+    /// ```rust
+    /// use acorn::AcornTree;
+    /// 
+    /// let mesh = AcornTree::create_mesh()?;
+    /// let tree1 = AcornTree::open("memory://")?;
+    /// let tree2 = AcornTree::open("memory://")?;
+    /// mesh.add_node("node1", &tree1)?;
+    /// mesh.add_node("node2", &tree2)?;
+    /// mesh.connect_nodes("node1", "node2")?;
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn connect_nodes(&self, node_a: &str, node_b: &str) -> Result<()> {
+        let node_ac = CString::new(node_a).map_err(|e| Error::Acorn(format!("Invalid node A ID: {}", e)))?;
+        let node_bc = CString::new(node_b).map_err(|e| Error::Acorn(format!("Invalid node B ID: {}", e)))?;
+        let rc = unsafe { acorn_mesh_connect_nodes(self.h, node_ac.as_ptr(), node_bc.as_ptr()) };
+        if rc == 0 {
+            Ok(())
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+
+    /// Create a full mesh topology where every node connects to every other node.
+    /// 
+    /// # Example
+    /// 
+    /// ```rust
+    /// use acorn::AcornTree;
+    /// 
+    /// let mesh = AcornTree::create_mesh()?;
+    /// // Add nodes first...
+    /// mesh.create_full_mesh()?;
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn create_full_mesh(&self) -> Result<()> {
+        let rc = unsafe { acorn_mesh_create_full_mesh(self.h) };
+        if rc == 0 {
+            Ok(())
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+
+    /// Create a ring topology where each node connects to the next, and the last connects to the first.
+    /// 
+    /// # Example
+    /// 
+    /// ```rust
+    /// use acorn::AcornTree;
+    /// 
+    /// let mesh = AcornTree::create_mesh()?;
+    /// // Add nodes first...
+    /// mesh.create_ring()?;
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn create_ring(&self) -> Result<()> {
+        let rc = unsafe { acorn_mesh_create_ring(self.h) };
+        if rc == 0 {
+            Ok(())
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+
+    /// Create a star topology where all nodes connect to a central hub.
+    /// 
+    /// # Example
+    /// 
+    /// ```rust
+    /// use acorn::AcornTree;
+    /// 
+    /// let mesh = AcornTree::create_mesh()?;
+    /// // Add nodes first...
+    /// mesh.create_star("hub")?;
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn create_star(&self, hub_node_id: &str) -> Result<()> {
+        let hubc = CString::new(hub_node_id).map_err(|e| Error::Acorn(format!("Invalid hub node ID: {}", e)))?;
+        let rc = unsafe { acorn_mesh_create_star(self.h, hubc.as_ptr()) };
+        if rc == 0 {
+            Ok(())
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+
+    /// Synchronize all nodes in the mesh.
+    /// 
+    /// # Example
+    /// 
+    /// ```rust
+    /// use acorn::AcornTree;
+    /// 
+    /// let mesh = AcornTree::create_mesh()?;
+    /// // Setup mesh topology...
+    /// mesh.synchronize_all()?;
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn synchronize_all(&self) -> Result<()> {
+        let rc = unsafe { acorn_mesh_synchronize_all(self.h) };
+        if rc == 0 {
+            Ok(())
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+}
+
+impl Drop for AcornMesh {
+    fn drop(&mut self) {
+        unsafe { acorn_mesh_close(self.h); }
+    }
+}
+
+impl AcornP2P {
+    /// Synchronize bidirectionally between the local and remote trees.
+    /// 
+    /// # Example
+    /// 
+    /// ```rust
+    /// use acorn::AcornTree;
+    /// 
+    /// let tree1 = AcornTree::open("memory://")?;
+    /// let tree2 = AcornTree::open("memory://")?;
+    /// let p2p = AcornTree::create_p2p(&tree1, &tree2)?;
+    /// p2p.sync_bidirectional()?;
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn sync_bidirectional(&self) -> Result<()> {
+        let rc = unsafe { acorn_p2p_sync_bidirectional(self.h) };
+        if rc == 0 {
+            Ok(())
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+
+    /// Synchronize by pushing changes from local to remote tree only.
+    /// 
+    /// # Example
+    /// 
+    /// ```rust
+    /// use acorn::AcornTree;
+    /// 
+    /// let tree1 = AcornTree::open("memory://")?;
+    /// let tree2 = AcornTree::open("memory://")?;
+    /// let p2p = AcornTree::create_p2p(&tree1, &tree2)?;
+    /// p2p.sync_push_only()?;
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn sync_push_only(&self) -> Result<()> {
+        let rc = unsafe { acorn_p2p_sync_push_only(self.h) };
+        if rc == 0 {
+            Ok(())
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+
+    /// Synchronize by pulling changes from remote to local tree only.
+    /// 
+    /// # Example
+    /// 
+    /// ```rust
+    /// use acorn::AcornTree;
+    /// 
+    /// let tree1 = AcornTree::open("memory://")?;
+    /// let tree2 = AcornTree::open("memory://")?;
+    /// let p2p = AcornTree::create_p2p(&tree1, &tree2)?;
+    /// p2p.sync_pull_only()?;
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn sync_pull_only(&self) -> Result<()> {
+        let rc = unsafe { acorn_p2p_sync_pull_only(self.h) };
+        if rc == 0 {
+            Ok(())
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+
+    /// Set the synchronization mode.
+    /// 
+    /// # Arguments
+    /// * `sync_mode` - 0=Bidirectional, 1=PushOnly, 2=PullOnly, 3=Disabled
+    /// 
+    /// # Example
+    /// 
+    /// ```rust
+    /// use acorn::AcornTree;
+    /// 
+    /// let tree1 = AcornTree::open("memory://")?;
+    /// let tree2 = AcornTree::open("memory://")?;
+    /// let p2p = AcornTree::create_p2p(&tree1, &tree2)?;
+    /// p2p.set_sync_mode(1)?; // PushOnly
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn set_sync_mode(&self, sync_mode: i32) -> Result<()> {
+        let rc = unsafe { acorn_p2p_set_sync_mode(self.h, sync_mode) };
+        if rc == 0 {
+            Ok(())
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+
+    /// Set the conflict resolution direction.
+    /// 
+    /// # Arguments
+    /// * `conflict_direction` - 0=UseJudge, 1=PreferLocal, 2=PreferRemote
+    /// 
+    /// # Example
+    /// 
+    /// ```rust
+    /// use acorn::AcornTree;
+    /// 
+    /// let tree1 = AcornTree::open("memory://")?;
+    /// let tree2 = AcornTree::open("memory://")?;
+    /// let p2p = AcornTree::create_p2p(&tree1, &tree2)?;
+    /// p2p.set_conflict_direction(1)?; // PreferLocal
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn set_conflict_direction(&self, conflict_direction: i32) -> Result<()> {
+        let rc = unsafe { acorn_p2p_set_conflict_direction(self.h, conflict_direction) };
+        if rc == 0 {
+            Ok(())
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+}
+
+impl Drop for AcornP2P {
+    fn drop(&mut self) {
+        unsafe { acorn_p2p_close(self.h); }
     }
 }
 

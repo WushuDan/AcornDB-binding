@@ -899,5 +899,254 @@ mod unit_tests {
         // No data should be committed
         assert!(tree.crack::<TestData>("user1").is_err());
     }
+
+    // Advanced Sync Tests
+    #[test]
+    fn test_mesh_basic_operations() {
+        let mesh = AcornTree::create_mesh().unwrap();
+        
+        let mut tree1 = AcornTree::open("memory://").unwrap();
+        let mut tree2 = AcornTree::open("memory://").unwrap();
+        
+        // Add nodes to mesh
+        mesh.add_node("node1", &tree1).unwrap();
+        mesh.add_node("node2", &tree2).unwrap();
+        
+        // Connect nodes
+        mesh.connect_nodes("node1", "node2").unwrap();
+        
+        // Add some data to tree1
+        tree1.stash("user1", &TestData { id: "user1".to_string(), name: "Alice".to_string(), value: 30 }).unwrap();
+        
+        // Synchronize mesh
+        mesh.synchronize_all().unwrap();
+        
+        // Data should be synchronized to tree2
+        let user1: TestData = tree2.crack("user1").unwrap();
+        assert_eq!(user1.name, "Alice");
+    }
+
+    #[test]
+    fn test_mesh_full_mesh_topology() {
+        let mesh = AcornTree::create_mesh().unwrap();
+        
+        let mut tree1 = AcornTree::open("memory://").unwrap();
+        let mut tree2 = AcornTree::open("memory://").unwrap();
+        let mut tree3 = AcornTree::open("memory://").unwrap();
+        
+        // Add nodes to mesh
+        mesh.add_node("node1", &tree1).unwrap();
+        mesh.add_node("node2", &tree2).unwrap();
+        mesh.add_node("node3", &tree3).unwrap();
+        
+        // Create full mesh topology
+        mesh.create_full_mesh().unwrap();
+        
+        // Add data to tree1
+        tree1.stash("user1", &TestData { id: "user1".to_string(), name: "Alice".to_string(), value: 30 }).unwrap();
+        
+        // Synchronize mesh
+        mesh.synchronize_all().unwrap();
+        
+        // Data should be synchronized to all other trees
+        let user1_tree2: TestData = tree2.crack("user1").unwrap();
+        let user1_tree3: TestData = tree3.crack("user1").unwrap();
+        assert_eq!(user1_tree2.name, "Alice");
+        assert_eq!(user1_tree3.name, "Alice");
+    }
+
+    #[test]
+    fn test_mesh_ring_topology() {
+        let mesh = AcornTree::create_mesh().unwrap();
+        
+        let mut tree1 = AcornTree::open("memory://").unwrap();
+        let mut tree2 = AcornTree::open("memory://").unwrap();
+        let mut tree3 = AcornTree::open("memory://").unwrap();
+        
+        // Add nodes to mesh
+        mesh.add_node("node1", &tree1).unwrap();
+        mesh.add_node("node2", &tree2).unwrap();
+        mesh.add_node("node3", &tree3).unwrap();
+        
+        // Create ring topology
+        mesh.create_ring().unwrap();
+        
+        // Add data to tree1
+        tree1.stash("user1", &TestData { id: "user1".to_string(), name: "Alice".to_string(), value: 30 }).unwrap();
+        
+        // Synchronize mesh
+        mesh.synchronize_all().unwrap();
+        
+        // Data should propagate through the ring
+        let user1_tree2: TestData = tree2.crack("user1").unwrap();
+        let user1_tree3: TestData = tree3.crack("user1").unwrap();
+        assert_eq!(user1_tree2.name, "Alice");
+        assert_eq!(user1_tree3.name, "Alice");
+    }
+
+    #[test]
+    fn test_mesh_star_topology() {
+        let mesh = AcornTree::create_mesh().unwrap();
+        
+        let mut hub_tree = AcornTree::open("memory://").unwrap();
+        let mut tree1 = AcornTree::open("memory://").unwrap();
+        let mut tree2 = AcornTree::open("memory://").unwrap();
+        
+        // Add nodes to mesh
+        mesh.add_node("hub", &hub_tree).unwrap();
+        mesh.add_node("node1", &tree1).unwrap();
+        mesh.add_node("node2", &tree2).unwrap();
+        
+        // Create star topology with hub as center
+        mesh.create_star("hub").unwrap();
+        
+        // Add data to hub
+        hub_tree.stash("user1", &TestData { id: "user1".to_string(), name: "Alice".to_string(), value: 30 }).unwrap();
+        
+        // Synchronize mesh
+        mesh.synchronize_all().unwrap();
+        
+        // Data should be synchronized to all spoke nodes
+        let user1_tree1: TestData = tree1.crack("user1").unwrap();
+        let user1_tree2: TestData = tree2.crack("user1").unwrap();
+        assert_eq!(user1_tree1.name, "Alice");
+        assert_eq!(user1_tree2.name, "Alice");
+    }
+
+    #[test]
+    fn test_p2p_bidirectional_sync() {
+        let mut tree1 = AcornTree::open("memory://").unwrap();
+        let mut tree2 = AcornTree::open("memory://").unwrap();
+        
+        // Create P2P connection
+        let p2p = AcornTree::create_p2p(&tree1, &tree2).unwrap();
+        
+        // Add data to tree1
+        tree1.stash("user1", &TestData { id: "user1".to_string(), name: "Alice".to_string(), value: 30 }).unwrap();
+        
+        // Sync bidirectionally
+        p2p.sync_bidirectional().unwrap();
+        
+        // Data should be synchronized to tree2
+        let user1: TestData = tree2.crack("user1").unwrap();
+        assert_eq!(user1.name, "Alice");
+        
+        // Add data to tree2
+        tree2.stash("user2", &TestData { id: "user2".to_string(), name: "Bob".to_string(), value: 25 }).unwrap();
+        
+        // Sync again
+        p2p.sync_bidirectional().unwrap();
+        
+        // Data should be synchronized to tree1
+        let user2: TestData = tree1.crack("user2").unwrap();
+        assert_eq!(user2.name, "Bob");
+    }
+
+    #[test]
+    fn test_p2p_push_only_sync() {
+        let mut tree1 = AcornTree::open("memory://").unwrap();
+        let mut tree2 = AcornTree::open("memory://").unwrap();
+        
+        // Create P2P connection
+        let p2p = AcornTree::create_p2p(&tree1, &tree2).unwrap();
+        
+        // Set to push-only mode
+        p2p.set_sync_mode(1).unwrap(); // PushOnly
+        
+        // Add data to tree1
+        tree1.stash("user1", &TestData { id: "user1".to_string(), name: "Alice".to_string(), value: 30 }).unwrap();
+        
+        // Sync push-only
+        p2p.sync_push_only().unwrap();
+        
+        // Data should be synchronized to tree2
+        let user1: TestData = tree2.crack("user1").unwrap();
+        assert_eq!(user1.name, "Alice");
+        
+        // Add data to tree2
+        tree2.stash("user2", &TestData { id: "user2".to_string(), name: "Bob".to_string(), value: 25 }).unwrap();
+        
+        // Sync push-only again
+        p2p.sync_push_only().unwrap();
+        
+        // Data from tree2 should NOT be synchronized to tree1 in push-only mode
+        assert!(tree1.crack::<TestData>("user2").is_err());
+    }
+
+    #[test]
+    fn test_p2p_pull_only_sync() {
+        let mut tree1 = AcornTree::open("memory://").unwrap();
+        let mut tree2 = AcornTree::open("memory://").unwrap();
+        
+        // Create P2P connection
+        let p2p = AcornTree::create_p2p(&tree1, &tree2).unwrap();
+        
+        // Set to pull-only mode
+        p2p.set_sync_mode(2).unwrap(); // PullOnly
+        
+        // Add data to tree2
+        tree2.stash("user1", &TestData { id: "user1".to_string(), name: "Alice".to_string(), value: 30 }).unwrap();
+        
+        // Sync pull-only
+        p2p.sync_pull_only().unwrap();
+        
+        // Data should be synchronized to tree1
+        let user1: TestData = tree1.crack("user1").unwrap();
+        assert_eq!(user1.name, "Alice");
+        
+        // Add data to tree1
+        tree1.stash("user2", &TestData { id: "user2".to_string(), name: "Bob".to_string(), value: 25 }).unwrap();
+        
+        // Sync pull-only again
+        p2p.sync_pull_only().unwrap();
+        
+        // Data from tree1 should NOT be synchronized to tree2 in pull-only mode
+        assert!(tree2.crack::<TestData>("user2").is_err());
+    }
+
+    #[test]
+    fn test_p2p_sync_mode_changes() {
+        let mut tree1 = AcornTree::open("memory://").unwrap();
+        let mut tree2 = AcornTree::open("memory://").unwrap();
+        
+        // Create P2P connection
+        let p2p = AcornTree::create_p2p(&tree1, &tree2).unwrap();
+        
+        // Test different sync modes
+        p2p.set_sync_mode(0).unwrap(); // Bidirectional
+        p2p.set_sync_mode(1).unwrap(); // PushOnly
+        p2p.set_sync_mode(2).unwrap(); // PullOnly
+        p2p.set_sync_mode(3).unwrap(); // Disabled
+        
+        // Test conflict direction settings
+        p2p.set_conflict_direction(0).unwrap(); // UseJudge
+        p2p.set_conflict_direction(1).unwrap(); // PreferLocal
+        p2p.set_conflict_direction(2).unwrap(); // PreferRemote
+    }
+
+    #[test]
+    fn test_advanced_sync_error_handling() {
+        let mesh = AcornTree::create_mesh().unwrap();
+        
+        // Try to connect non-existent nodes
+        let result = mesh.connect_nodes("nonexistent1", "nonexistent2");
+        assert!(result.is_err());
+        
+        // Try to create star with non-existent hub
+        let result = mesh.create_star("nonexistent_hub");
+        assert!(result.is_err());
+        
+        let mut tree1 = AcornTree::open("memory://").unwrap();
+        let mut tree2 = AcornTree::open("memory://").unwrap();
+        
+        // Try to create P2P with invalid sync mode
+        let p2p = AcornTree::create_p2p(&tree1, &tree2).unwrap();
+        let result = p2p.set_sync_mode(999); // Invalid mode
+        assert!(result.is_err());
+        
+        // Try to create P2P with invalid conflict direction
+        let result = p2p.set_conflict_direction(999); // Invalid direction
+        assert!(result.is_err());
+    }
 }
 

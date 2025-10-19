@@ -8,6 +8,8 @@ public static class NativeExports
     static readonly HandleTable<AcornFacade.JsonSubscription> Subscriptions = new();
     static readonly HandleTable<SubscriptionContext> SubscriptionContexts = new();
     static readonly HandleTable<AcornFacade.JsonTransaction> Transactions = new();
+    static readonly HandleTable<AcornFacade.JsonMesh> Meshes = new();
+    static readonly HandleTable<AcornFacade.JsonP2P> P2PConnections = new();
 
     [UnmanagedCallersOnly(EntryPoint = "acorn_open_tree")]
     public static int OpenTree(IntPtr uriUtf8, IntPtr handlePtr)
@@ -517,6 +519,173 @@ public static class NativeExports
     {
         try {
             Transactions.Remove(transactionHandle, out _);
+            return 0;
+        } catch (Exception ex) { Error.Set(ex); return -1; }
+    }
+
+    // Advanced Sync - Mesh Sync Methods
+    [UnmanagedCallersOnly(EntryPoint = "acorn_mesh_create")]
+    public static int MeshCreate(IntPtr outMeshPtr)
+    {
+        try {
+            var mesh = AcornFacade.CreateMesh();
+            ulong meshHandle = Meshes.Add(mesh);
+            unsafe { *(ulong*)outMeshPtr = meshHandle; }
+            return 0;
+        } catch (Exception ex) {
+            unsafe { *(ulong*)outMeshPtr = 0; }
+            Error.Set(ex);
+            return -1;
+        }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_mesh_add_node")]
+    public static int MeshAddNode(ulong meshHandle, IntPtr nodeIdUtf8, ulong treeHandle)
+    {
+        try {
+            var mesh = Meshes.Get(meshHandle);
+            var tree = Trees.Get(treeHandle);
+            string nodeId = Utf8.In(nodeIdUtf8);
+            mesh.AddNode(nodeId, tree);
+            return 0;
+        } catch (Exception ex) { Error.Set(ex); return -1; }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_mesh_connect_nodes")]
+    public static int MeshConnectNodes(ulong meshHandle, IntPtr nodeAUtf8, IntPtr nodeBUtf8)
+    {
+        try {
+            var mesh = Meshes.Get(meshHandle);
+            string nodeA = Utf8.In(nodeAUtf8);
+            string nodeB = Utf8.In(nodeBUtf8);
+            mesh.ConnectNodes(nodeA, nodeB);
+            return 0;
+        } catch (Exception ex) { Error.Set(ex); return -1; }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_mesh_create_full_mesh")]
+    public static int MeshCreateFullMesh(ulong meshHandle)
+    {
+        try {
+            var mesh = Meshes.Get(meshHandle);
+            mesh.CreateFullMesh();
+            return 0;
+        } catch (Exception ex) { Error.Set(ex); return -1; }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_mesh_create_ring")]
+    public static int MeshCreateRing(ulong meshHandle)
+    {
+        try {
+            var mesh = Meshes.Get(meshHandle);
+            mesh.CreateRing();
+            return 0;
+        } catch (Exception ex) { Error.Set(ex); return -1; }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_mesh_create_star")]
+    public static int MeshCreateStar(ulong meshHandle, IntPtr hubNodeIdUtf8)
+    {
+        try {
+            var mesh = Meshes.Get(meshHandle);
+            string hubNodeId = Utf8.In(hubNodeIdUtf8);
+            mesh.CreateStar(hubNodeId);
+            return 0;
+        } catch (Exception ex) { Error.Set(ex); return -1; }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_mesh_synchronize_all")]
+    public static int MeshSynchronizeAll(ulong meshHandle)
+    {
+        try {
+            var mesh = Meshes.Get(meshHandle);
+            mesh.SynchronizeAll();
+            return 0;
+        } catch (Exception ex) { Error.Set(ex); return -1; }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_mesh_close")]
+    public static int MeshClose(ulong meshHandle)
+    {
+        try {
+            Meshes.Remove(meshHandle, out _);
+            return 0;
+        } catch (Exception ex) { Error.Set(ex); return -1; }
+    }
+
+    // Advanced Sync - Peer-to-Peer Sync Methods
+    [UnmanagedCallersOnly(EntryPoint = "acorn_p2p_create")]
+    public static int P2PCreate(ulong localTreeHandle, ulong remoteTreeHandle, IntPtr outP2PPtr)
+    {
+        try {
+            var localTree = Trees.Get(localTreeHandle);
+            var remoteTree = Trees.Get(remoteTreeHandle);
+            var p2p = AcornFacade.CreateP2P(localTree, remoteTree);
+            ulong p2pHandle = P2PConnections.Add(p2p);
+            unsafe { *(ulong*)outP2PPtr = p2pHandle; }
+            return 0;
+        } catch (Exception ex) {
+            unsafe { *(ulong*)outP2PPtr = 0; }
+            Error.Set(ex);
+            return -1;
+        }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_p2p_sync_bidirectional")]
+    public static int P2PSyncBidirectional(ulong p2pHandle)
+    {
+        try {
+            var p2p = P2PConnections.Get(p2pHandle);
+            p2p.SyncBidirectional();
+            return 0;
+        } catch (Exception ex) { Error.Set(ex); return -1; }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_p2p_sync_push_only")]
+    public static int P2PSyncPushOnly(ulong p2pHandle)
+    {
+        try {
+            var p2p = P2PConnections.Get(p2pHandle);
+            p2p.SyncPushOnly();
+            return 0;
+        } catch (Exception ex) { Error.Set(ex); return -1; }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_p2p_sync_pull_only")]
+    public static int P2PSyncPullOnly(ulong p2pHandle)
+    {
+        try {
+            var p2p = P2PConnections.Get(p2pHandle);
+            p2p.SyncPullOnly();
+            return 0;
+        } catch (Exception ex) { Error.Set(ex); return -1; }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_p2p_set_sync_mode")]
+    public static int P2PSetSyncMode(ulong p2pHandle, int syncMode)
+    {
+        try {
+            var p2p = P2PConnections.Get(p2pHandle);
+            p2p.SetSyncMode(syncMode);
+            return 0;
+        } catch (Exception ex) { Error.Set(ex); return -1; }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_p2p_set_conflict_direction")]
+    public static int P2PSetConflictDirection(ulong p2pHandle, int conflictDirection)
+    {
+        try {
+            var p2p = P2PConnections.Get(p2pHandle);
+            p2p.SetConflictDirection(conflictDirection);
+            return 0;
+        } catch (Exception ex) { Error.Set(ex); return -1; }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_p2p_close")]
+    public static int P2PClose(ulong p2pHandle)
+    {
+        try {
+            P2PConnections.Remove(p2pHandle, out _);
             return 0;
         } catch (Exception ex) { Error.Set(ex); return -1; }
     }

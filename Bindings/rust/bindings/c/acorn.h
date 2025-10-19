@@ -65,6 +65,29 @@ ACORN_API int acorn_unsubscribe(acorn_sub_handle sub);
 // Sync (optional)
 ACORN_API int acorn_sync_http(acorn_tree_handle tree, const char* url);
 
+// Advanced Sync - Mesh and Peer-to-Peer synchronization
+typedef uint64_t acorn_mesh_handle;
+typedef uint64_t acorn_p2p_handle;
+
+// Mesh Sync - Coordinate synchronization across multiple trees
+ACORN_API int acorn_mesh_create(acorn_mesh_handle* out_mesh);
+ACORN_API int acorn_mesh_add_node(acorn_mesh_handle mesh, const char* node_id, acorn_tree_handle tree);
+ACORN_API int acorn_mesh_connect_nodes(acorn_mesh_handle mesh, const char* node_a, const char* node_b);
+ACORN_API int acorn_mesh_create_full_mesh(acorn_mesh_handle mesh);
+ACORN_API int acorn_mesh_create_ring(acorn_mesh_handle mesh);
+ACORN_API int acorn_mesh_create_star(acorn_mesh_handle mesh, const char* hub_node_id);
+ACORN_API int acorn_mesh_synchronize_all(acorn_mesh_handle mesh);
+ACORN_API int acorn_mesh_close(acorn_mesh_handle mesh);
+
+// Peer-to-Peer Sync - Direct tree-to-tree synchronization
+ACORN_API int acorn_p2p_create(acorn_tree_handle local_tree, acorn_tree_handle remote_tree, acorn_p2p_handle* out_p2p);
+ACORN_API int acorn_p2p_sync_bidirectional(acorn_p2p_handle p2p);
+ACORN_API int acorn_p2p_sync_push_only(acorn_p2p_handle p2p);
+ACORN_API int acorn_p2p_sync_pull_only(acorn_p2p_handle p2p);
+ACORN_API int acorn_p2p_set_sync_mode(acorn_p2p_handle p2p, int sync_mode); // 0=Bidirectional, 1=PushOnly, 2=PullOnly, 3=Disabled
+ACORN_API int acorn_p2p_set_conflict_direction(acorn_p2p_handle p2p, int conflict_direction); // 0=UseJudge, 1=PreferLocal, 2=PreferRemote
+ACORN_API int acorn_p2p_close(acorn_p2p_handle p2p);
+
 // Transactions
 typedef uint64_t acorn_transaction_handle;
 
