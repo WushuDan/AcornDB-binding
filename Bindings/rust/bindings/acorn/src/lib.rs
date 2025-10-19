@@ -287,6 +287,30 @@ impl AcornTree {
             Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
+
+    /// Start a LINQ-style query on this tree.
+    /// Returns a query builder that supports filtering, ordering, and projection.
+    ///
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornTree, Error};
+    /// # use serde::{Deserialize, Serialize};
+    /// # #[derive(Serialize, Deserialize)]
+    /// # struct User { name: String, age: u32 }
+    /// # fn main() -> Result<(), Error> {
+    /// let tree = AcornTree::open("memory://")?;
+    /// 
+    /// // Query users older than 18, ordered by name
+    /// let adults: Vec<User> = tree.query()
+    ///     .where_condition(|user| user["age"].as_u64().unwrap_or(0) >= 18)
+    ///     .order_by(|user| user["name"].as_str().unwrap_or("").to_string())
+    ///     .collect()?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn query(&self) -> AcornQuery {
+        AcornQuery::new(self.h)
+    }
 }
 
 impl Drop for AcornTree {
@@ -440,6 +464,732 @@ impl Drop for AcornSubscription {
         unsafe {
             acorn_unsubscribe(self.h);
         }
+    }
+}
+
+/// LINQ-style query builder for AcornTree.
+/// Provides fluent API for filtering, ordering, and projecting tree data.
+pub struct AcornQuery {
+    tree_h: acorn_tree_handle,
+}
+
+impl AcornQuery {
+    fn new(tree_h: acorn_tree_handle) -> Self {
+        Self { tree_h }
+    }
+
+    /// Filter items by a condition on the payload.
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornTree, Error};
+    /// # use serde::{Deserialize, Serialize};
+    /// # #[derive(Serialize, Deserialize)]
+    /// # struct User { name: String, age: u32 }
+    /// # fn main() -> Result<(), Error> {
+    /// let tree = AcornTree::open("memory://")?;
+    /// let adults: Vec<User> = tree.query()
+    ///     .where_condition(|user| user["age"].as_u64().unwrap_or(0) >= 18)
+    ///     .collect()?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn where_condition<F>(self, predicate: F) -> AcornQueryWhere<F>
+    where
+        F: Fn(&serde_json::Value) -> bool,
+    {
+        AcornQueryWhere {
+            tree_h: self.tree_h,
+            predicate,
+        }
+    }
+
+    /// Order items by a key selector.
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornTree, Error};
+    /// # use serde::{Deserialize, Serialize};
+    /// # #[derive(Serialize, Deserialize)]
+    /// # struct User { name: String, age: u32 }
+    /// # fn main() -> Result<(), Error> {
+    /// let tree = AcornTree::open("memory://")?;
+    /// let users: Vec<User> = tree.query()
+    ///     .order_by(|user| user["name"].as_str().unwrap_or("").to_string())
+    ///     .collect()?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn order_by<F>(self, key_selector: F) -> AcornQueryOrderBy<F>
+    where
+        F: Fn(&serde_json::Value) -> String,
+    {
+        AcornQueryOrderBy {
+            tree_h: self.tree_h,
+            key_selector,
+            descending: false,
+        }
+    }
+
+    /// Order items by a key selector (descending).
+    pub fn order_by_descending<F>(self, key_selector: F) -> AcornQueryOrderBy<F>
+    where
+        F: Fn(&serde_json::Value) -> String,
+    {
+        AcornQueryOrderBy {
+            tree_h: self.tree_h,
+            key_selector,
+            descending: true,
+        }
+    }
+
+    /// Take only the first N items.
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornTree, Error};
+    /// # use serde::{Deserialize, Serialize};
+    /// # #[derive(Serialize, Deserialize)]
+    /// # struct User { name: String, age: u32 }
+    /// # fn main() -> Result<(), Error> {
+    /// let tree = AcornTree::open("memory://")?;
+    /// let top_users: Vec<User> = tree.query()
+    ///     .order_by(|user| user["name"].as_str().unwrap_or("").to_string())
+    ///     .take(10)
+    ///     .collect()?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn take(self, count: usize) -> AcornQueryTake {
+        AcornQueryTake {
+            tree_h: self.tree_h,
+            count,
+        }
+    }
+
+    /// Skip the first N items.
+    pub fn skip(self, count: usize) -> AcornQuerySkip {
+        AcornQuerySkip {
+            tree_h: self.tree_h,
+            count,
+        }
+    }
+
+    /// Execute the query and collect all results into a Vec.
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornTree, Error};
+    /// # use serde::{Deserialize, Serialize};
+    /// # #[derive(Serialize, Deserialize)]
+    /// # struct User { name: String, age: u32 }
+    /// # fn main() -> Result<(), Error> {
+    /// let tree = AcornTree::open("memory://")?;
+    /// let users: Vec<User> = tree.query().collect()?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn collect<T: DeserializeOwned>(&self) -> Result<Vec<T>> {
+        // For now, we'll implement a simple version that gets all items
+        // In a full implementation, we'd need to implement the query execution
+        // through the FFI layer
+        let mut iter = unsafe {
+            let mut iter_h: acorn_iter_handle = 0;
+            let rc = acorn_iter_start(self.tree_h, ptr::null(), &mut iter_h as *mut _);
+            if rc != 0 {
+                return Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }));
+            }
+            AcornIterator { h: iter_h }
+        };
+
+        let mut results = Vec::new();
+        while let Some((_, value)) = iter.next()? {
+            results.push(value);
+        }
+        Ok(results)
+    }
+
+    /// Execute the query and return the first result, or None if empty.
+    pub fn first<T: DeserializeOwned>(&self) -> Result<Option<T>> {
+        let mut iter = unsafe {
+            let mut iter_h: acorn_iter_handle = 0;
+            let rc = acorn_iter_start(self.tree_h, ptr::null(), &mut iter_h as *mut _);
+            if rc != 0 {
+                return Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }));
+            }
+            AcornIterator { h: iter_h }
+        };
+
+        if let Some((_, value)) = iter.next()? {
+            Ok(Some(value))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Count the number of items that would be returned by this query.
+    pub fn count(&self) -> Result<usize> {
+        unsafe {
+            let mut count: usize = 0;
+            let rc = acorn_count(self.tree_h, &mut count as *mut _);
+            if rc != 0 {
+                return Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }));
+            }
+            Ok(count)
+        }
+    }
+
+    /// Check if any items match this query.
+    pub fn any(&self) -> Result<bool> {
+        Ok(self.count()? > 0)
+    }
+}
+
+/// Query builder with WHERE condition applied.
+pub struct AcornQueryWhere<F> {
+    tree_h: acorn_tree_handle,
+    predicate: F,
+}
+
+impl<F> AcornQueryWhere<F>
+where
+    F: Fn(&serde_json::Value) -> bool,
+{
+    /// Apply ordering to the filtered results.
+    pub fn order_by<G>(self, key_selector: G) -> AcornQueryWhereOrderBy<F, G>
+    where
+        G: Fn(&serde_json::Value) -> String,
+    {
+        AcornQueryWhereOrderBy {
+            tree_h: self.tree_h,
+            predicate: self.predicate,
+            key_selector,
+            descending: false,
+        }
+    }
+
+    /// Apply ordering to the filtered results (descending).
+    pub fn order_by_descending<G>(self, key_selector: G) -> AcornQueryWhereOrderBy<F, G>
+    where
+        G: Fn(&serde_json::Value) -> String,
+    {
+        AcornQueryWhereOrderBy {
+            tree_h: self.tree_h,
+            predicate: self.predicate,
+            key_selector,
+            descending: true,
+        }
+    }
+
+    /// Take only the first N items from filtered results.
+    pub fn take(self, count: usize) -> AcornQueryWhereTake<F> {
+        AcornQueryWhereTake {
+            tree_h: self.tree_h,
+            predicate: self.predicate,
+            count,
+        }
+    }
+
+    /// Skip the first N items from filtered results.
+    pub fn skip(self, count: usize) -> AcornQueryWhereSkip<F> {
+        AcornQueryWhereSkip {
+            tree_h: self.tree_h,
+            predicate: self.predicate,
+            count,
+        }
+    }
+
+    /// Execute the query and collect all filtered results.
+    pub fn collect<T: DeserializeOwned>(&self) -> Result<Vec<T>> {
+        // For now, implement simple filtering by getting all items and filtering in Rust
+        // In a full implementation, this would be done in the C# layer
+        let mut iter = unsafe {
+            let mut iter_h: acorn_iter_handle = 0;
+            let rc = acorn_iter_start(self.tree_h, ptr::null(), &mut iter_h as *mut _);
+            if rc != 0 {
+                return Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }));
+            }
+            AcornIterator { h: iter_h }
+        };
+
+        let mut results = Vec::new();
+        while let Some((_, value)) = iter.next::<serde_json::Value>()? {
+            if (self.predicate)(&value) {
+                let typed_value: T = serde_json::from_value(value).map_err(|e| Error::Acorn(e.to_string()))?;
+                results.push(typed_value);
+            }
+        }
+        Ok(results)
+    }
+
+    /// Execute the query and return the first filtered result.
+    pub fn first<T: DeserializeOwned>(&self) -> Result<Option<T>> {
+        let mut iter = unsafe {
+            let mut iter_h: acorn_iter_handle = 0;
+            let rc = acorn_iter_start(self.tree_h, ptr::null(), &mut iter_h as *mut _);
+            if rc != 0 {
+                return Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }));
+            }
+            AcornIterator { h: iter_h }
+        };
+
+        while let Some((_, value)) = iter.next::<serde_json::Value>()? {
+            if (self.predicate)(&value) {
+                let typed_value: T = serde_json::from_value(value).map_err(|e| Error::Acorn(e.to_string()))?;
+                return Ok(Some(typed_value));
+            }
+        }
+        Ok(None)
+    }
+
+    /// Count the number of filtered results.
+    pub fn count(&self) -> Result<usize> {
+        let mut iter = unsafe {
+            let mut iter_h: acorn_iter_handle = 0;
+            let rc = acorn_iter_start(self.tree_h, ptr::null(), &mut iter_h as *mut _);
+            if rc != 0 {
+                return Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }));
+            }
+            AcornIterator { h: iter_h }
+        };
+
+        let mut count = 0;
+        while let Some((_, value)) = iter.next::<serde_json::Value>()? {
+            if (self.predicate)(&value) {
+                count += 1;
+            }
+        }
+        Ok(count)
+    }
+
+    /// Check if any items match the filter.
+    pub fn any(&self) -> Result<bool> {
+        Ok(self.count()? > 0)
+    }
+}
+
+/// Query builder with WHERE condition and ORDER BY applied.
+pub struct AcornQueryWhereOrderBy<F, G> {
+    tree_h: acorn_tree_handle,
+    predicate: F,
+    key_selector: G,
+    descending: bool,
+}
+
+impl<F, G> AcornQueryWhereOrderBy<F, G>
+where
+    F: Fn(&serde_json::Value) -> bool,
+    G: Fn(&serde_json::Value) -> String,
+{
+    /// Take only the first N items from filtered, ordered results.
+    pub fn take(self, count: usize) -> AcornQueryWhereOrderByTake<F, G> {
+        AcornQueryWhereOrderByTake {
+            tree_h: self.tree_h,
+            predicate: self.predicate,
+            key_selector: self.key_selector,
+            descending: self.descending,
+            count,
+        }
+    }
+
+    /// Execute the query and collect all filtered, ordered results.
+    pub fn collect<T: DeserializeOwned>(&self) -> Result<Vec<T>> {
+        // Get all filtered results first
+        let mut iter = unsafe {
+            let mut iter_h: acorn_iter_handle = 0;
+            let rc = acorn_iter_start(self.tree_h, ptr::null(), &mut iter_h as *mut _);
+            if rc != 0 {
+                return Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }));
+            }
+            AcornIterator { h: iter_h }
+        };
+
+        let mut filtered_items = Vec::new();
+        while let Some((key, value)) = iter.next::<serde_json::Value>()? {
+            if (self.predicate)(&value) {
+                let key_str = (self.key_selector)(&value);
+                filtered_items.push((key_str, value));
+            }
+        }
+
+        // Sort by the key selector
+        filtered_items.sort_by(|a, b| {
+            if self.descending {
+                b.0.cmp(&a.0)
+            } else {
+                a.0.cmp(&b.0)
+            }
+        });
+
+        // Convert to typed results
+        let mut results = Vec::new();
+        for (_, value) in filtered_items {
+            let typed_value: T = serde_json::from_value(value).map_err(|e| Error::Acorn(e.to_string()))?;
+            results.push(typed_value);
+        }
+        Ok(results)
+    }
+}
+
+/// Query builder with WHERE condition and TAKE applied.
+pub struct AcornQueryWhereTake<F> {
+    tree_h: acorn_tree_handle,
+    predicate: F,
+    count: usize,
+}
+
+impl<F> AcornQueryWhereTake<F>
+where
+    F: Fn(&serde_json::Value) -> bool,
+{
+    /// Execute the query and collect up to N filtered results.
+    pub fn collect<T: DeserializeOwned>(&self) -> Result<Vec<T>> {
+        let mut iter = unsafe {
+            let mut iter_h: acorn_iter_handle = 0;
+            let rc = acorn_iter_start(self.tree_h, ptr::null(), &mut iter_h as *mut _);
+            if rc != 0 {
+                return Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }));
+            }
+            AcornIterator { h: iter_h }
+        };
+
+        let mut results = Vec::new();
+        while let Some((_, value)) = iter.next::<serde_json::Value>()? {
+            if (self.predicate)(&value) {
+                let typed_value: T = serde_json::from_value(value).map_err(|e| Error::Acorn(e.to_string()))?;
+                results.push(typed_value);
+                if results.len() >= self.count {
+                    break;
+                }
+            }
+        }
+        Ok(results)
+    }
+}
+
+/// Query builder with WHERE condition and SKIP applied.
+pub struct AcornQueryWhereSkip<F> {
+    tree_h: acorn_tree_handle,
+    predicate: F,
+    count: usize,
+}
+
+impl<F> AcornQueryWhereSkip<F>
+where
+    F: Fn(&serde_json::Value) -> bool,
+{
+    /// Execute the query and collect filtered results after skipping N items.
+    pub fn collect<T: DeserializeOwned>(&self) -> Result<Vec<T>> {
+        let mut iter = unsafe {
+            let mut iter_h: acorn_iter_handle = 0;
+            let rc = acorn_iter_start(self.tree_h, ptr::null(), &mut iter_h as *mut _);
+            if rc != 0 {
+                return Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }));
+            }
+            AcornIterator { h: iter_h }
+        };
+
+        let mut results = Vec::new();
+        let mut skipped = 0;
+        while let Some((_, value)) = iter.next::<serde_json::Value>()? {
+            if (self.predicate)(&value) {
+                if skipped < self.count {
+                    skipped += 1;
+                } else {
+                    let typed_value: T = serde_json::from_value(value).map_err(|e| Error::Acorn(e.to_string()))?;
+                    results.push(typed_value);
+                }
+            }
+        }
+        Ok(results)
+    }
+}
+
+/// Query builder with ORDER BY applied.
+pub struct AcornQueryOrderBy<F> {
+    tree_h: acorn_tree_handle,
+    key_selector: F,
+    descending: bool,
+}
+
+impl<F> AcornQueryOrderBy<F>
+where
+    F: Fn(&serde_json::Value) -> String,
+{
+    /// Take only the first N items from ordered results.
+    pub fn take(self, count: usize) -> AcornQueryOrderByTake<F> {
+        AcornQueryOrderByTake {
+            tree_h: self.tree_h,
+            key_selector: self.key_selector,
+            descending: self.descending,
+            count,
+        }
+    }
+
+    /// Skip the first N items from ordered results.
+    pub fn skip(self, count: usize) -> AcornQueryOrderBySkip<F> {
+        AcornQueryOrderBySkip {
+            tree_h: self.tree_h,
+            key_selector: self.key_selector,
+            descending: self.descending,
+            count,
+        }
+    }
+
+    /// Execute the query and collect all ordered results.
+    pub fn collect<T: DeserializeOwned>(&self) -> Result<Vec<T>> {
+        let mut iter = unsafe {
+            let mut iter_h: acorn_iter_handle = 0;
+            let rc = acorn_iter_start(self.tree_h, ptr::null(), &mut iter_h as *mut _);
+            if rc != 0 {
+                return Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }));
+            }
+            AcornIterator { h: iter_h }
+        };
+
+        let mut items = Vec::new();
+        while let Some((_, value)) = iter.next::<serde_json::Value>()? {
+            let key_str = (self.key_selector)(&value);
+            items.push((key_str, value));
+        }
+
+        // Sort by the key selector
+        items.sort_by(|a, b| {
+            if self.descending {
+                b.0.cmp(&a.0)
+            } else {
+                a.0.cmp(&b.0)
+            }
+        });
+
+        // Convert to typed results
+        let mut results = Vec::new();
+        for (_, value) in items {
+            let typed_value: T = serde_json::from_value(value).map_err(|e| Error::Acorn(e.to_string()))?;
+            results.push(typed_value);
+        }
+        Ok(results)
+    }
+}
+
+/// Query builder with TAKE applied.
+pub struct AcornQueryTake {
+    tree_h: acorn_tree_handle,
+    count: usize,
+}
+
+impl AcornQueryTake {
+    /// Execute the query and collect up to N results.
+    pub fn collect<T: DeserializeOwned>(&self) -> Result<Vec<T>> {
+        let mut iter = unsafe {
+            let mut iter_h: acorn_iter_handle = 0;
+            let rc = acorn_iter_start(self.tree_h, ptr::null(), &mut iter_h as *mut _);
+            if rc != 0 {
+                return Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }));
+            }
+            AcornIterator { h: iter_h }
+        };
+
+        let mut results = Vec::new();
+        while let Some((_, value)) = iter.next()? {
+            results.push(value);
+            if results.len() >= self.count {
+                break;
+            }
+        }
+        Ok(results)
+    }
+}
+
+/// Query builder with SKIP applied.
+pub struct AcornQuerySkip {
+    tree_h: acorn_tree_handle,
+    count: usize,
+}
+
+impl AcornQuerySkip {
+    /// Execute the query and collect results after skipping N items.
+    pub fn collect<T: DeserializeOwned>(&self) -> Result<Vec<T>> {
+        let mut iter = unsafe {
+            let mut iter_h: acorn_iter_handle = 0;
+            let rc = acorn_iter_start(self.tree_h, ptr::null(), &mut iter_h as *mut _);
+            if rc != 0 {
+                return Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }));
+            }
+            AcornIterator { h: iter_h }
+        };
+
+        let mut results = Vec::new();
+        let mut skipped = 0;
+        while let Some((_, value)) = iter.next()? {
+            if skipped < self.count {
+                skipped += 1;
+            } else {
+                results.push(value);
+            }
+        }
+        Ok(results)
+    }
+}
+
+/// Query builder with ORDER BY and TAKE applied.
+pub struct AcornQueryOrderByTake<F> {
+    tree_h: acorn_tree_handle,
+    key_selector: F,
+    descending: bool,
+    count: usize,
+}
+
+impl<F> AcornQueryOrderByTake<F>
+where
+    F: Fn(&serde_json::Value) -> String,
+{
+    /// Execute the query and collect up to N ordered results.
+    pub fn collect<T: DeserializeOwned>(&self) -> Result<Vec<T>> {
+        let mut iter = unsafe {
+            let mut iter_h: acorn_iter_handle = 0;
+            let rc = acorn_iter_start(self.tree_h, ptr::null(), &mut iter_h as *mut _);
+            if rc != 0 {
+                return Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }));
+            }
+            AcornIterator { h: iter_h }
+        };
+
+        let mut items = Vec::new();
+        while let Some((_, value)) = iter.next::<serde_json::Value>()? {
+            let key_str = (self.key_selector)(&value);
+            items.push((key_str, value));
+        }
+
+        // Sort by the key selector
+        items.sort_by(|a, b| {
+            if self.descending {
+                b.0.cmp(&a.0)
+            } else {
+                a.0.cmp(&b.0)
+            }
+        });
+
+        // Take only the first N items
+        items.truncate(self.count);
+
+        // Convert to typed results
+        let mut results = Vec::new();
+        for (_, value) in items {
+            let typed_value: T = serde_json::from_value(value).map_err(|e| Error::Acorn(e.to_string()))?;
+            results.push(typed_value);
+        }
+        Ok(results)
+    }
+}
+
+/// Query builder with ORDER BY and SKIP applied.
+pub struct AcornQueryOrderBySkip<F> {
+    tree_h: acorn_tree_handle,
+    key_selector: F,
+    descending: bool,
+    count: usize,
+}
+
+impl<F> AcornQueryOrderBySkip<F>
+where
+    F: Fn(&serde_json::Value) -> String,
+{
+    /// Execute the query and collect ordered results after skipping N items.
+    pub fn collect<T: DeserializeOwned>(&self) -> Result<Vec<T>> {
+        let mut iter = unsafe {
+            let mut iter_h: acorn_iter_handle = 0;
+            let rc = acorn_iter_start(self.tree_h, ptr::null(), &mut iter_h as *mut _);
+            if rc != 0 {
+                return Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }));
+            }
+            AcornIterator { h: iter_h }
+        };
+
+        let mut items = Vec::new();
+        while let Some((_, value)) = iter.next::<serde_json::Value>()? {
+            let key_str = (self.key_selector)(&value);
+            items.push((key_str, value));
+        }
+
+        // Sort by the key selector
+        items.sort_by(|a, b| {
+            if self.descending {
+                b.0.cmp(&a.0)
+            } else {
+                a.0.cmp(&b.0)
+            }
+        });
+
+        // Skip the first N items
+        if self.count < items.len() {
+            items.drain(0..self.count);
+        } else {
+            items.clear();
+        }
+
+        // Convert to typed results
+        let mut results = Vec::new();
+        for (_, value) in items {
+            let typed_value: T = serde_json::from_value(value).map_err(|e| Error::Acorn(e.to_string()))?;
+            results.push(typed_value);
+        }
+        Ok(results)
+    }
+}
+
+/// Query builder with WHERE condition, ORDER BY, and TAKE applied.
+pub struct AcornQueryWhereOrderByTake<F, G> {
+    tree_h: acorn_tree_handle,
+    predicate: F,
+    key_selector: G,
+    descending: bool,
+    count: usize,
+}
+
+impl<F, G> AcornQueryWhereOrderByTake<F, G>
+where
+    F: Fn(&serde_json::Value) -> bool,
+    G: Fn(&serde_json::Value) -> String,
+{
+    /// Execute the query and collect up to N filtered, ordered results.
+    pub fn collect<T: DeserializeOwned>(&self) -> Result<Vec<T>> {
+        let mut iter = unsafe {
+            let mut iter_h: acorn_iter_handle = 0;
+            let rc = acorn_iter_start(self.tree_h, ptr::null(), &mut iter_h as *mut _);
+            if rc != 0 {
+                return Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }));
+            }
+            AcornIterator { h: iter_h }
+        };
+
+        let mut filtered_items = Vec::new();
+        while let Some((_, value)) = iter.next::<serde_json::Value>()? {
+            if (self.predicate)(&value) {
+                let key_str = (self.key_selector)(&value);
+                filtered_items.push((key_str, value));
+            }
+        }
+
+        // Sort by the key selector
+        filtered_items.sort_by(|a, b| {
+            if self.descending {
+                b.0.cmp(&a.0)
+            } else {
+                a.0.cmp(&b.0)
+            }
+        });
+
+        // Take only the first N items
+        filtered_items.truncate(self.count);
+
+        // Convert to typed results
+        let mut results = Vec::new();
+        for (_, value) in filtered_items {
+            let typed_value: T = serde_json::from_value(value).map_err(|e| Error::Acorn(e.to_string()))?;
+            results.push(typed_value);
+        }
+        Ok(results)
     }
 }
 

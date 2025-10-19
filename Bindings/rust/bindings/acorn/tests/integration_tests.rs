@@ -517,6 +517,227 @@ mod integration_tests {
             assert_eq!(result.as_ref().unwrap().value, i as i32);
         }
     }
+
+    #[test]
+    fn test_query_basic() {
+        let mut tree = get_test_tree();
+
+        // Store some test data
+        let items = vec![
+            ("query-1", TestData { id: "1".to_string(), value: 100, name: "First".to_string() }),
+            ("query-2", TestData { id: "2".to_string(), value: 200, name: "Second".to_string() }),
+            ("query-3", TestData { id: "3".to_string(), value: 300, name: "Third".to_string() }),
+        ];
+
+        tree.batch_stash(&items).unwrap();
+
+        // Test basic query operations
+        let all_items: Vec<TestData> = tree.query().collect().unwrap();
+        assert_eq!(all_items.len(), 3);
+
+        let first_item: Option<TestData> = tree.query().first().unwrap();
+        assert!(first_item.is_some());
+
+        let count = tree.query().count().unwrap();
+        assert_eq!(count, 3);
+
+        let has_items = tree.query().any().unwrap();
+        assert!(has_items);
+    }
+
+    #[test]
+    fn test_query_where_condition() {
+        let mut tree = get_test_tree();
+
+        // Store test data with different values
+        let items = vec![
+            ("where-1", TestData { id: "1".to_string(), value: 100, name: "Low".to_string() }),
+            ("where-2", TestData { id: "2".to_string(), value: 200, name: "Medium".to_string() }),
+            ("where-3", TestData { id: "3".to_string(), value: 300, name: "High".to_string() }),
+        ];
+
+        tree.batch_stash(&items).unwrap();
+
+        // Test filtering by value
+        let high_values: Vec<TestData> = tree.query()
+            .where_condition(|item| item["value"].as_u64().unwrap_or(0) > 150)
+            .collect()
+            .unwrap();
+        assert_eq!(high_values.len(), 2);
+        assert!(high_values.iter().all(|item| item.value > 150));
+
+        // Test filtering by name
+        let medium_items: Vec<TestData> = tree.query()
+            .where_condition(|item| item["name"].as_str() == Some("Medium"))
+            .collect()
+            .unwrap();
+        assert_eq!(medium_items.len(), 1);
+        assert_eq!(medium_items[0].name, "Medium");
+    }
+
+    #[test]
+    fn test_query_order_by() {
+        let mut tree = get_test_tree();
+
+        // Store test data in random order
+        let items = vec![
+            ("order-3", TestData { id: "3".to_string(), value: 300, name: "Charlie".to_string() }),
+            ("order-1", TestData { id: "1".to_string(), value: 100, name: "Alice".to_string() }),
+            ("order-2", TestData { id: "2".to_string(), value: 200, name: "Bob".to_string() }),
+        ];
+
+        tree.batch_stash(&items).unwrap();
+
+        // Test ordering by name
+        let ordered_by_name: Vec<TestData> = tree.query()
+            .order_by(|item| item["name"].as_str().unwrap_or("").to_string())
+            .collect()
+            .unwrap();
+        assert_eq!(ordered_by_name.len(), 3);
+        assert_eq!(ordered_by_name[0].name, "Alice");
+        assert_eq!(ordered_by_name[1].name, "Bob");
+        assert_eq!(ordered_by_name[2].name, "Charlie");
+
+        // Test ordering by value (descending)
+        let ordered_by_value: Vec<TestData> = tree.query()
+            .order_by_descending(|item| item["value"].as_u64().unwrap_or(0).to_string())
+            .collect()
+            .unwrap();
+        assert_eq!(ordered_by_value.len(), 3);
+        assert_eq!(ordered_by_value[0].value, 300);
+        assert_eq!(ordered_by_value[1].value, 200);
+        assert_eq!(ordered_by_value[2].value, 100);
+    }
+
+    #[test]
+    fn test_query_where_and_order() {
+        let mut tree = get_test_tree();
+
+        // Store test data
+        let items = vec![
+            ("combo-1", TestData { id: "1".to_string(), value: 100, name: "Alice".to_string() }),
+            ("combo-2", TestData { id: "2".to_string(), value: 200, name: "Bob".to_string() }),
+            ("combo-3", TestData { id: "3".to_string(), value: 300, name: "Charlie".to_string() }),
+            ("combo-4", TestData { id: "4".to_string(), value: 400, name: "David".to_string() }),
+        ];
+
+        tree.batch_stash(&items).unwrap();
+
+        // Test combining WHERE and ORDER BY
+        let filtered_and_ordered: Vec<TestData> = tree.query()
+            .where_condition(|item| item["value"].as_u64().unwrap_or(0) >= 200)
+            .order_by(|item| item["name"].as_str().unwrap_or("").to_string())
+            .collect()
+            .unwrap();
+        assert_eq!(filtered_and_ordered.len(), 3);
+        assert_eq!(filtered_and_ordered[0].name, "Bob");
+        assert_eq!(filtered_and_ordered[1].name, "Charlie");
+        assert_eq!(filtered_and_ordered[2].name, "David");
+    }
+
+    #[test]
+    fn test_query_take_and_skip() {
+        let mut tree = get_test_tree();
+
+        // Store test data
+        let items: Vec<(&str, TestData)> = (0..10)
+            .map(|i| {
+                (
+                    Box::leak(format!("take-skip-{}", i).into_boxed_str()) as &str,
+                    TestData {
+                        id: i.to_string(),
+                        value: i as i32 * 10,
+                        name: format!("Item {}", i),
+                    },
+                )
+            })
+            .collect();
+
+        tree.batch_stash(&items).unwrap();
+
+        // Test TAKE
+        let first_three: Vec<TestData> = tree.query()
+            .order_by(|item| item["name"].as_str().unwrap_or("").to_string())
+            .take(3)
+            .collect()
+            .unwrap();
+        assert_eq!(first_three.len(), 3);
+
+        // Test SKIP
+        let after_first_three: Vec<TestData> = tree.query()
+            .order_by(|item| item["name"].as_str().unwrap_or("").to_string())
+            .skip(3)
+            .collect()
+            .unwrap();
+        assert_eq!(after_first_three.len(), 7);
+
+        // Test WHERE + TAKE
+        let high_values_take: Vec<TestData> = tree.query()
+            .where_condition(|item| item["value"].as_u64().unwrap_or(0) >= 50)
+            .take(2)
+            .collect()
+            .unwrap();
+        assert_eq!(high_values_take.len(), 2);
+        assert!(high_values_take.iter().all(|item| item.value >= 50));
+    }
+
+    #[test]
+    fn test_query_empty_tree() {
+        let tree = get_test_tree();
+
+        // Test queries on empty tree
+        let empty_results: Vec<TestData> = tree.query().collect().unwrap();
+        assert_eq!(empty_results.len(), 0);
+
+        let first_empty: Option<TestData> = tree.query().first().unwrap();
+        assert!(first_empty.is_none());
+
+        let count_empty = tree.query().count().unwrap();
+        assert_eq!(count_empty, 0);
+
+        let any_empty = tree.query().any().unwrap();
+        assert!(!any_empty);
+    }
+
+    #[test]
+    fn test_query_complex_filtering() {
+        let mut tree = get_test_tree();
+
+        // Store test data with various properties
+        let items = vec![
+            ("complex-1", TestData { id: "1".to_string(), value: 100, name: "Alpha".to_string() }),
+            ("complex-2", TestData { id: "2".to_string(), value: 200, name: "Beta".to_string() }),
+            ("complex-3", TestData { id: "3".to_string(), value: 300, name: "Gamma".to_string() }),
+            ("complex-4", TestData { id: "4".to_string(), value: 400, name: "Delta".to_string() }),
+            ("complex-5", TestData { id: "5".to_string(), value: 500, name: "Epsilon".to_string() }),
+        ];
+
+        tree.batch_stash(&items).unwrap();
+
+        // Test complex filtering conditions
+        let medium_values: Vec<TestData> = tree.query()
+            .where_condition(|item| {
+                let value = item["value"].as_u64().unwrap_or(0);
+                value >= 200 && value <= 400
+            })
+            .order_by(|item| item["value"].as_u64().unwrap_or(0).to_string())
+            .collect()
+            .unwrap();
+        assert_eq!(medium_values.len(), 3);
+        assert_eq!(medium_values[0].value, 200);
+        assert_eq!(medium_values[1].value, 300);
+        assert_eq!(medium_values[2].value, 400);
+
+        // Test filtering by name pattern
+        let greek_letters: Vec<TestData> = tree.query()
+            .where_condition(|item| {
+                let name = item["name"].as_str().unwrap_or("");
+                name.len() == 5 // All Greek letters are 5 characters
+            })
+            .collect()
+            .unwrap();
+        assert_eq!(greek_letters.len(), 3); // Alpha, Gamma, and Delta
+    }
 }
 
 // Unit tests that don't require the shim
