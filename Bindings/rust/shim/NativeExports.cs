@@ -15,6 +15,7 @@ public static class NativeExports
     static readonly HandleTable<AcornFacade.JsonCacheStrategy> CacheProviders = new();
     static readonly HandleTable<AcornFacade.JsonConflictJudge> ConflictJudges = new();
     static readonly HandleTable<AcornFacade.JsonStorageBackend> StorageProviders = new();
+    static readonly HandleTable<AcornFacade.JsonDocumentStore> DocumentStores = new();
 
     [UnmanagedCallersOnly(EntryPoint = "acorn_open_tree")]
     public static int OpenTree(IntPtr uriUtf8, IntPtr handlePtr)
@@ -1524,6 +1525,92 @@ public static class NativeExports
         try {
             var storage = StorageProviders.Get(storageHandle);
             var tree = AcornFacade.OpenJsonTreeWithStorage(storage);
+            ulong handle = Trees.Add(tree);
+            unsafe { *(ulong*)handlePtr = handle; }
+            return 0;
+        } catch (Exception ex) { 
+            unsafe { *(ulong*)handlePtr = 0; }
+            Error.Set(ex); 
+            return -1; 
+        }
+    }
+
+    // Document Store FFI Functions
+    [UnmanagedCallersOnly(EntryPoint = "acorn_document_store_create")]
+    public static int DocumentStoreCreate(IntPtr customPathUtf8, IntPtr handlePtr)
+    {
+        try {
+            var customPath = customPathUtf8 == IntPtr.Zero ? null : Utf8.ReadString(customPathUtf8);
+            var documentStore = AcornFacade.CreateDocumentStore(customPath);
+            ulong handle = DocumentStores.Add(documentStore);
+            unsafe { *(ulong*)handlePtr = handle; }
+            return 0;
+        } catch (Exception ex) { 
+            unsafe { *(ulong*)handlePtr = 0; }
+            Error.Set(ex); 
+            return -1; 
+        }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_document_store_get_history")]
+    public static int DocumentStoreGetHistory(ulong documentStoreHandle, IntPtr idUtf8, IntPtr historyBufPtr)
+    {
+        try {
+            var documentStore = DocumentStores.Get(documentStoreHandle);
+            var id = Utf8.ReadString(idUtf8);
+            var historyJson = documentStore.GetHistory(id);
+            return Utf8.WriteString(historyJson, historyBufPtr);
+        } catch (Exception ex) { 
+            Error.Set(ex); 
+            return -1; 
+        }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_document_store_get_info")]
+    public static int DocumentStoreGetInfo(ulong documentStoreHandle, IntPtr infoBufPtr)
+    {
+        try {
+            var documentStore = DocumentStores.Get(documentStoreHandle);
+            var info = documentStore.GetInfo();
+            var infoJson = JsonConvert.SerializeObject(info);
+            return Utf8.WriteString(infoJson, infoBufPtr);
+        } catch (Exception ex) { 
+            Error.Set(ex); 
+            return -1; 
+        }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_document_store_compact")]
+    public static int DocumentStoreCompact(ulong documentStoreHandle)
+    {
+        try {
+            var documentStore = DocumentStores.Get(documentStoreHandle);
+            documentStore.Compact();
+            return 0;
+        } catch (Exception ex) { 
+            Error.Set(ex); 
+            return -1; 
+        }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_document_store_close")]
+    public static int DocumentStoreClose(ulong documentStoreHandle)
+    {
+        try {
+            DocumentStores.Remove(documentStoreHandle, out _);
+            return 0;
+        } catch (Exception ex) { 
+            Error.Set(ex); 
+            return -1; 
+        }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "acorn_open_tree_with_document_store")]
+    public static int OpenTreeWithDocumentStore(ulong documentStoreHandle, IntPtr handlePtr)
+    {
+        try {
+            var documentStore = DocumentStores.Get(documentStoreHandle);
+            var tree = AcornFacade.OpenJsonTreeWithDocumentStore(documentStore);
             ulong handle = Trees.Add(tree);
             unsafe { *(ulong*)handlePtr = handle; }
             return 0;

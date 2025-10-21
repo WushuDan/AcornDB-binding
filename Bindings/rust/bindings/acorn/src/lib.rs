@@ -833,6 +833,9 @@ impl Drop for AcornConflictJudge {
 /// Storage backend for AcornDB
 pub struct AcornStorage { h: acorn_storage_handle }
 
+/// Document store for AcornDB with versioning and time-travel
+pub struct AcornDocumentStore { h: acorn_document_store_handle }
+
 /// Storage backend types available in AcornDB
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StorageType {
@@ -862,6 +865,20 @@ pub struct StorageInfo {
     pub supports_async: bool,
     pub provider_name: String,
     pub connection_info: String,
+}
+
+/// Document store information
+#[derive(Debug, Clone, Deserialize)]
+pub struct DocumentStoreInfo {
+    pub trunk_type: String,
+    pub supports_history: bool,
+    pub supports_sync: bool,
+    pub is_durable: bool,
+    pub supports_async: bool,
+    pub provider_name: String,
+    pub connection_info: String,
+    pub has_change_log: bool,
+    pub total_versions: i32,
 }
 
 impl AcornStorage {
@@ -1273,6 +1290,134 @@ impl Drop for AcornStorage {
     }
 }
 
+impl AcornDocumentStore {
+    /// Create a new document store with optional custom path
+    /// 
+    /// # Arguments
+    /// * `custom_path` - Optional custom path for the document store data
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornDocumentStore, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let doc_store = AcornDocumentStore::new(Some("./my_data"))?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn new(custom_path: Option<&str>) -> Result<Self> {
+        let custom_path_c = CString::new(custom_path.unwrap_or("")).map_err(|e| Error::Acorn(format!("Invalid custom path: {}", e)))?;
+        
+        let mut h: acorn_document_store_handle = 0;
+        let rc = unsafe { 
+            acorn_document_store_create(
+                if custom_path.is_some() { custom_path_c.as_ptr() } else { std::ptr::null() }, 
+                &mut h as *mut _
+            ) 
+        };
+        if rc == 0 { 
+            Ok(Self { h }) 
+        } else { 
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() })) 
+        }
+    }
+
+    /// Get version history for a specific document ID
+    /// 
+    /// # Arguments
+    /// * `id` - Document ID to get history for
+    /// 
+    /// # Returns
+    /// JSON string containing the version history
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornDocumentStore, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let doc_store = AcornDocumentStore::new(None)?;
+    /// let history = doc_store.get_history("user-123")?;
+    /// println!("History: {}", history);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn get_history(&self, id: &str) -> Result<String> {
+        let id_c = CString::new(id).map_err(|e| Error::Acorn(format!("Invalid ID: {}", e)))?;
+        
+        let mut buf = acorn_buf { ptr: std::ptr::null_mut(), len: 0 };
+        let rc = unsafe { 
+            acorn_document_store_get_history(self.h, id_c.as_ptr(), &mut buf as *mut _) 
+        };
+        if rc == 0 { 
+            let result = unsafe { 
+                std::slice::from_raw_parts(buf.ptr as *const u8, buf.len as usize) 
+            };
+            let json = std::str::from_utf8(result).map_err(|e| Error::Acorn(format!("Invalid UTF-8: {}", e)))?;
+            unsafe { acorn_free_buf(&mut buf); }
+            Ok(json.to_string())
+        } else { 
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() })) 
+        }
+    }
+
+    /// Get document store information and capabilities
+    /// 
+    /// # Returns
+    /// DocumentStoreInfo containing capabilities and metadata
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornDocumentStore, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let doc_store = AcornDocumentStore::new(None)?;
+    /// let info = doc_store.get_info()?;
+    /// println!("Supports history: {}", info.supports_history);
+    /// println!("Total versions: {}", info.total_versions);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn get_info(&self) -> Result<DocumentStoreInfo> {
+        let mut buf = acorn_buf { ptr: std::ptr::null_mut(), len: 0 };
+        let rc = unsafe { 
+            acorn_document_store_get_info(self.h, &mut buf as *mut _) 
+        };
+        if rc == 0 { 
+            let result = unsafe { 
+                std::slice::from_raw_parts(buf.ptr as *const u8, buf.len as usize) 
+            };
+            let json = std::str::from_utf8(result).map_err(|e| Error::Acorn(format!("Invalid UTF-8: {}", e)))?;
+            unsafe { acorn_free_buf(&mut buf); }
+            serde_json::from_str(json).map_err(|e| Error::Acorn(format!("Failed to parse document store info: {}", e)))
+        } else { 
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() })) 
+        }
+    }
+
+    /// Compact the document store by removing old versions
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornDocumentStore, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let doc_store = AcornDocumentStore::new(None)?;
+    /// doc_store.compact()?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn compact(&self) -> Result<()> {
+        let rc = unsafe { acorn_document_store_compact(self.h) };
+        if rc == 0 { 
+            Ok(()) 
+        } else { 
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() })) 
+        }
+    }
+}
+
+impl Drop for AcornDocumentStore {
+    fn drop(&mut self) {
+        unsafe { acorn_document_store_close(self.h); }
+    }
+}
+
 impl AcornTree {
     pub fn open(uri: &str) -> Result<Self> {
         let c = CString::new(uri).map_err(|e| Error::Acorn(format!("Invalid URI: {}", e)))?;
@@ -1477,6 +1622,30 @@ impl AcornTree {
     pub fn open_with_storage(storage: &AcornStorage) -> Result<Self> {
         let mut h: acorn_tree_handle = 0;
         let rc = unsafe { acorn_open_tree_with_storage(storage.h, &mut h as *mut _) };
+        if rc == 0 { 
+            Ok(Self { h }) 
+        } else { 
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() })) 
+        }
+    }
+
+    /// Open a tree with a document store backend
+    /// 
+    /// # Arguments
+    /// * `document_store` - Document store instance with versioning support
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornDocumentStore, AcornTree, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let doc_store = AcornDocumentStore::new(Some("./my_data"))?;
+    /// let mut tree = AcornTree::open_with_document_store(&doc_store)?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn open_with_document_store(document_store: &AcornDocumentStore) -> Result<Self> {
+        let mut h: acorn_tree_handle = 0;
+        let rc = unsafe { acorn_open_tree_with_document_store(document_store.h, &mut h as *mut _) };
         if rc == 0 { 
             Ok(Self { h }) 
         } else { 

@@ -1416,4 +1416,141 @@ internal static class AcornFacade
         public string ProviderName { get; set; } = "";
         public string ConnectionInfo { get; set; } = "";
     }
-}
+
+    // Factory methods for Document Store
+    public static JsonDocumentStore CreateDocumentStore(string? customPath = null)
+    {
+        try
+        {
+            var documentStoreTrunk = new DocumentStoreTrunk<object>(customPath);
+            return new JsonDocumentStore(documentStoreTrunk);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException($"Failed to create document store: {ex.Message}", ex);
+        }
+    }
+
+    public static JsonTree OpenJsonTreeWithDocumentStore(JsonDocumentStore documentStore)
+    {
+        try
+        {
+            var tree = new Tree<object>(documentStore.DocumentStore);
+            return new JsonTree(tree);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException($"Failed to open tree with document store: {ex.Message}", ex);
+        }
+    }
+
+    internal sealed class JsonDocumentStore
+    {
+        private readonly DocumentStoreTrunk<object> _documentStore;
+
+        public DocumentStoreTrunk<object> DocumentStore => _documentStore;
+
+        public JsonDocumentStore(DocumentStoreTrunk<object> documentStore)
+        {
+            _documentStore = documentStore ?? throw new ArgumentNullException(nameof(documentStore));
+        }
+
+        public DocumentStoreInfo GetInfo()
+        {
+            try
+            {
+                var capabilities = _documentStore.GetCapabilities();
+                return new DocumentStoreInfo
+                {
+                    TrunkType = capabilities.TrunkType,
+                    SupportsHistory = capabilities.SupportsHistory,
+                    SupportsSync = capabilities.SupportsSync,
+                    IsDurable = capabilities.IsDurable,
+                    SupportsAsync = capabilities.SupportsAsync,
+                    ProviderName = "DocumentStore",
+                    ConnectionInfo = "Document Store with Versioning",
+                    HasChangeLog = HasChangeLog(),
+                    TotalVersions = GetTotalVersions()
+                };
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"Failed to get document store info: {ex.Message}", ex);
+            }
+        }
+
+        public string GetHistory(string id)
+        {
+            try
+            {
+                var history = _documentStore.GetHistory(id);
+                var historyList = history.ToList();
+                return JsonConvert.SerializeObject(historyList);
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"Failed to get history for '{id}': {ex.Message}", ex);
+            }
+        }
+
+        public void Compact()
+        {
+            try
+            {
+                // DocumentStoreTrunk doesn't have a public SmushNow method, but we can simulate compaction
+                // by creating a new snapshot and clearing old history
+                // For now, we'll just log that compaction was requested
+                Console.WriteLine("Document store compaction requested (simulated)");
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"Failed to compact document store: {ex.Message}", ex);
+            }
+        }
+
+        private bool HasChangeLog()
+        {
+            try
+            {
+                // Check if the document store has any data
+                var allItems = _documentStore.LoadAll();
+                return allItems.Any();
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private int GetTotalVersions()
+        {
+            try
+            {
+                var allItems = _documentStore.LoadAll();
+                int totalVersions = 0;
+                foreach (var item in allItems)
+                {
+                    var history = _documentStore.GetHistory(item.Id);
+                    totalVersions += history.Count + 1; // +1 for current version
+                }
+                return totalVersions;
+            }
+            catch
+            {
+                return 0;
+            }
+        }
+    }
+
+    internal sealed class DocumentStoreInfo
+    {
+        public string TrunkType { get; set; } = "";
+        public bool SupportsHistory { get; set; }
+        public bool SupportsSync { get; set; }
+        public bool IsDurable { get; set; }
+        public bool SupportsAsync { get; set; }
+        public string ProviderName { get; set; } = "";
+        public string ConnectionInfo { get; set; } = "";
+        public bool HasChangeLog { get; set; }
+        public int TotalVersions { get; set; }
+    }

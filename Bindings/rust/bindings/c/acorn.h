@@ -145,6 +145,9 @@ typedef uint64_t acorn_conflict_judge_handle;
 // Storage backend support
 typedef uint64_t acorn_storage_handle;
 
+// Document store support
+typedef uint64_t acorn_document_store_handle;
+
 // Create encryption provider from password
 ACORN_API int acorn_encryption_from_password(const char* password, const char* salt, acorn_encryption_handle* out_encryption);
 
@@ -251,6 +254,20 @@ ACORN_API int acorn_storage_close(acorn_storage_handle storage);
 
 // Open tree with storage backend
 ACORN_API int acorn_open_tree_with_storage(acorn_storage_handle storage, acorn_tree_handle* out_tree);
+
+// Document store creation
+ACORN_API int acorn_document_store_create(const char* custom_path, acorn_document_store_handle* out_document_store);
+
+// Document store operations
+ACORN_API int acorn_document_store_get_history(acorn_document_store_handle document_store, const char* id, acorn_buf* out_history_json);
+ACORN_API int acorn_document_store_get_info(acorn_document_store_handle document_store, acorn_buf* out_info);
+ACORN_API int acorn_document_store_compact(acorn_document_store_handle document_store);
+
+// Close document store handle
+ACORN_API int acorn_document_store_close(acorn_document_store_handle document_store);
+
+// Open tree with document store
+ACORN_API int acorn_open_tree_with_document_store(acorn_document_store_handle document_store, acorn_tree_handle* out_tree);
 
 // Memory management for buffers allocated by shim
 ACORN_API void acorn_free_buf(acorn_buf* buf);

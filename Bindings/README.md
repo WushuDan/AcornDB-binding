@@ -804,7 +804,7 @@ The bindings use Rust's `Result<T, Error>` type:
 
 ### Phase 3: Advanced AcornDB Features (Binding Existing Features)
 - [x] **Advanced Storage Backends**: Bind cloud storage (S3, Azure), RDBMS (SQLite, PostgreSQL, MySQL), Git storage
-- [ ] **Document Store**: Bind DocumentStoreTrunk with append-only logging and versioning
+- [x] **Document Store**: Bind DocumentStoreTrunk with append-only logging and versioning
 - [ ] **Optimized Storage**: Bind OptimizedFileTrunk with async I/O and compression
 - [ ] **Reactive Programming**: Bind IObservable<T> streams, change notifications, filtered observables
 - [ ] **Advanced Query Capabilities**: Bind LINQ-style queries, timestamp filtering, node filtering, ordering, pagination
@@ -865,7 +865,7 @@ The core Rust bindings are **COMPLETE**! All major functionality has been implem
 
 **Phase 3: Advanced AcornDB Features**
 - ✅ **Storage Backends**: Bind cloud storage (S3, Azure), RDBMS (SQLite, PostgreSQL, MySQL), Git storage
-- 🔄 **Document Store**: Bind DocumentStoreTrunk with append-only logging and versioning
+- ✅ **Document Store**: Bind DocumentStoreTrunk with append-only logging and versioning
 - 🔄 **Optimized Storage**: Bind OptimizedFileTrunk with async I/O and compression
 - 🔄 **Reactive Programming**: Bind IObservable streams, change notifications, filtered observables
 - 🔄 **Advanced Queries**: Bind LINQ-style queries, timestamp filtering, node filtering

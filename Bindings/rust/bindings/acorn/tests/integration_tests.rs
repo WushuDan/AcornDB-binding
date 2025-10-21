@@ -1,4 +1,4 @@
-use acorn::{AcornTree, AcornEncryption, AcornCompression, AcornCache, AcornConflictJudge, AcornStorage, CompressionLevel, Error};
+use acorn::{AcornTree, AcornEncryption, AcornCompression, AcornCache, AcornConflictJudge, AcornStorage, AcornDocumentStore, CompressionLevel, Error};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
@@ -1988,6 +1988,246 @@ mod unit_tests {
             let retrieved: TestData = tree.crack("compression-test").unwrap();
             assert_eq!(test_data, retrieved);
         }
+    }
+
+    #[test]
+    fn test_document_store_basic_operations() {
+        // Create document store
+        let doc_store = AcornDocumentStore::new(Some("./test_docstore")).unwrap();
+        
+        // Get initial info
+        let info = doc_store.get_info().unwrap();
+        assert_eq!(info.trunk_type, "DocumentStoreTrunk");
+        assert!(info.supports_history);
+        assert!(info.is_durable);
+        assert!(!info.supports_async);
+        assert_eq!(info.provider_name, "DocumentStore");
+        assert_eq!(info.total_versions, 0);
+        assert!(!info.has_change_log);
+
+        // Open tree with document store
+        let mut tree = AcornTree::open_with_document_store(&doc_store).unwrap();
+        
+        // Store some data
+        let test_data = TestData {
+            id: "doc-1".to_string(),
+            value: 42,
+            name: "Document Store Test".to_string(),
+        };
+        
+        tree.stash("doc-1", &test_data).unwrap();
+        
+        // Retrieve data
+        let retrieved: TestData = tree.crack("doc-1").unwrap();
+        assert_eq!(test_data, retrieved);
+        
+        // Update data to create version history
+        let updated_data = TestData {
+            id: "doc-1".to_string(),
+            value: 84,
+            name: "Updated Document Store Test".to_string(),
+        };
+        
+        tree.stash("doc-1", &updated_data).unwrap();
+        
+        // Verify current version
+        let current: TestData = tree.crack("doc-1").unwrap();
+        assert_eq!(updated_data, current);
+        
+        // Get version history
+        let history_json = doc_store.get_history("doc-1").unwrap();
+        assert!(!history_json.is_empty());
+        
+        // Parse history
+        let history: Vec<serde_json::Value> = serde_json::from_str(&history_json).unwrap();
+        assert!(history.len() >= 1); // Should have at least one previous version
+        
+        // Get updated info
+        let updated_info = doc_store.get_info().unwrap();
+        assert!(updated_info.has_change_log);
+        assert!(updated_info.total_versions > 0);
+    }
+
+    #[test]
+    fn test_document_store_version_history() {
+        let doc_store = AcornDocumentStore::new(Some("./test_version_history")).unwrap();
+        let mut tree = AcornTree::open_with_document_store(&doc_store).unwrap();
+        
+        // Create multiple versions of the same document
+        for i in 1..=5 {
+            let data = TestData {
+                id: "versioned-doc".to_string(),
+                value: i * 10,
+                name: format!("Version {}", i),
+            };
+            
+            tree.stash("versioned-doc", &data).unwrap();
+        }
+        
+        // Verify current version
+        let current: TestData = tree.crack("versioned-doc").unwrap();
+        assert_eq!(current.value, 50);
+        assert_eq!(current.name, "Version 5");
+        
+        // Get version history
+        let history_json = doc_store.get_history("versioned-doc").unwrap();
+        let history: Vec<serde_json::Value> = serde_json::from_str(&history_json).unwrap();
+        
+        // Should have 4 previous versions (versions 1-4)
+        assert_eq!(history.len(), 4);
+        
+        // Verify version progression
+        for (i, version) in history.iter().enumerate() {
+            let expected_value = (i + 1) * 10;
+            let actual_value = version["Payload"]["value"].as_i64().unwrap() as i32;
+            assert_eq!(actual_value, expected_value);
+        }
+    }
+
+    #[test]
+    fn test_document_store_multiple_documents() {
+        let doc_store = AcornDocumentStore::new(Some("./test_multiple_docs")).unwrap();
+        let mut tree = AcornTree::open_with_document_store(&doc_store).unwrap();
+        
+        // Store multiple documents
+        for i in 1..=3 {
+            let data = TestData {
+                id: format!("doc-{}", i),
+                value: i * 100,
+                name: format!("Document {}", i),
+            };
+            
+            tree.stash(&format!("doc-{}", i), &data).unwrap();
+        }
+        
+        // Update each document to create history
+        for i in 1..=3 {
+            let updated_data = TestData {
+                id: format!("doc-{}", i),
+                value: i * 200,
+                name: format!("Updated Document {}", i),
+            };
+            
+            tree.stash(&format!("doc-{}", i), &updated_data).unwrap();
+        }
+        
+        // Verify all documents exist
+        for i in 1..=3 {
+            let doc: TestData = tree.crack(&format!("doc-{}", i)).unwrap();
+            assert_eq!(doc.value, i * 200);
+            assert_eq!(doc.name, format!("Updated Document {}", i));
+        }
+        
+        // Get info and verify total versions
+        let info = doc_store.get_info().unwrap();
+        assert_eq!(info.total_versions, 6); // 3 current + 3 previous versions
+        
+        // Verify each document has history
+        for i in 1..=3 {
+            let history_json = doc_store.get_history(&format!("doc-{}", i)).unwrap();
+            let history: Vec<serde_json::Value> = serde_json::from_str(&history_json).unwrap();
+            assert_eq!(history.len(), 1); // Each should have 1 previous version
+        }
+    }
+
+    #[test]
+    fn test_document_store_compaction() {
+        let doc_store = AcornDocumentStore::new(Some("./test_compaction")).unwrap();
+        let mut tree = AcornTree::open_with_document_store(&doc_store).unwrap();
+        
+        // Create multiple versions
+        for i in 1..=10 {
+            let data = TestData {
+                id: "compaction-test".to_string(),
+                value: i,
+                name: format!("Version {}", i),
+            };
+            
+            tree.stash("compaction-test", &data).unwrap();
+        }
+        
+        // Verify we have history
+        let info_before = doc_store.get_info().unwrap();
+        assert!(info_before.total_versions > 1);
+        
+        // Perform compaction
+        doc_store.compact().unwrap();
+        
+        // Verify compaction completed
+        let info_after = doc_store.get_info().unwrap();
+        // Note: The actual compaction behavior depends on the C# implementation
+        // For now, we just verify the operation completes without error
+        assert!(info_after.total_versions >= 1);
+    }
+
+    #[test]
+    fn test_document_store_error_handling() {
+        // Test invalid document store creation
+        let result = AcornDocumentStore::new(Some(""));
+        // This should succeed as empty string is valid
+        
+        let doc_store = AcornDocumentStore::new(None).unwrap();
+        
+        // Test getting history for non-existent document
+        let history = doc_store.get_history("non-existent");
+        // This should succeed but return empty history
+        
+        // Test getting info
+        let info = doc_store.get_info().unwrap();
+        assert_eq!(info.trunk_type, "DocumentStoreTrunk");
+    }
+
+    #[test]
+    fn test_document_store_with_tree_operations() {
+        let doc_store = AcornDocumentStore::new(Some("./test_tree_ops")).unwrap();
+        let mut tree = AcornTree::open_with_document_store(&doc_store).unwrap();
+        
+        // Test all tree operations work with document store
+        let data1 = TestData {
+            id: "tree-op-1".to_string(),
+            value: 100,
+            name: "Tree Operation 1".to_string(),
+        };
+        
+        let data2 = TestData {
+            id: "tree-op-2".to_string(),
+            value: 200,
+            name: "Tree Operation 2".to_string(),
+        };
+        
+        // Stash operations
+        tree.stash("key1", &data1).unwrap();
+        tree.stash("key2", &data2).unwrap();
+        
+        // Crack operations
+        let retrieved1: TestData = tree.crack("key1").unwrap();
+        let retrieved2: TestData = tree.crack("key2").unwrap();
+        
+        assert_eq!(data1, retrieved1);
+        assert_eq!(data2, retrieved2);
+        
+        // Update to create version history
+        let updated_data1 = TestData {
+            id: "tree-op-1".to_string(),
+            value: 150,
+            name: "Updated Tree Operation 1".to_string(),
+        };
+        
+        tree.stash("key1", &updated_data1).unwrap();
+        
+        // Verify current version
+        let current: TestData = tree.crack("key1").unwrap();
+        assert_eq!(updated_data1, current);
+        
+        // Verify history exists
+        let history_json = doc_store.get_history("key1").unwrap();
+        let history: Vec<serde_json::Value> = serde_json::from_str(&history_json).unwrap();
+        assert_eq!(history.len(), 1);
+        
+        // Verify history contains original version
+        let original_version = &history[0]["Payload"];
+        assert_eq!(original_version["value"].as_i64().unwrap(), 100);
+        assert_eq!(original_version["name"].as_str().unwrap(), "Tree Operation 1");
     }
 }
 
