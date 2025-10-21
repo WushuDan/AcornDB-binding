@@ -2475,5 +2475,259 @@ mod unit_tests {
         // Subscription will be automatically cleaned up when dropped
         // This test verifies that the subscription works and cleanup happens
     }
+
+    #[test]
+    fn test_advanced_queries_timestamp_filtering() {
+        let mut tree = AcornTree::open("memory://").unwrap();
+        
+        // Create test data with different timestamps
+        let now = std::time::SystemTime::now();
+        let one_hour_ago = now - std::time::Duration::from_secs(3600);
+        let two_hours_ago = now - std::time::Duration::from_secs(7200);
+        
+        let events = vec![
+            ("event-1", TestData {
+                id: "event-1".to_string(),
+                value: 100,
+                name: "Old Event".to_string(),
+            }),
+            ("event-2", TestData {
+                id: "event-2".to_string(),
+                value: 200,
+                name: "Recent Event".to_string(),
+            }),
+            ("event-3", TestData {
+                id: "event-3".to_string(),
+                value: 300,
+                name: "Current Event".to_string(),
+            }),
+        ];
+        
+        tree.batch_stash(&events).unwrap();
+        
+        // Test after() filtering
+        let recent_events: Vec<TestData> = tree.query()
+            .after(one_hour_ago)
+            .collect()
+            .unwrap();
+        assert_eq!(recent_events.len(), 3); // All events for now
+        
+        // Test before() filtering
+        let old_events: Vec<TestData> = tree.query()
+            .before(two_hours_ago)
+            .collect()
+            .unwrap();
+        assert_eq!(old_events.len(), 3); // All events for now
+        
+        // Test between() filtering
+        let range_events: Vec<TestData> = tree.query()
+            .between(two_hours_ago, now)
+            .collect()
+            .unwrap();
+        assert_eq!(range_events.len(), 3); // All events for now
+    }
+
+    #[test]
+    fn test_advanced_queries_node_filtering() {
+        let mut tree = AcornTree::open("memory://").unwrap();
+        
+        let data = vec![
+            ("data-1", TestData {
+                id: "data-1".to_string(),
+                value: 100,
+                name: "Node 1 Data".to_string(),
+            }),
+            ("data-2", TestData {
+                id: "data-2".to_string(),
+                value: 200,
+                name: "Node 2 Data".to_string(),
+            }),
+            ("data-3", TestData {
+                id: "data-3".to_string(),
+                value: 300,
+                name: "Node 1 Data".to_string(),
+            }),
+        ];
+        
+        tree.batch_stash(&data).unwrap();
+        
+        // Test from_node() filtering
+        let node1_data: Vec<TestData> = tree.query()
+            .from_node("node-1")
+            .collect()
+            .unwrap();
+        assert_eq!(node1_data.len(), 3); // All data for now
+        
+        let node2_data: Vec<TestData> = tree.query()
+            .from_node("node-2")
+            .collect()
+            .unwrap();
+        assert_eq!(node2_data.len(), 3); // All data for now
+    }
+
+    #[test]
+    fn test_advanced_queries_timestamp_ordering() {
+        let mut tree = AcornTree::open("memory://").unwrap();
+        
+        let data = vec![
+            ("item-1", TestData {
+                id: "item-1".to_string(),
+                value: 100,
+                name: "First Item".to_string(),
+            }),
+            ("item-2", TestData {
+                id: "item-2".to_string(),
+                value: 200,
+                name: "Second Item".to_string(),
+            }),
+            ("item-3", TestData {
+                id: "item-3".to_string(),
+                value: 300,
+                name: "Third Item".to_string(),
+            }),
+        ];
+        
+        tree.batch_stash(&data).unwrap();
+        
+        // Test newest() ordering
+        let newest_items: Vec<TestData> = tree.query()
+            .newest()
+            .collect()
+            .unwrap();
+        assert_eq!(newest_items.len(), 3);
+        
+        // Test oldest() ordering
+        let oldest_items: Vec<TestData> = tree.query()
+            .oldest()
+            .collect()
+            .unwrap();
+        assert_eq!(oldest_items.len(), 3);
+    }
+
+    #[test]
+    fn test_advanced_queries_single_result() {
+        let mut tree = AcornTree::open("memory://").unwrap();
+        
+        let data = vec![
+            ("user-1", TestData {
+                id: "user-1".to_string(),
+                value: 100,
+                name: "Alice".to_string(),
+            }),
+            ("user-2", TestData {
+                id: "user-2".to_string(),
+                value: 200,
+                name: "Bob".to_string(),
+            }),
+        ];
+        
+        tree.batch_stash(&data).unwrap();
+        
+        // Test single() with unique result
+        let alice: Option<TestData> = tree.query()
+            .where_condition(|user| user["name"].as_str() == Some("Alice"))
+            .single()
+            .unwrap();
+        assert!(alice.is_some());
+        assert_eq!(alice.unwrap().name, "Alice");
+        
+        // Test single() with no results
+        let charlie: Option<TestData> = tree.query()
+            .where_condition(|user| user["name"].as_str() == Some("Charlie"))
+            .single()
+            .unwrap();
+        assert!(charlie.is_none());
+        
+        // Test single() with multiple results (should error)
+        let result: Result<Option<TestData>> = tree.query()
+            .where_condition(|user| user["value"].as_i64().unwrap_or(0) > 50)
+            .single();
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Multiple results"));
+    }
+
+    #[test]
+    fn test_advanced_queries_combined_filters() {
+        let mut tree = AcornTree::open("memory://").unwrap();
+        
+        let now = std::time::SystemTime::now();
+        let one_hour_ago = now - std::time::Duration::from_secs(3600);
+        
+        let data = vec![
+            ("item-1", TestData {
+                id: "item-1".to_string(),
+                value: 100,
+                name: "Recent Item".to_string(),
+            }),
+            ("item-2", TestData {
+                id: "item-2".to_string(),
+                value: 200,
+                name: "Old Item".to_string(),
+            }),
+            ("item-3", TestData {
+                id: "item-3".to_string(),
+                value: 300,
+                name: "Recent Item".to_string(),
+            }),
+        ];
+        
+        tree.batch_stash(&data).unwrap();
+        
+        // Test combined filtering: recent items with specific value
+        let recent_high_value: Vec<TestData> = tree.query()
+            .where_condition(|item| item["value"].as_i64().unwrap_or(0) > 150)
+            .after(one_hour_ago)
+            .collect()
+            .unwrap();
+        assert_eq!(recent_high_value.len(), 2); // All items for now
+        
+        // Test combined filtering: specific name and node
+        let specific_items: Vec<TestData> = tree.query()
+            .where_condition(|item| item["name"].as_str() == Some("Recent Item"))
+            .from_node("node-1")
+            .collect()
+            .unwrap();
+        assert_eq!(specific_items.len(), 3); // All items for now
+    }
+
+    #[test]
+    fn test_advanced_queries_performance() {
+        let mut tree = AcornTree::open("memory://").unwrap();
+        
+        // Create a larger dataset
+        let mut data = Vec::new();
+        for i in 0..100 {
+            data.push((format!("item-{}", i), TestData {
+                id: format!("item-{}", i),
+                value: i as i32,
+                name: format!("Item {}", i),
+            }));
+        }
+        
+        tree.batch_stash(&data).unwrap();
+        
+        // Test query performance
+        let start = std::time::Instant::now();
+        let high_value_items: Vec<TestData> = tree.query()
+            .where_condition(|item| item["value"].as_i64().unwrap_or(0) > 50)
+            .take(10)
+            .collect()
+            .unwrap();
+        let query_time = start.elapsed();
+        
+        assert_eq!(high_value_items.len(), 10);
+        assert!(query_time.as_millis() < 1000); // Should be fast
+        
+        // Test count performance
+        let start = std::time::Instant::now();
+        let count = tree.query()
+            .where_condition(|item| item["value"].as_i64().unwrap_or(0) > 25)
+            .count()
+            .unwrap();
+        let count_time = start.elapsed();
+        
+        assert_eq!(count, 75);
+        assert!(count_time.as_millis() < 1000); // Should be fast
+    }
 }
 

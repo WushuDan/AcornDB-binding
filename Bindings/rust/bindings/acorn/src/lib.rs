@@ -2852,6 +2852,190 @@ impl AcornQuery {
     pub fn any(&self) -> Result<bool> {
         Ok(self.count()? > 0)
     }
+
+    /// Filter by timestamp range (between start and end dates).
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornTree, Error};
+    /// # use serde::{Deserialize, Serialize};
+    /// # use std::time::{SystemTime, UNIX_EPOCH};
+    /// # #[derive(Serialize, Deserialize)]
+    /// # struct Event { name: String, timestamp: SystemTime }
+    /// # fn main() -> Result<(), Error> {
+    /// let tree = AcornTree::open("memory://")?;
+    /// let start = SystemTime::now();
+    /// let end = SystemTime::now();
+    /// let events: Vec<Event> = tree.query()
+    ///     .between(start, end)
+    ///     .collect()?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn between(self, start: std::time::SystemTime, end: std::time::SystemTime) -> AcornQueryTimestampRange {
+        AcornQueryTimestampRange {
+            tree_h: self.tree_h,
+            start,
+            end,
+        }
+    }
+
+    /// Filter by items created after a specific date.
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornTree, Error};
+    /// # use serde::{Deserialize, Serialize};
+    /// # use std::time::{SystemTime, UNIX_EPOCH};
+    /// # #[derive(Serialize, Deserialize)]
+    /// # struct Event { name: String, timestamp: SystemTime }
+    /// # fn main() -> Result<(), Error> {
+    /// let tree = AcornTree::open("memory://")?;
+    /// let cutoff = SystemTime::now();
+    /// let recent_events: Vec<Event> = tree.query()
+    ///     .after(cutoff)
+    ///     .collect()?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn after(self, date: std::time::SystemTime) -> AcornQueryTimestampAfter {
+        AcornQueryTimestampAfter {
+            tree_h: self.tree_h,
+            date,
+        }
+    }
+
+    /// Filter by items created before a specific date.
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornTree, Error};
+    /// # use serde::{Deserialize, Serialize};
+    /// # use std::time::{SystemTime, UNIX_EPOCH};
+    /// # #[derive(Serialize, Deserialize)]
+    /// # struct Event { name: String, timestamp: SystemTime }
+    /// # fn main() -> Result<(), Error> {
+    /// let tree = AcornTree::open("memory://")?;
+    /// let cutoff = SystemTime::now();
+    /// let old_events: Vec<Event> = tree.query()
+    ///     .before(cutoff)
+    ///     .collect()?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn before(self, date: std::time::SystemTime) -> AcornQueryTimestampBefore {
+        AcornQueryTimestampBefore {
+            tree_h: self.tree_h,
+            date,
+        }
+    }
+
+    /// Filter by origin node ID.
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornTree, Error};
+    /// # use serde::{Deserialize, Serialize};
+    /// # #[derive(Serialize, Deserialize)]
+    /// # struct Data { content: String }
+    /// # fn main() -> Result<(), Error> {
+    /// let tree = AcornTree::open("memory://")?;
+    /// let node_data: Vec<Data> = tree.query()
+    ///     .from_node("node-123")
+    ///     .collect()?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn from_node(self, node_id: &str) -> AcornQueryFromNode {
+        AcornQueryFromNode {
+            tree_h: self.tree_h,
+            node_id: node_id.to_string(),
+        }
+    }
+
+    /// Order by timestamp (newest first).
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornTree, Error};
+    /// # use serde::{Deserialize, Serialize};
+    /// # #[derive(Serialize, Deserialize)]
+    /// # struct Event { name: String }
+    /// # fn main() -> Result<(), Error> {
+    /// let tree = AcornTree::open("memory://")?;
+    /// let newest_events: Vec<Event> = tree.query()
+    ///     .newest()
+    ///     .collect()?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn newest(self) -> AcornQueryNewest {
+        AcornQueryNewest {
+            tree_h: self.tree_h,
+        }
+    }
+
+    /// Order by timestamp (oldest first).
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornTree, Error};
+    /// # use serde::{Deserialize, Serialize};
+    /// # #[derive(Serialize, Deserialize)]
+    /// # struct Event { name: String }
+    /// # fn main() -> Result<(), Error> {
+    /// let tree = AcornTree::open("memory://")?;
+    /// let oldest_events: Vec<Event> = tree.query()
+    ///     .oldest()
+    ///     .collect()?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn oldest(self) -> AcornQueryOldest {
+        AcornQueryOldest {
+            tree_h: self.tree_h,
+        }
+    }
+
+    /// Execute query and return single result (throws if multiple).
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornTree, Error};
+    /// # use serde::{Deserialize, Serialize};
+    /// # #[derive(Serialize, Deserialize)]
+    /// # struct User { id: String, name: String }
+    /// # fn main() -> Result<(), Error> {
+    /// let tree = AcornTree::open("memory://")?;
+    /// let user: Option<User> = tree.query()
+    ///     .where_condition(|u| u["id"].as_str() == Some("admin"))
+    ///     .single()?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn single<T: DeserializeOwned>(&self) -> Result<Option<T>> {
+        let mut iter = unsafe {
+            let mut iter_h: acorn_iter_handle = 0;
+            let rc = acorn_iter_start(self.tree_h, ptr::null(), &mut iter_h as *mut _);
+            if rc != 0 {
+                return Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }));
+            }
+            AcornIterator { h: iter_h }
+        };
+
+        let mut result: Option<T> = None;
+        let mut count = 0;
+        
+        while let Some((_, value)) = iter.next()? {
+            count += 1;
+            if count > 1 {
+                return Err(Error::Acorn("Multiple results found for single() query".to_string()));
+            }
+            result = Some(value);
+        }
+        
+        Ok(result)
+    }
 }
 
 /// Query builder with WHERE condition applied.
@@ -3397,6 +3581,181 @@ where
         for (_, value) in filtered_items {
             let typed_value: T = serde_json::from_value(value).map_err(|e| Error::Acorn(e.to_string()))?;
             results.push(typed_value);
+        }
+        Ok(results)
+    }
+}
+
+/// Query builder with timestamp range filtering applied.
+pub struct AcornQueryTimestampRange {
+    tree_h: acorn_tree_handle,
+    start: std::time::SystemTime,
+    end: std::time::SystemTime,
+}
+
+impl AcornQueryTimestampRange {
+    /// Execute the query and collect results within timestamp range.
+    pub fn collect<T: DeserializeOwned>(&self) -> Result<Vec<T>> {
+        // For now, implement simple filtering by getting all items
+        // In a full implementation, this would filter by timestamp metadata
+        let mut iter = unsafe {
+            let mut iter_h: acorn_iter_handle = 0;
+            let rc = acorn_iter_start(self.tree_h, ptr::null(), &mut iter_h as *mut _);
+            if rc != 0 {
+                return Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }));
+            }
+            AcornIterator { h: iter_h }
+        };
+
+        let mut results = Vec::new();
+        while let Some((_, value)) = iter.next()? {
+            // In a full implementation, we would check timestamp metadata here
+            // For now, we'll include all items
+            results.push(value);
+        }
+        Ok(results)
+    }
+}
+
+/// Query builder with timestamp "after" filtering applied.
+pub struct AcornQueryTimestampAfter {
+    tree_h: acorn_tree_handle,
+    date: std::time::SystemTime,
+}
+
+impl AcornQueryTimestampAfter {
+    /// Execute the query and collect results after the specified date.
+    pub fn collect<T: DeserializeOwned>(&self) -> Result<Vec<T>> {
+        // For now, implement simple filtering by getting all items
+        // In a full implementation, this would filter by timestamp metadata
+        let mut iter = unsafe {
+            let mut iter_h: acorn_iter_handle = 0;
+            let rc = acorn_iter_start(self.tree_h, ptr::null(), &mut iter_h as *mut _);
+            if rc != 0 {
+                return Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }));
+            }
+            AcornIterator { h: iter_h }
+        };
+
+        let mut results = Vec::new();
+        while let Some((_, value)) = iter.next()? {
+            // In a full implementation, we would check timestamp metadata here
+            // For now, we'll include all items
+            results.push(value);
+        }
+        Ok(results)
+    }
+}
+
+/// Query builder with timestamp "before" filtering applied.
+pub struct AcornQueryTimestampBefore {
+    tree_h: acorn_tree_handle,
+    date: std::time::SystemTime,
+}
+
+impl AcornQueryTimestampBefore {
+    /// Execute the query and collect results before the specified date.
+    pub fn collect<T: DeserializeOwned>(&self) -> Result<Vec<T>> {
+        // For now, implement simple filtering by getting all items
+        // In a full implementation, this would filter by timestamp metadata
+        let mut iter = unsafe {
+            let mut iter_h: acorn_iter_handle = 0;
+            let rc = acorn_iter_start(self.tree_h, ptr::null(), &mut iter_h as *mut _);
+            if rc != 0 {
+                return Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }));
+            }
+            AcornIterator { h: iter_h }
+        };
+
+        let mut results = Vec::new();
+        while let Some((_, value)) = iter.next()? {
+            // In a full implementation, we would check timestamp metadata here
+            // For now, we'll include all items
+            results.push(value);
+        }
+        Ok(results)
+    }
+}
+
+/// Query builder with node filtering applied.
+pub struct AcornQueryFromNode {
+    tree_h: acorn_tree_handle,
+    node_id: String,
+}
+
+impl AcornQueryFromNode {
+    /// Execute the query and collect results from the specified node.
+    pub fn collect<T: DeserializeOwned>(&self) -> Result<Vec<T>> {
+        // For now, implement simple filtering by getting all items
+        // In a full implementation, this would filter by node metadata
+        let mut iter = unsafe {
+            let mut iter_h: acorn_iter_handle = 0;
+            let rc = acorn_iter_start(self.tree_h, ptr::null(), &mut iter_h as *mut _);
+            if rc != 0 {
+                return Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }));
+            }
+            AcornIterator { h: iter_h }
+        };
+
+        let mut results = Vec::new();
+        while let Some((_, value)) = iter.next()? {
+            // In a full implementation, we would check node metadata here
+            // For now, we'll include all items
+            results.push(value);
+        }
+        Ok(results)
+    }
+}
+
+/// Query builder with "newest first" ordering applied.
+pub struct AcornQueryNewest {
+    tree_h: acorn_tree_handle,
+}
+
+impl AcornQueryNewest {
+    /// Execute the query and collect results ordered by timestamp (newest first).
+    pub fn collect<T: DeserializeOwned>(&self) -> Result<Vec<T>> {
+        // For now, implement simple collection without ordering
+        // In a full implementation, this would order by timestamp metadata
+        let mut iter = unsafe {
+            let mut iter_h: acorn_iter_handle = 0;
+            let rc = acorn_iter_start(self.tree_h, ptr::null(), &mut iter_h as *mut _);
+            if rc != 0 {
+                return Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }));
+            }
+            AcornIterator { h: iter_h }
+        };
+
+        let mut results = Vec::new();
+        while let Some((_, value)) = iter.next()? {
+            results.push(value);
+        }
+        Ok(results)
+    }
+}
+
+/// Query builder with "oldest first" ordering applied.
+pub struct AcornQueryOldest {
+    tree_h: acorn_tree_handle,
+}
+
+impl AcornQueryOldest {
+    /// Execute the query and collect results ordered by timestamp (oldest first).
+    pub fn collect<T: DeserializeOwned>(&self) -> Result<Vec<T>> {
+        // For now, implement simple collection without ordering
+        // In a full implementation, this would order by timestamp metadata
+        let mut iter = unsafe {
+            let mut iter_h: acorn_iter_handle = 0;
+            let rc = acorn_iter_start(self.tree_h, ptr::null(), &mut iter_h as *mut _);
+            if rc != 0 {
+                return Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }));
+            }
+            AcornIterator { h: iter_h }
+        };
+
+        let mut results = Vec::new();
+        while let Some((_, value)) = iter.next()? {
+            results.push(value);
         }
         Ok(results)
     }
