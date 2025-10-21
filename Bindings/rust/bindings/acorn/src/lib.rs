@@ -1,13 +1,780 @@
+//! # AcornDB Rust Bindings
+//!
+//! Safe, idiomatic Rust bindings for AcornDB - a lightweight, embedded, event-driven NoSQL database engine.
+//!
+//! ## Overview
+//!
+//! AcornDB is designed to be:
+//! - **Local-first**: Perfect for edge devices, mobile, desktop, or microservices
+//! - **Embedded**: Integrates directly into your application without external services
+//! - **Event-driven**: Supports reactive subscriptions to data changes
+//! - **Extendable**: Seamlessly connects to cloud services for scaling and backup
+//!
+//! ## Quick Start
+//!
+//! ```rust,no_run
+//! use acorn::{AcornTree, Error};
+//! use serde::{Deserialize, Serialize};
+//!
+//! #[derive(Serialize, Deserialize, Debug)]
+//! struct User {
+//!     id: String,
+//!     name: String,
+//!     email: String,
+//! }
+//!
+//! fn main() -> Result<(), Error> {
+//!     // Open a tree (database)
+//!     let tree = AcornTree::open_memory()?;
+//!     
+//!     // Create a user
+//!     let user = User {
+//!         id: "user-1".to_string(),
+//!         name: "Alice".to_string(),
+//!         email: "alice@example.com".to_string(),
+//!     };
+//!     
+//!     // Serialize and store
+//!     let user_json = serde_json::to_string(&user)?;
+//!     tree.stash(&user.id, &user_json)?;
+//!     
+//!     // Retrieve and deserialize
+//!     if let Some(user_json) = tree.crack(&user.id)? {
+//!         let retrieved_user: User = serde_json::from_str(&user_json)?;
+//!         println!("Retrieved user: {:?}", retrieved_user);
+//!     }
+//!     
+//!     Ok(())
+//! }
+//! ```
+//!
+//! ## Core Concepts
+//!
+//! ### Trees
+//! A **Tree** is AcornDB's primary data structure, similar to a table or collection in other databases.
+//! Each tree stores key-value pairs where values are JSON documents.
+//!
+//! ### Trunks
+//! A **Trunk** defines how data is stored. AcornDB supports multiple storage backends:
+//! - `MemoryTrunk`: In-memory storage (fast, not persistent)
+//! - `FileTrunk`: File-based storage (persistent, local)
+//! - `DocumentStoreTrunk`: Append-only storage with history
+//! - `GitHubTrunk`: Git-based storage with version history
+//! - Cloud trunks: Azure, AWS S3, etc.
+//! - Database trunks: SQLite, PostgreSQL, MySQL, etc.
+//!
+//! ### Operations
+//! - **Stash**: Store a value with a key
+//! - **Crack**: Retrieve a value by key
+//! - **Toss**: Delete a value by key
+//! - **Iterate**: Iterate over keys/values
+//!
+//! ## Features
+//!
+//! ### 🔐 Security & Encryption
+//! - AES-256 encryption with PBKDF2 key derivation
+//! - Password-based and key-based encryption
+//! - Secure key export/import
+//!
+//! ### 🗜️ Compression
+//! - Gzip, Brotli, and custom compression
+//! - Configurable compression levels
+//! - Compression statistics and monitoring
+//!
+//! ### 🚀 Performance
+//! - LRU caching with configurable limits
+//! - Batch operations for improved performance
+//! - Performance monitoring and metrics
+//!
+//! ### 🔄 Synchronization
+//! - HTTP-based synchronization
+//! - Mesh synchronization for peer-to-peer sync
+//! - Conflict resolution strategies
+//!
+//! ### 📊 Advanced Features
+//! - LINQ-style queries with filtering and sorting
+//! - ACID transactions
+//! - Reactive programming with subscriptions
+//! - Git integration for version history
+//! - Nursery system for dynamic trunk management
+//! - Event management and monitoring
+//!
+//! ## Examples
+//!
+//! ### Basic Operations
+//! ```rust,no_run
+//! use acorn::{AcornTree, Error};
+//!
+//! fn basic_operations() -> Result<(), Error> {
+//!     let tree = AcornTree::open_memory()?;
+//!     
+//!     // Store data
+//!     tree.stash("key1", r#"{"name": "Alice", "age": 30}"#)?;
+//!     tree.stash("key2", r#"{"name": "Bob", "age": 25}"#)?;
+//!     
+//!     // Retrieve data
+//!     if let Some(data) = tree.crack("key1")? {
+//!         println!("Found: {}", data);
+//!     }
+//!     
+//!     // Iterate over all data
+//!     for item in tree.iter()? {
+//!         println!("Item: {}", item);
+//!     }
+//!     
+//!     // Delete data
+//!     tree.toss("key1")?;
+//!     
+//!     Ok(())
+//! }
+//! ```
+//!
+//! ### Batch Operations
+//! ```rust,no_run
+//! use acorn::{AcornTree, AcornBatch, Error};
+//!
+//! fn batch_operations() -> Result<(), Error> {
+//!     let tree = AcornTree::open_memory()?;
+//!     let mut batch = AcornBatch::new(tree)?;
+//!     
+//!     // Add multiple operations to batch
+//!     batch.stash("user1", r#"{"name": "Alice"}"#)?;
+//!     batch.stash("user2", r#"{"name": "Bob"}"#)?;
+//!     batch.toss("old_user")?;
+//!     
+//!     // Commit all operations atomically
+//!     batch.commit()?;
+//!     
+//!     Ok(())
+//! }
+//! ```
+//!
+//! ### Queries
+//! ```rust,no_run
+//! use acorn::{AcornTree, AcornQuery, Error};
+//!
+//! fn query_example() -> Result<(), Error> {
+//!     let tree = AcornTree::open_memory()?;
+//!     
+//!     // Add some data
+//!     tree.stash("user1", r#"{"name": "Alice", "age": 30}"#)?;
+//!     tree.stash("user2", r#"{"name": "Bob", "age": 25}"#)?;
+//!     tree.stash("user3", r#"{"name": "Charlie", "age": 35}"#)?;
+//!     
+//!     // Query with filtering
+//!     let query = AcornQuery::new(tree)?;
+//!     let adults: Vec<String> = query
+//!         .where_condition(|json| {
+//!             json.contains("\"age\":") && 
+//!             json.find("\"age\":").and_then(|pos| {
+//!                 json[pos+6..].parse::<i32>().ok()
+//!             }).map_or(false, |age| age >= 30)
+//!         })
+//!         .collect()?;
+//!     
+//!     println!("Adults: {:?}", adults);
+//!     
+//!     Ok(())
+//! }
+//! ```
+//!
+//! ### Encryption
+//! ```rust,no_run
+//! use acorn::{AcornTree, AcornEncryption, Error};
+//!
+//! fn encryption_example() -> Result<(), Error> {
+//!     // Create encryption provider
+//!     let encryption = AcornEncryption::from_password("my-password", "my-salt")?;
+//!     
+//!     // Open encrypted tree
+//!     let tree = AcornTree::open_encrypted("file://./secure_db", &encryption)?;
+//!     
+//!     // Use tree normally - data is automatically encrypted/decrypted
+//!     tree.stash("secret", "sensitive data")?;
+//!     let data = tree.crack("secret")?;
+//!     
+//!     Ok(())
+//! }
+//! ```
+//!
+//! ### Synchronization
+//! ```rust,no_run
+//! use acorn::{AcornTree, AcornSync, Error};
+//!
+//! fn sync_example() -> Result<(), Error> {
+//!     let tree = AcornTree::open_memory()?;
+//!     
+//!     // Create sync client
+//!     let sync = AcornSync::new(tree, "http://localhost:8080/sync")?;
+//!     
+//!     // Push local changes to server
+//!     sync.push()?;
+//!     
+//!     // Pull changes from server
+//!     sync.pull()?;
+//!     
+//!     Ok(())
+//! }
+//! ```
+//!
+//! ## Error Handling
+//!
+//! The library provides comprehensive error handling with detailed error types:
+//!
+//! ```rust,no_run
+//! use acorn::{AcornTree, Error, ErrorContext};
+//!
+//! fn error_handling_example() -> Result<(), Error> {
+//!     let tree = AcornTree::open_memory()?;
+//!     
+//!     match tree.crack("nonexistent-key") {
+//!         Ok(value) => println!("Found: {}", value),
+//!         Err(Error::NotFound { key, operation }) => {
+//!             println!("Key '{}' not found during {}", key, operation);
+//!         },
+//!         Err(e) => {
+//!             println!("Error: {}", e);
+//!             if let Some(op) = e.operation() {
+//!                 println!("Operation: {}", op);
+//!             }
+//!             if let Some(ctx) = e.context() {
+//!                 println!("Context: {}", ctx);
+//!             }
+//!         }
+//!     }
+//!     
+//!     Ok(())
+//! }
+//! ```
+//!
+//! ## Performance
+//!
+//! AcornDB is designed for high performance:
+//! - **Memory efficiency**: Minimal memory allocations
+//! - **Batch operations**: Efficient bulk operations
+//! - **Caching**: Configurable LRU caching
+//! - **Compression**: Optional data compression
+//! - **Async support**: Non-blocking operations where possible
+//!
+//! ## Thread Safety
+//!
+//! All AcornDB types are thread-safe and can be safely shared between threads:
+//!
+//! ```rust,no_run
+//! use acorn::{AcornTree, Error};
+//! use std::sync::Arc;
+//! use std::thread;
+//!
+//! fn thread_safety_example() -> Result<(), Error> {
+//!     let tree = Arc::new(AcornTree::open_memory()?);
+//!     
+//!     let handles: Vec<_> = (0..4).map(|i| {
+//!         let tree_clone = tree.clone();
+//!         thread::spawn(move || {
+//!             for j in 0..100 {
+//!                 let key = format!("thread-{}-{}", i, j);
+//!                 let value = format!("data-{}-{}", i, j);
+//!                 tree_clone.stash(&key, &value).unwrap();
+//!             }
+//!         })
+//!     }).collect();
+//!     
+//!     for handle in handles {
+//!         handle.join().unwrap();
+//!     }
+//!     
+//!     Ok(())
+//! }
+//! ```
+//!
+//! ## Integration
+//!
+//! AcornDB integrates well with the Rust ecosystem:
+//! - **Serde**: Automatic serialization/deserialization
+//! - **Tokio**: Async runtime support
+//! - **Tracing**: Structured logging
+//! - **Anyhow/Thiserror**: Error handling
+//!
+//! ## License
+//!
+//! This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+//!
+//! ## Contributing
+//!
+//! Contributions are welcome! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
+//!
+//! ## Support
+//!
+//! - **Documentation**: [docs.rs/acorn](https://docs.rs/acorn)
+//! - **Issues**: [GitHub Issues](https://github.com/acorn-db/acorn/issues)
+//! - **Discussions**: [GitHub Discussions](https://github.com/acorn-db/acorn/discussions)
+//! - **Discord**: [AcornDB Discord](https://discord.gg/acorn-db)
+
 use acorn_sys::*;
 use serde::{de::DeserializeOwned, Serialize};
-use std::{ffi::CString, ptr};
+use std::{ffi::CString, ptr, fmt, backtrace::Backtrace};
 
+/// Comprehensive error types for AcornDB Rust bindings
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
-    #[error("Acorn error: {0}")]
-    Acorn(String),
-    #[error("Not found")]
-    NotFound,
+    /// AcornDB internal error with context
+    #[error("AcornDB error: {message}")]
+    Acorn {
+        message: String,
+        context: Option<String>,
+        operation: Option<String>,
+        #[source]
+        source: Option<Box<dyn std::error::Error + Send + Sync>>,
+    },
+    
+    /// Item not found in the tree
+    #[error("Item not found: {key}")]
+    NotFound {
+        key: String,
+        operation: String,
+    },
+    
+    /// Serialization/deserialization error
+    #[error("Serialization error: {message}")]
+    Serialization {
+        message: String,
+        data_type: String,
+        operation: String,
+    },
+    
+    /// Invalid input parameters
+    #[error("Invalid input: {message}")]
+    InvalidInput {
+        message: String,
+        parameter: String,
+        expected: String,
+    },
+    
+    /// File system related errors
+    #[error("File system error: {message}")]
+    FileSystem {
+        message: String,
+        path: String,
+        operation: String,
+    },
+    
+    /// Network related errors
+    #[error("Network error: {message}")]
+    Network {
+        message: String,
+        url: String,
+        operation: String,
+    },
+    
+    /// Encryption/decryption errors
+    #[error("Encryption error: {message}")]
+    Encryption {
+        message: String,
+        operation: String,
+    },
+    
+    /// Compression/decompression errors
+    #[error("Compression error: {message}")]
+    Compression {
+        message: String,
+        operation: String,
+    },
+    
+    /// Cache related errors
+    #[error("Cache error: {message}")]
+    Cache {
+        message: String,
+        operation: String,
+    },
+    
+    /// Query related errors
+    #[error("Query error: {message}")]
+    Query {
+        message: String,
+        query_type: String,
+        operation: String,
+    },
+    
+    /// Transaction related errors
+    #[error("Transaction error: {message}")]
+    Transaction {
+        message: String,
+        operation: String,
+    },
+    
+    /// Sync related errors
+    #[error("Sync error: {message}")]
+    Sync {
+        message: String,
+        operation: String,
+        remote_url: Option<String>,
+    },
+    
+    /// Configuration errors
+    #[error("Configuration error: {message}")]
+    Configuration {
+        message: String,
+        parameter: String,
+    },
+    
+    /// Resource exhaustion errors
+    #[error("Resource exhausted: {message}")]
+    ResourceExhausted {
+        message: String,
+        resource_type: String,
+        limit: Option<u64>,
+    },
+    
+    /// Timeout errors
+    #[error("Operation timed out: {message}")]
+    Timeout {
+        message: String,
+        operation: String,
+        duration_ms: u64,
+    },
+    
+    /// Concurrent access errors
+    #[error("Concurrent access error: {message}")]
+    ConcurrentAccess {
+        message: String,
+        operation: String,
+    },
+}
+
+impl Error {
+    /// Create a new AcornDB error with context
+    pub fn acorn(message: impl Into<String>) -> Self {
+        Self::Acorn {
+            message: message.into(),
+            context: None,
+            operation: None,
+            source: None,
+        }
+    }
+    
+    /// Create a new AcornDB error with context and operation
+    pub fn acorn_with_context(
+        message: impl Into<String>,
+        context: impl Into<String>,
+        operation: impl Into<String>,
+    ) -> Self {
+        Self::Acorn {
+            message: message.into(),
+            context: Some(context.into()),
+            operation: Some(operation.into()),
+            source: None,
+        }
+    }
+    
+    /// Create a not found error
+    pub fn not_found(key: impl Into<String>, operation: impl Into<String>) -> Self {
+        Self::NotFound {
+            key: key.into(),
+            operation: operation.into(),
+        }
+    }
+    
+    /// Create a serialization error
+    pub fn serialization(
+        message: impl Into<String>,
+        data_type: impl Into<String>,
+        operation: impl Into<String>,
+    ) -> Self {
+        Self::Serialization {
+            message: message.into(),
+            data_type: data_type.into(),
+            operation: operation.into(),
+        }
+    }
+    
+    /// Create an invalid input error
+    pub fn invalid_input(
+        message: impl Into<String>,
+        parameter: impl Into<String>,
+        expected: impl Into<String>,
+    ) -> Self {
+        Self::InvalidInput {
+            message: message.into(),
+            parameter: parameter.into(),
+            expected: expected.into(),
+        }
+    }
+    
+    /// Create a file system error
+    pub fn file_system(
+        message: impl Into<String>,
+        path: impl Into<String>,
+        operation: impl Into<String>,
+    ) -> Self {
+        Self::FileSystem {
+            message: message.into(),
+            path: path.into(),
+            operation: operation.into(),
+        }
+    }
+    
+    /// Create a network error
+    pub fn network(
+        message: impl Into<String>,
+        url: impl Into<String>,
+        operation: impl Into<String>,
+    ) -> Self {
+        Self::Network {
+            message: message.into(),
+            url: url.into(),
+            operation: operation.into(),
+        }
+    }
+    
+    /// Create an encryption error
+    pub fn encryption(message: impl Into<String>, operation: impl Into<String>) -> Self {
+        Self::Encryption {
+            message: message.into(),
+            operation: operation.into(),
+        }
+    }
+    
+    /// Create a compression error
+    pub fn compression(message: impl Into<String>, operation: impl Into<String>) -> Self {
+        Self::Compression {
+            message: message.into(),
+            operation: operation.into(),
+        }
+    }
+    
+    /// Create a cache error
+    pub fn cache(message: impl Into<String>, operation: impl Into<String>) -> Self {
+        Self::Cache {
+            message: message.into(),
+            operation: operation.into(),
+        }
+    }
+    
+    /// Create a query error
+    pub fn query(
+        message: impl Into<String>,
+        query_type: impl Into<String>,
+        operation: impl Into<String>,
+    ) -> Self {
+        Self::Query {
+            message: message.into(),
+            query_type: query_type.into(),
+            operation: operation.into(),
+        }
+    }
+    
+    /// Create a transaction error
+    pub fn transaction(message: impl Into<String>, operation: impl Into<String>) -> Self {
+        Self::Transaction {
+            message: message.into(),
+            operation: operation.into(),
+        }
+    }
+    
+    /// Create a sync error
+    pub fn sync(
+        message: impl Into<String>,
+        operation: impl Into<String>,
+        remote_url: Option<String>,
+    ) -> Self {
+        Self::Sync {
+            message: message.into(),
+            operation: operation.into(),
+            remote_url,
+        }
+    }
+    
+    /// Create a configuration error
+    pub fn configuration(message: impl Into<String>, parameter: impl Into<String>) -> Self {
+        Self::Configuration {
+            message: message.into(),
+            parameter: parameter.into(),
+        }
+    }
+    
+    /// Create a resource exhausted error
+    pub fn resource_exhausted(
+        message: impl Into<String>,
+        resource_type: impl Into<String>,
+        limit: Option<u64>,
+    ) -> Self {
+        Self::ResourceExhausted {
+            message: message.into(),
+            resource_type: resource_type.into(),
+            limit,
+        }
+    }
+    
+    /// Create a timeout error
+    pub fn timeout(
+        message: impl Into<String>,
+        operation: impl Into<String>,
+        duration_ms: u64,
+    ) -> Self {
+        Self::Timeout {
+            message: message.into(),
+            operation: operation.into(),
+            duration_ms,
+        }
+    }
+    
+    /// Create a concurrent access error
+    pub fn concurrent_access(message: impl Into<String>, operation: impl Into<String>) -> Self {
+        Self::ConcurrentAccess {
+            message: message.into(),
+            operation: operation.into(),
+        }
+    }
+    
+    /// Get the operation that caused the error
+    pub fn operation(&self) -> Option<&str> {
+        match self {
+            Self::Acorn { operation, .. } => operation.as_deref(),
+            Self::NotFound { operation, .. } => Some(operation),
+            Self::Serialization { operation, .. } => Some(operation),
+            Self::InvalidInput { .. } => None,
+            Self::FileSystem { operation, .. } => Some(operation),
+            Self::Network { operation, .. } => Some(operation),
+            Self::Encryption { operation, .. } => Some(operation),
+            Self::Compression { operation, .. } => Some(operation),
+            Self::Cache { operation, .. } => Some(operation),
+            Self::Query { operation, .. } => Some(operation),
+            Self::Transaction { operation, .. } => Some(operation),
+            Self::Sync { operation, .. } => Some(operation),
+            Self::Configuration { .. } => None,
+            Self::ResourceExhausted { .. } => None,
+            Self::Timeout { operation, .. } => Some(operation),
+            Self::ConcurrentAccess { operation, .. } => Some(operation),
+        }
+    }
+    
+    /// Get additional context for the error
+    pub fn context(&self) -> Option<&str> {
+        match self {
+            Self::Acorn { context, .. } => context.as_deref(),
+            _ => None,
+        }
+    }
+    
+    /// Check if this is a recoverable error
+    pub fn is_recoverable(&self) -> bool {
+        match self {
+            Self::NotFound { .. } => true,
+            Self::Timeout { .. } => true,
+            Self::Network { .. } => true,
+            Self::ResourceExhausted { .. } => true,
+            Self::ConcurrentAccess { .. } => true,
+            _ => false,
+        }
+    }
+    
+    /// Get error severity level
+    pub fn severity(&self) -> ErrorSeverity {
+        match self {
+            Self::NotFound { .. } => ErrorSeverity::Info,
+            Self::Timeout { .. } => ErrorSeverity::Warning,
+            Self::Network { .. } => ErrorSeverity::Warning,
+            Self::ConcurrentAccess { .. } => ErrorSeverity::Warning,
+            Self::ResourceExhausted { .. } => ErrorSeverity::Error,
+            Self::Configuration { .. } => ErrorSeverity::Error,
+            Self::Serialization { .. } => ErrorSeverity::Error,
+            Self::InvalidInput { .. } => ErrorSeverity::Error,
+            Self::FileSystem { .. } => ErrorSeverity::Error,
+            Self::Encryption { .. } => ErrorSeverity::Error,
+            Self::Compression { .. } => ErrorSeverity::Error,
+            Self::Cache { .. } => ErrorSeverity::Error,
+            Self::Query { .. } => ErrorSeverity::Error,
+            Self::Transaction { .. } => ErrorSeverity::Error,
+            Self::Sync { .. } => ErrorSeverity::Error,
+            Self::Acorn { .. } => ErrorSeverity::Error,
+        }
+    }
+}
+
+/// Error severity levels
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum ErrorSeverity {
+    Info,
+    Warning,
+    Error,
+    Critical,
+}
+
+impl fmt::Display for ErrorSeverity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Info => write!(f, "INFO"),
+            Self::Warning => write!(f, "WARNING"),
+            Self::Error => write!(f, "ERROR"),
+            Self::Critical => write!(f, "CRITICAL"),
+        }
+    }
+}
+
+/// Helper trait for creating errors with context
+pub trait ErrorContext<T> {
+    fn with_context<F>(self, f: F) -> Result<T>
+    where
+        F: FnOnce() -> String;
+    
+    fn with_operation(self, operation: &str) -> Result<T>;
+}
+
+impl<T, E> ErrorContext<T> for std::result::Result<T, E>
+where
+    E: std::error::Error + Send + Sync + 'static,
+{
+    fn with_context<F>(self, f: F) -> Result<T>
+    where
+        F: FnOnce() -> String,
+    {
+        self.map_err(|e| Error::Acorn {
+            message: f(),
+            context: None,
+            operation: None,
+            source: Some(Box::new(e)),
+        })
+    }
+    
+    fn with_operation(self, operation: &str) -> Result<T> {
+        self.map_err(|e| Error::Acorn {
+            message: e.to_string(),
+            context: None,
+            operation: Some(operation.to_string()),
+            source: Some(Box::new(e)),
+        })
+    }
+}
+
+/// Helper function to get the last error from the FFI layer
+fn get_last_error() -> String {
+    unsafe { acorn_sys::last_error_string() }
+}
+
+/// Helper function to create an AcornDB error from FFI result
+fn ffi_result<T>(rc: i32, operation: &str, success_value: T) -> Result<T> {
+    if rc == 0 {
+        Ok(success_value)
+    } else {
+        Err(Error::acorn_with_context(
+            get_last_error(),
+            "FFI operation failed",
+            operation,
+        ))
+    }
+}
+
+/// Helper function to create an AcornDB error from FFI result with context
+fn ffi_result_with_context<T>(rc: i32, operation: &str, context: &str, success_value: T) -> Result<T> {
+    if rc == 0 {
+        Ok(success_value)
+    } else {
+        Err(Error::acorn_with_context(
+            get_last_error(),
+            context,
+            operation,
+        ))
+    }
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
