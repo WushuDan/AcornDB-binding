@@ -4796,6 +4796,645 @@ impl AcornAdvancedTree {
     }
 }
 
+/// Event Management for enhanced event system, tangle support, and mesh primitives
+pub struct AcornEventManager {
+    h: acorn_event_manager_handle,
+}
+
+/// Event types for filtering and categorization
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EventType {
+    Stash,
+    Toss,
+    Squabble,
+    Sync,
+}
+
+/// Event information structure
+#[derive(Debug, Clone)]
+pub struct EventInfo {
+    pub event_type: EventType,
+    pub key: String,
+    pub json_payload: String,
+    pub timestamp: i64,
+    pub source_node: Option<String>,
+}
+
+/// Mesh topology types
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MeshTopology {
+    Full,
+    Ring,
+    Star,
+    Custom,
+}
+
+/// Mesh statistics information
+#[derive(Debug, Clone)]
+pub struct MeshStats {
+    pub node_id: String,
+    pub tracked_change_ids: i32,
+    pub active_tangles: i32,
+    pub max_hop_count: i32,
+    pub total_sync_operations: i32,
+    pub last_sync_timestamp: i64,
+}
+
+impl AcornEventManager {
+    /// Create an event manager for a tree
+    /// 
+    /// # Arguments
+    /// * `tree` - The tree to manage events for
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornTree, AcornEventManager, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let tree = AcornTree::open_memory()?;
+    /// let event_manager = AcornEventManager::new(tree)?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn new(tree: AcornTree) -> Result<Self> {
+        let mut h: acorn_event_manager_handle = 0;
+        let rc = unsafe { acorn_event_manager_create(tree.h, &mut h as *mut _) };
+        
+        if rc == 0 {
+            Ok(Self { h })
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+
+    /// Subscribe to all events from this tree
+    /// 
+    /// # Arguments
+    /// * `callback` - Function to call when events occur
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornTree, AcornEventManager, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let tree = AcornTree::open_memory()?;
+    /// let event_manager = AcornEventManager::new(tree)?;
+    /// let subscription = event_manager.subscribe(|key, json, len| {
+    ///     println!("Event: {} with data length {}", key, len);
+    /// })?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn subscribe<F>(&self, callback: F) -> Result<AcornSubscription>
+    where
+        F: Fn(&str, &[u8]) + Send + Sync + 'static,
+    {
+        let callback = Box::new(callback);
+        let user_data = Box::into_raw(callback) as *mut std::ffi::c_void;
+        
+        let mut sub_h: acorn_sub_handle = 0;
+        let rc = unsafe { 
+            acorn_event_manager_subscribe(self.h, Some(event_callback), user_data, &mut sub_h as *mut _) 
+        };
+        
+        if rc == 0 {
+            Ok(AcornSubscription { h: sub_h })
+        } else {
+            unsafe { Box::from_raw(user_data as *mut F); }
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+
+    /// Subscribe to specific event types only
+    /// 
+    /// # Arguments
+    /// * `event_type` - Type of events to subscribe to
+    /// * `callback` - Function to call when events occur
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornTree, AcornEventManager, EventType, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let tree = AcornTree::open_memory()?;
+    /// let event_manager = AcornEventManager::new(tree)?;
+    /// let subscription = event_manager.subscribe_filtered(EventType::Stash, |key, json, len| {
+    ///     println!("Stash event: {}", key);
+    /// })?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn subscribe_filtered<F>(&self, event_type: EventType, callback: F) -> Result<AcornSubscription>
+    where
+        F: Fn(&str, &[u8]) + Send + Sync + 'static,
+    {
+        let callback = Box::new(callback);
+        let user_data = Box::into_raw(callback) as *mut std::ffi::c_void;
+        
+        let mut sub_h: acorn_sub_handle = 0;
+        let rc = unsafe { 
+            acorn_event_manager_subscribe_filtered(self.h, event_type as i32, Some(event_callback), user_data, &mut sub_h as *mut _) 
+        };
+        
+        if rc == 0 {
+            Ok(AcornSubscription { h: sub_h })
+        } else {
+            unsafe { Box::from_raw(user_data as *mut F); }
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+
+    /// Raise a custom event
+    /// 
+    /// # Arguments
+    /// * `event_type` - Type of event to raise
+    /// * `key` - Key associated with the event
+    /// * `json_payload` - JSON payload for the event
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornTree, AcornEventManager, EventType, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let tree = AcornTree::open_memory()?;
+    /// let event_manager = AcornEventManager::new(tree)?;
+    /// let payload = r#"{"message": "Custom event"}"#;
+    /// event_manager.raise_event(EventType::Sync, "custom-key", payload)?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn raise_event(&self, event_type: EventType, key: &str, json_payload: &str) -> Result<()> {
+        let key_c = CString::new(key).map_err(|e| Error::Acorn(format!("Invalid key: {}", e)))?;
+        let payload_c = CString::new(json_payload).map_err(|e| Error::Acorn(format!("Invalid JSON payload: {}", e)))?;
+        
+        let rc = unsafe { 
+            acorn_event_manager_raise_event(self.h, event_type as i32, key_c.as_ptr(), payload_c.as_ptr(), json_payload.len()) 
+        };
+        
+        if rc == 0 {
+            Ok(())
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+
+    /// Get the number of active subscribers
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornTree, AcornEventManager, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let tree = AcornTree::open_memory()?;
+    /// let event_manager = AcornEventManager::new(tree)?;
+    /// let count = event_manager.get_subscriber_count()?;
+    /// println!("Active subscribers: {}", count);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn get_subscriber_count(&self) -> Result<i32> {
+        let mut count: i32 = 0;
+        
+        let rc = unsafe { 
+            acorn_event_manager_get_subscriber_count(self.h, &mut count as *mut _) 
+        };
+        
+        if rc == 0 {
+            Ok(count)
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+}
+
+impl Drop for AcornEventManager {
+    fn drop(&mut self) {
+        unsafe { acorn_event_manager_close(self.h); }
+    }
+}
+
+/// Tangle for live synchronization between trees
+pub struct AcornTangle {
+    h: acorn_tangle_handle,
+}
+
+impl AcornTangle {
+    /// Create a tangle between two trees
+    /// 
+    /// # Arguments
+    /// * `local_tree` - Local tree
+    /// * `remote_tree` - Remote tree
+    /// * `tangle_name` - Name for the tangle
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornTree, AcornTangle, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let local_tree = AcornTree::open_memory()?;
+    /// let remote_tree = AcornTree::open_memory()?;
+    /// let tangle = AcornTangle::new(local_tree, remote_tree, "sync-session")?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn new(local_tree: AcornTree, remote_tree: AcornTree, tangle_name: &str) -> Result<Self> {
+        let name_c = CString::new(tangle_name).map_err(|e| Error::Acorn(format!("Invalid tangle name: {}", e)))?;
+        
+        let mut h: acorn_tangle_handle = 0;
+        let rc = unsafe { 
+            acorn_tangle_create(local_tree.h, remote_tree.h, name_c.as_ptr(), &mut h as *mut _) 
+        };
+        
+        if rc == 0 {
+            Ok(Self { h })
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+
+    /// Create an in-process tangle between two trees
+    /// 
+    /// # Arguments
+    /// * `local_tree` - Local tree
+    /// * `remote_tree` - Remote tree
+    /// * `tangle_name` - Name for the tangle
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornTree, AcornTangle, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let local_tree = AcornTree::open_memory()?;
+    /// let remote_tree = AcornTree::open_memory()?;
+    /// let tangle = AcornTangle::new_in_process(local_tree, remote_tree, "in-process-sync")?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn new_in_process(local_tree: AcornTree, remote_tree: AcornTree, tangle_name: &str) -> Result<Self> {
+        let name_c = CString::new(tangle_name).map_err(|e| Error::Acorn(format!("Invalid tangle name: {}", e)))?;
+        
+        let mut h: acorn_tangle_handle = 0;
+        let rc = unsafe { 
+            acorn_tangle_create_in_process(local_tree.h, remote_tree.h, name_c.as_ptr(), &mut h as *mut _) 
+        };
+        
+        if rc == 0 {
+            Ok(Self { h })
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+
+    /// Push data to the remote tree
+    /// 
+    /// # Arguments
+    /// * `key` - Key to push
+    /// * `json_payload` - JSON payload to push
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornTree, AcornTangle, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let local_tree = AcornTree::open_memory()?;
+    /// let remote_tree = AcornTree::open_memory()?;
+    /// let tangle = AcornTangle::new(local_tree, remote_tree, "sync-session")?;
+    /// let payload = r#"{"name": "Alice", "age": 30}"#;
+    /// tangle.push("user-1", payload)?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn push(&self, key: &str, json_payload: &str) -> Result<()> {
+        let key_c = CString::new(key).map_err(|e| Error::Acorn(format!("Invalid key: {}", e)))?;
+        let payload_c = CString::new(json_payload).map_err(|e| Error::Acorn(format!("Invalid JSON payload: {}", e)))?;
+        
+        let rc = unsafe { 
+            acorn_tangle_push(self.h, key_c.as_ptr(), payload_c.as_ptr(), json_payload.len()) 
+        };
+        
+        if rc == 0 {
+            Ok(())
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+
+    /// Pull data from the remote tree
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornTree, AcornTangle, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let local_tree = AcornTree::open_memory()?;
+    /// let remote_tree = AcornTree::open_memory()?;
+    /// let tangle = AcornTangle::new(local_tree, remote_tree, "sync-session")?;
+    /// tangle.pull()?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn pull(&self) -> Result<()> {
+        let rc = unsafe { acorn_tangle_pull(self.h) };
+        
+        if rc == 0 {
+            Ok(())
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+
+    /// Synchronize bidirectionally with the remote tree
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornTree, AcornTangle, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let local_tree = AcornTree::open_memory()?;
+    /// let remote_tree = AcornTree::open_memory()?;
+    /// let tangle = AcornTangle::new(local_tree, remote_tree, "sync-session")?;
+    /// tangle.sync_bidirectional()?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn sync_bidirectional(&self) -> Result<()> {
+        let rc = unsafe { acorn_tangle_sync_bidirectional(self.h) };
+        
+        if rc == 0 {
+            Ok(())
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+
+    /// Get tangle statistics
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornTree, AcornTangle, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let local_tree = AcornTree::open_memory()?;
+    /// let remote_tree = AcornTree::open_memory()?;
+    /// let tangle = AcornTangle::new(local_tree, remote_tree, "sync-session")?;
+    /// let stats = tangle.get_stats()?;
+    /// println!("Active tangles: {}", stats.active_tangles);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn get_stats(&self) -> Result<MeshStats> {
+        let mut stats: acorn_mesh_stats = unsafe { std::mem::zeroed() };
+        
+        let rc = unsafe { 
+            acorn_tangle_get_stats(self.h, &mut stats as *mut _) 
+        };
+        
+        if rc == 0 {
+            Ok(MeshStats {
+                node_id: unsafe { CStr::from_ptr(stats.node_id).to_string_lossy().into_owned() },
+                tracked_change_ids: stats.tracked_change_ids,
+                active_tangles: stats.active_tangles,
+                max_hop_count: stats.max_hop_count,
+                total_sync_operations: stats.total_sync_operations,
+                last_sync_timestamp: stats.last_sync_timestamp,
+            })
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+}
+
+impl Drop for AcornTangle {
+    fn drop(&mut self) {
+        unsafe { acorn_tangle_close(self.h); }
+    }
+}
+
+/// Mesh coordinator for multi-node synchronization
+pub struct AcornMeshCoordinator {
+    h: acorn_mesh_coordinator_handle,
+}
+
+impl AcornMeshCoordinator {
+    /// Create a new mesh coordinator
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornMeshCoordinator, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let coordinator = AcornMeshCoordinator::new()?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn new() -> Result<Self> {
+        let mut h: acorn_mesh_coordinator_handle = 0;
+        let rc = unsafe { acorn_mesh_coordinator_create(&mut h as *mut _) };
+        
+        if rc == 0 {
+            Ok(Self { h })
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+
+    /// Add a node to the mesh
+    /// 
+    /// # Arguments
+    /// * `node_id` - Unique identifier for the node
+    /// * `tree` - Tree to add to the mesh
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornMeshCoordinator, AcornTree, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let coordinator = AcornMeshCoordinator::new()?;
+    /// let tree = AcornTree::open_memory()?;
+    /// coordinator.add_node("node-1", tree)?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn add_node(&self, node_id: &str, tree: AcornTree) -> Result<()> {
+        let node_id_c = CString::new(node_id).map_err(|e| Error::Acorn(format!("Invalid node ID: {}", e)))?;
+        
+        let rc = unsafe { 
+            acorn_mesh_coordinator_add_node(self.h, node_id_c.as_ptr(), tree.h) 
+        };
+        
+        if rc == 0 {
+            Ok(())
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+
+    /// Connect two nodes bidirectionally
+    /// 
+    /// # Arguments
+    /// * `node_a` - First node ID
+    /// * `node_b` - Second node ID
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornMeshCoordinator, AcornTree, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let coordinator = AcornMeshCoordinator::new()?;
+    /// let tree_a = AcornTree::open_memory()?;
+    /// let tree_b = AcornTree::open_memory()?;
+    /// coordinator.add_node("node-a", tree_a)?;
+    /// coordinator.add_node("node-b", tree_b)?;
+    /// coordinator.connect_nodes("node-a", "node-b")?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn connect_nodes(&self, node_a: &str, node_b: &str) -> Result<()> {
+        let node_a_c = CString::new(node_a).map_err(|e| Error::Acorn(format!("Invalid node A ID: {}", e)))?;
+        let node_b_c = CString::new(node_b).map_err(|e| Error::Acorn(format!("Invalid node B ID: {}", e)))?;
+        
+        let rc = unsafe { 
+            acorn_mesh_coordinator_connect_nodes(self.h, node_a_c.as_ptr(), node_b_c.as_ptr()) 
+        };
+        
+        if rc == 0 {
+            Ok(())
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+
+    /// Create a specific topology
+    /// 
+    /// # Arguments
+    /// * `topology` - Type of topology to create
+    /// * `hub_node_id` - Hub node ID for star topology (ignored for other topologies)
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornMeshCoordinator, AcornTree, MeshTopology, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let coordinator = AcornMeshCoordinator::new()?;
+    /// let tree_a = AcornTree::open_memory()?;
+    /// let tree_b = AcornTree::open_memory()?;
+    /// let tree_c = AcornTree::open_memory()?;
+    /// coordinator.add_node("node-a", tree_a)?;
+    /// coordinator.add_node("node-b", tree_b)?;
+    /// coordinator.add_node("node-c", tree_c)?;
+    /// coordinator.create_topology(MeshTopology::Full, "")?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn create_topology(&self, topology: MeshTopology, hub_node_id: &str) -> Result<()> {
+        let hub_c = CString::new(hub_node_id).map_err(|e| Error::Acorn(format!("Invalid hub node ID: {}", e)))?;
+        
+        let rc = unsafe { 
+            acorn_mesh_coordinator_create_topology(self.h, topology as i32, hub_c.as_ptr()) 
+        };
+        
+        if rc == 0 {
+            Ok(())
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+
+    /// Synchronize all nodes in the mesh
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornMeshCoordinator, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let coordinator = AcornMeshCoordinator::new()?;
+    /// coordinator.synchronize_all()?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn synchronize_all(&self) -> Result<()> {
+        let rc = unsafe { acorn_mesh_coordinator_synchronize_all(self.h) };
+        
+        if rc == 0 {
+            Ok(())
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+
+    /// Get statistics for a specific node
+    /// 
+    /// # Arguments
+    /// * `node_id` - Node ID to get statistics for
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornMeshCoordinator, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let coordinator = AcornMeshCoordinator::new()?;
+    /// let stats = coordinator.get_node_stats("node-1")?;
+    /// println!("Node {}: {} active tangles", stats.node_id, stats.active_tangles);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn get_node_stats(&self, node_id: &str) -> Result<MeshStats> {
+        let node_id_c = CString::new(node_id).map_err(|e| Error::Acorn(format!("Invalid node ID: {}", e)))?;
+        
+        let mut stats: acorn_mesh_stats = unsafe { std::mem::zeroed() };
+        
+        let rc = unsafe { 
+            acorn_mesh_coordinator_get_node_stats(self.h, node_id_c.as_ptr(), &mut stats as *mut _) 
+        };
+        
+        if rc == 0 {
+            Ok(MeshStats {
+                node_id: unsafe { CStr::from_ptr(stats.node_id).to_string_lossy().into_owned() },
+                tracked_change_ids: stats.tracked_change_ids,
+                active_tangles: stats.active_tangles,
+                max_hop_count: stats.max_hop_count,
+                total_sync_operations: stats.total_sync_operations,
+                last_sync_timestamp: stats.last_sync_timestamp,
+            })
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+
+    /// Get statistics for all nodes in the mesh
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornMeshCoordinator, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let coordinator = AcornMeshCoordinator::new()?;
+    /// let all_stats = coordinator.get_all_stats()?;
+    /// for stats in all_stats {
+    ///     println!("Node {}: {} active tangles", stats.node_id, stats.active_tangles);
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn get_all_stats(&self) -> Result<Vec<MeshStats>> {
+        let mut stats_ptr: *mut acorn_mesh_stats = std::ptr::null_mut();
+        let mut count: usize = 0;
+        
+        let rc = unsafe { 
+            acorn_mesh_coordinator_get_all_stats(self.h, &mut stats_ptr as *mut _, &mut count as *mut _) 
+        };
+        
+        if rc == 0 {
+            let mut stats_list = Vec::new();
+            if !stats_ptr.is_null() && count > 0 {
+                let stats_slice = unsafe { std::slice::from_raw_parts(stats_ptr, count) };
+                for stats in stats_slice {
+                    stats_list.push(MeshStats {
+                        node_id: unsafe { CStr::from_ptr(stats.node_id).to_string_lossy().into_owned() },
+                        tracked_change_ids: stats.tracked_change_ids,
+                        active_tangles: stats.active_tangles,
+                        max_hop_count: stats.max_hop_count,
+                        total_sync_operations: stats.total_sync_operations,
+                        last_sync_timestamp: stats.last_sync_timestamp,
+                    });
+                }
+                unsafe { acorn_mesh_coordinator_free_stats(stats_ptr, count); }
+            }
+            Ok(stats_list)
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+}
+
+impl Drop for AcornMeshCoordinator {
+    fn drop(&mut self) {
+        unsafe { acorn_mesh_coordinator_close(self.h); }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

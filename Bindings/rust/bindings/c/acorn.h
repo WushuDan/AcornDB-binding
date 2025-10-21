@@ -389,6 +389,78 @@ ACORN_API int acorn_tree_get_last_sync_timestamp(acorn_tree_handle tree, int64_t
 ACORN_API void acorn_tree_free_expiring_nuts(char** ids, size_t count);
 ACORN_API void acorn_tree_free_all_nuts(char* json);
 
+// Event Management - Enhanced event system, tangle support, mesh primitives
+typedef uint64_t acorn_event_manager_handle;
+typedef uint64_t acorn_tangle_handle;
+typedef uint64_t acorn_mesh_coordinator_handle;
+
+// Event types
+typedef enum {
+    ACORN_EVENT_STASH = 0,
+    ACORN_EVENT_TOSS = 1,
+    ACORN_EVENT_SQUABBLE = 2,
+    ACORN_EVENT_SYNC = 3
+} acorn_event_type;
+
+// Event information
+typedef struct {
+    acorn_event_type event_type;
+    char* key;
+    char* json_payload;
+    size_t json_length;
+    int64_t timestamp;
+    char* source_node;
+} acorn_event_info;
+
+// Mesh topology types
+typedef enum {
+    ACORN_MESH_FULL = 0,
+    ACORN_MESH_RING = 1,
+    ACORN_MESH_STAR = 2,
+    ACORN_MESH_CUSTOM = 3
+} acorn_mesh_topology;
+
+// Mesh statistics
+typedef struct {
+    char* node_id;
+    int tracked_change_ids;
+    int active_tangles;
+    int max_hop_count;
+    int total_sync_operations;
+    int64_t last_sync_timestamp;
+} acorn_mesh_stats;
+
+// Enhanced event management
+ACORN_API int acorn_event_manager_create(acorn_tree_handle tree, acorn_event_manager_handle* out_manager);
+ACORN_API int acorn_event_manager_subscribe(acorn_event_manager_handle manager, acorn_event_cb cb, void* user, acorn_sub_handle* out_sub);
+ACORN_API int acorn_event_manager_subscribe_filtered(acorn_event_manager_handle manager, acorn_event_type event_type, acorn_event_cb cb, void* user, acorn_sub_handle* out_sub);
+ACORN_API int acorn_event_manager_raise_event(acorn_event_manager_handle manager, acorn_event_type event_type, const char* key, const char* json_payload, size_t json_length);
+ACORN_API int acorn_event_manager_get_subscriber_count(acorn_event_manager_handle manager, int* out_count);
+ACORN_API int acorn_event_manager_close(acorn_event_manager_handle manager);
+
+// Tangle management
+ACORN_API int acorn_tangle_create(acorn_tree_handle local_tree, acorn_tree_handle remote_tree, const char* tangle_name, acorn_tangle_handle* out_tangle);
+ACORN_API int acorn_tangle_create_in_process(acorn_tree_handle local_tree, acorn_tree_handle remote_tree, const char* tangle_name, acorn_tangle_handle* out_tangle);
+ACORN_API int acorn_tangle_push(acorn_tangle_handle tangle, const char* key, const char* json_payload, size_t json_length);
+ACORN_API int acorn_tangle_pull(acorn_tangle_handle tangle);
+ACORN_API int acorn_tangle_sync_bidirectional(acorn_tangle_handle tangle);
+ACORN_API int acorn_tangle_get_stats(acorn_tangle_handle tangle, acorn_mesh_stats* out_stats);
+ACORN_API int acorn_tangle_close(acorn_tangle_handle tangle);
+
+// Mesh coordinator
+ACORN_API int acorn_mesh_coordinator_create(acorn_mesh_coordinator_handle* out_coordinator);
+ACORN_API int acorn_mesh_coordinator_add_node(acorn_mesh_coordinator_handle coordinator, const char* node_id, acorn_tree_handle tree);
+ACORN_API int acorn_mesh_coordinator_connect_nodes(acorn_mesh_coordinator_handle coordinator, const char* node_a, const char* node_b);
+ACORN_API int acorn_mesh_coordinator_create_topology(acorn_mesh_coordinator_handle coordinator, acorn_mesh_topology topology, const char* hub_node_id);
+ACORN_API int acorn_mesh_coordinator_synchronize_all(acorn_mesh_coordinator_handle coordinator);
+ACORN_API int acorn_mesh_coordinator_get_node_stats(acorn_mesh_coordinator_handle coordinator, const char* node_id, acorn_mesh_stats* out_stats);
+ACORN_API int acorn_mesh_coordinator_get_all_stats(acorn_mesh_coordinator_handle coordinator, acorn_mesh_stats** out_stats, size_t* out_count);
+ACORN_API int acorn_mesh_coordinator_close(acorn_mesh_coordinator_handle coordinator);
+
+// Free event management resources
+ACORN_API void acorn_event_manager_free_event_info(acorn_event_info* event_info);
+ACORN_API void acorn_mesh_coordinator_free_stats(acorn_mesh_stats* stats, size_t count);
+
 // Memory management for buffers allocated by shim
 ACORN_API void acorn_free_buf(acorn_buf* buf);
 

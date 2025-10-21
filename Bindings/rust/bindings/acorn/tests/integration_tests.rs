@@ -3250,5 +3250,281 @@ mod unit_tests {
         
         Ok(())
     }
+
+    // Event Management Tests
+    #[test]
+    fn test_event_manager_creation() -> Result<(), Error> {
+        let tree = AcornTree::open_memory()?;
+        let event_manager = AcornEventManager::new(tree)?;
+        
+        // Verify event manager was created
+        let subscriber_count = event_manager.get_subscriber_count()?;
+        assert!(subscriber_count >= 0);
+        
+        Ok(())
+    }
+
+    #[test]
+    fn test_event_manager_subscription() -> Result<(), Error> {
+        let tree = AcornTree::open_memory()?;
+        let event_manager = AcornEventManager::new(tree)?;
+        
+        // Subscribe to all events
+        let subscription = event_manager.subscribe(|key, json_data| {
+            println!("Event: {} with {} bytes", key, json_data.len());
+        })?;
+        
+        // Verify subscription was created
+        let subscriber_count = event_manager.get_subscriber_count()?;
+        assert!(subscriber_count > 0);
+        
+        // Clean up subscription
+        drop(subscription);
+        
+        Ok(())
+    }
+
+    #[test]
+    fn test_event_manager_filtered_subscription() -> Result<(), Error> {
+        let tree = AcornTree::open_memory()?;
+        let event_manager = AcornEventManager::new(tree)?;
+        
+        // Subscribe to stash events only
+        let subscription = event_manager.subscribe_filtered(EventType::Stash, |key, _| {
+            println!("Stash event: {}", key);
+        })?;
+        
+        // Verify subscription was created
+        let subscriber_count = event_manager.get_subscriber_count()?;
+        assert!(subscriber_count > 0);
+        
+        // Clean up subscription
+        drop(subscription);
+        
+        Ok(())
+    }
+
+    #[test]
+    fn test_event_manager_raise_event() -> Result<(), Error> {
+        let tree = AcornTree::open_memory()?;
+        let event_manager = AcornEventManager::new(tree)?;
+        
+        // Raise a custom event
+        let payload = r#"{"message": "test event"}"#;
+        event_manager.raise_event(EventType::Sync, "test-key", payload)?;
+        
+        Ok(())
+    }
+
+    #[test]
+    fn test_tangle_creation() -> Result<(), Error> {
+        let local_tree = AcornTree::open_memory()?;
+        let remote_tree = AcornTree::open_memory()?;
+        
+        // Create tangle
+        let tangle = AcornTangle::new(local_tree, remote_tree, "test-tangle")?;
+        
+        // Get tangle stats
+        let stats = tangle.get_stats()?;
+        assert!(!stats.node_id.is_empty());
+        
+        Ok(())
+    }
+
+    #[test]
+    fn test_tangle_in_process() -> Result<(), Error> {
+        let local_tree = AcornTree::open_memory()?;
+        let remote_tree = AcornTree::open_memory()?;
+        
+        // Create in-process tangle
+        let tangle = AcornTangle::new_in_process(local_tree, remote_tree, "in-process-tangle")?;
+        
+        // Get tangle stats
+        let stats = tangle.get_stats()?;
+        assert!(!stats.node_id.is_empty());
+        
+        Ok(())
+    }
+
+    #[test]
+    fn test_tangle_operations() -> Result<(), Error> {
+        let local_tree = AcornTree::open_memory()?;
+        let remote_tree = AcornTree::open_memory()?;
+        
+        let tangle = AcornTangle::new(local_tree, remote_tree, "test-tangle")?;
+        
+        // Test push operation
+        let payload = r#"{"name": "test", "value": 42}"#;
+        tangle.push("test-key", payload)?;
+        
+        // Test pull operation
+        tangle.pull()?;
+        
+        // Test bidirectional sync
+        tangle.sync_bidirectional()?;
+        
+        Ok(())
+    }
+
+    #[test]
+    fn test_mesh_coordinator_creation() -> Result<(), Error> {
+        let coordinator = AcornMeshCoordinator::new()?;
+        
+        // Coordinator should be created successfully
+        Ok(())
+    }
+
+    #[test]
+    fn test_mesh_coordinator_add_node() -> Result<(), Error> {
+        let coordinator = AcornMeshCoordinator::new()?;
+        let tree = AcornTree::open_memory()?;
+        
+        // Add node to mesh
+        coordinator.add_node("test-node", tree)?;
+        
+        Ok(())
+    }
+
+    #[test]
+    fn test_mesh_coordinator_connect_nodes() -> Result<(), Error> {
+        let coordinator = AcornMeshCoordinator::new()?;
+        let tree_a = AcornTree::open_memory()?;
+        let tree_b = AcornTree::open_memory()?;
+        
+        // Add nodes
+        coordinator.add_node("node-a", tree_a)?;
+        coordinator.add_node("node-b", tree_b)?;
+        
+        // Connect nodes
+        coordinator.connect_nodes("node-a", "node-b")?;
+        
+        Ok(())
+    }
+
+    #[test]
+    fn test_mesh_coordinator_topology() -> Result<(), Error> {
+        let coordinator = AcornMeshCoordinator::new()?;
+        let tree_a = AcornTree::open_memory()?;
+        let tree_b = AcornTree::open_memory()?;
+        let tree_c = AcornTree::open_memory()?;
+        
+        // Add nodes
+        coordinator.add_node("node-a", tree_a)?;
+        coordinator.add_node("node-b", tree_b)?;
+        coordinator.add_node("node-c", tree_c)?;
+        
+        // Create full mesh topology
+        coordinator.create_topology(MeshTopology::Full, "")?;
+        
+        Ok(())
+    }
+
+    #[test]
+    fn test_mesh_coordinator_synchronize() -> Result<(), Error> {
+        let coordinator = AcornMeshCoordinator::new()?;
+        let tree_a = AcornTree::open_memory()?;
+        let tree_b = AcornTree::open_memory()?;
+        
+        // Add nodes
+        coordinator.add_node("node-a", tree_a)?;
+        coordinator.add_node("node-b", tree_b)?;
+        
+        // Synchronize all nodes
+        coordinator.synchronize_all()?;
+        
+        Ok(())
+    }
+
+    #[test]
+    fn test_mesh_coordinator_stats() -> Result<(), Error> {
+        let coordinator = AcornMeshCoordinator::new()?;
+        let tree = AcornTree::open_memory()?;
+        
+        // Add node
+        coordinator.add_node("test-node", tree)?;
+        
+        // Get node stats
+        let stats = coordinator.get_node_stats("test-node")?;
+        assert_eq!(stats.node_id, "test-node");
+        assert!(stats.active_tangles >= 0);
+        assert!(stats.tracked_change_ids >= 0);
+        
+        Ok(())
+    }
+
+    #[test]
+    fn test_mesh_coordinator_all_stats() -> Result<(), Error> {
+        let coordinator = AcornMeshCoordinator::new()?;
+        let tree_a = AcornTree::open_memory()?;
+        let tree_b = AcornTree::open_memory()?;
+        
+        // Add nodes
+        coordinator.add_node("node-a", tree_a)?;
+        coordinator.add_node("node-b", tree_b)?;
+        
+        // Get all stats
+        let all_stats = coordinator.get_all_stats()?;
+        assert_eq!(all_stats.len(), 2);
+        
+        // Verify stats structure
+        for stats in &all_stats {
+            assert!(!stats.node_id.is_empty());
+            assert!(stats.active_tangles >= 0);
+            assert!(stats.tracked_change_ids >= 0);
+        }
+        
+        Ok(())
+    }
+
+    #[test]
+    fn test_event_management_comprehensive_workflow() -> Result<(), Error> {
+        // Create trees and event managers
+        let tree_a = AcornTree::open_memory()?;
+        let tree_b = AcornTree::open_memory()?;
+        
+        let event_manager_a = AcornEventManager::new(tree_a)?;
+        let event_manager_b = AcornEventManager::new(tree_b)?;
+        
+        // Create tangle between trees
+        let tangle = AcornTangle::new(tree_a, tree_b, "comprehensive-tangle")?;
+        
+        // Create mesh coordinator
+        let coordinator = AcornMeshCoordinator::new()?;
+        coordinator.add_node("tree-a", tree_a)?;
+        coordinator.add_node("tree-b", tree_b)?;
+        
+        // Set up event subscriptions
+        let _sub_a = event_manager_a.subscribe(|key, json_data| {
+            println!("Tree A event: {} ({} bytes)", key, json_data.len());
+        })?;
+        
+        let _sub_b = event_manager_b.subscribe(|key, json_data| {
+            println!("Tree B event: {} ({} bytes)", key, json_data.len());
+        })?;
+        
+        // Raise events
+        let payload = r#"{"test": "data"}"#;
+        event_manager_a.raise_event(EventType::Stash, "test-key", payload)?;
+        event_manager_b.raise_event(EventType::Sync, "sync-key", payload)?;
+        
+        // Test tangle operations
+        tangle.push("tangle-key", payload)?;
+        tangle.pull()?;
+        tangle.sync_bidirectional()?;
+        
+        // Test mesh operations
+        coordinator.connect_nodes("tree-a", "tree-b")?;
+        coordinator.create_topology(MeshTopology::Full, "")?;
+        coordinator.synchronize_all()?;
+        
+        // Verify everything worked
+        let stats = tangle.get_stats()?;
+        assert!(!stats.node_id.is_empty());
+        
+        let mesh_stats = coordinator.get_all_stats()?;
+        assert_eq!(mesh_stats.len(), 2);
+        
+        Ok(())
+    }
 }
 
