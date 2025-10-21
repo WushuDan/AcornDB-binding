@@ -3526,5 +3526,296 @@ mod unit_tests {
         
         Ok(())
     }
+
+    // Performance Monitoring Tests
+    #[test]
+    fn test_performance_monitor_creation() -> Result<(), Error> {
+        let monitor = AcornPerformanceMonitor::new()?;
+        
+        // Monitor should be created successfully
+        Ok(())
+    }
+
+    #[test]
+    fn test_performance_monitor_collection() -> Result<(), Error> {
+        let monitor = AcornPerformanceMonitor::new()?;
+        
+        // Start collection
+        monitor.start_collection()?;
+        
+        // Stop collection
+        monitor.stop_collection()?;
+        
+        Ok(())
+    }
+
+    #[test]
+    fn test_performance_monitor_metrics() -> Result<(), Error> {
+        let monitor = AcornPerformanceMonitor::new()?;
+        
+        // Get metrics (should work even without collection)
+        let metrics = monitor.get_metrics()?;
+        assert!(metrics.operations_per_second >= 0);
+        assert!(metrics.memory_usage_bytes >= 0);
+        assert!(metrics.cache_hit_rate_percent >= 0);
+        assert!(metrics.cache_hit_rate_percent <= 100);
+        
+        Ok(())
+    }
+
+    #[test]
+    fn test_performance_monitor_history() -> Result<(), Error> {
+        let monitor = AcornPerformanceMonitor::new()?;
+        
+        // Get history (should return empty initially)
+        let history = monitor.get_history()?;
+        assert!(history.is_empty());
+        
+        Ok(())
+    }
+
+    #[test]
+    fn test_performance_monitor_reset() -> Result<(), Error> {
+        let monitor = AcornPerformanceMonitor::new()?;
+        
+        // Reset metrics
+        monitor.reset_metrics()?;
+        
+        Ok(())
+    }
+
+    #[test]
+    fn test_health_checker_creation() -> Result<(), Error> {
+        let checker = AcornHealthChecker::new()?;
+        
+        // Checker should be created successfully
+        Ok(())
+    }
+
+    #[test]
+    fn test_health_checker_add_service() -> Result<(), Error> {
+        let checker = AcornHealthChecker::new()?;
+        
+        // Add a service
+        checker.add_service("test-service", "http://localhost:8080/health")?;
+        
+        Ok(())
+    }
+
+    #[test]
+    fn test_health_checker_check_all() -> Result<(), Error> {
+        let checker = AcornHealthChecker::new()?;
+        
+        // Add a service
+        checker.add_service("test-service", "http://localhost:8080/health")?;
+        
+        // Check all services
+        let results = checker.check_all()?;
+        assert!(results.len() >= 0);
+        
+        Ok(())
+    }
+
+    #[test]
+    fn test_health_checker_check_service() -> Result<(), Error> {
+        let checker = AcornHealthChecker::new()?;
+        
+        // Add a service
+        checker.add_service("test-service", "http://localhost:8080/health")?;
+        
+        // Check specific service
+        let result = checker.check_service("test-service")?;
+        assert_eq!(result.service_name, "test-service");
+        
+        Ok(())
+    }
+
+    #[test]
+    fn test_health_checker_overall_status() -> Result<(), Error> {
+        let checker = AcornHealthChecker::new()?;
+        
+        // Get overall status
+        let status = checker.get_overall_status()?;
+        assert!(matches!(status, HealthStatus::Unknown | HealthStatus::Healthy | HealthStatus::Degraded | HealthStatus::Unhealthy));
+        
+        Ok(())
+    }
+
+    #[test]
+    fn test_benchmark_tree_operations() -> Result<(), Error> {
+        let tree = AcornTree::open_memory()?;
+        let config = BenchmarkConfig {
+            operation_count: 100,
+            warmup_iterations: 5,
+            measurement_iterations: 10,
+            timeout_ms: 10000,
+            enable_memory_tracking: true,
+            enable_disk_tracking: false,
+            enable_network_tracking: false,
+        };
+        
+        let results = AcornBenchmark::benchmark_tree_operations(tree, &config)?;
+        assert!(results.len() > 0);
+        
+        for result in &results {
+            assert!(!result.operation_name.is_empty());
+            assert!(result.operations_per_second >= 0);
+            assert!(result.total_time_ms >= 0);
+        }
+        
+        Ok(())
+    }
+
+    #[test]
+    fn test_benchmark_sync_operations() -> Result<(), Error> {
+        let local_tree = AcornTree::open_memory()?;
+        let remote_tree = AcornTree::open_memory()?;
+        let tangle = AcornTangle::new(local_tree, remote_tree, "benchmark-tangle")?;
+        
+        let config = BenchmarkConfig {
+            operation_count: 50,
+            warmup_iterations: 3,
+            measurement_iterations: 5,
+            timeout_ms: 10000,
+            enable_memory_tracking: true,
+            enable_disk_tracking: false,
+            enable_network_tracking: true,
+        };
+        
+        let results = AcornBenchmark::benchmark_sync_operations(tangle, &config)?;
+        assert!(results.len() > 0);
+        
+        for result in &results {
+            assert!(!result.operation_name.is_empty());
+            assert!(result.operations_per_second >= 0);
+            assert!(result.total_time_ms >= 0);
+        }
+        
+        Ok(())
+    }
+
+    #[test]
+    fn test_benchmark_mesh_operations() -> Result<(), Error> {
+        let coordinator = AcornMeshCoordinator::new()?;
+        let tree_a = AcornTree::open_memory()?;
+        let tree_b = AcornTree::open_memory()?;
+        
+        coordinator.add_node("node-a", tree_a)?;
+        coordinator.add_node("node-b", tree_b)?;
+        
+        let config = BenchmarkConfig {
+            operation_count: 30,
+            warmup_iterations: 2,
+            measurement_iterations: 3,
+            timeout_ms: 10000,
+            enable_memory_tracking: true,
+            enable_disk_tracking: false,
+            enable_network_tracking: true,
+        };
+        
+        let results = AcornBenchmark::benchmark_mesh_operations(coordinator, &config)?;
+        assert!(results.len() > 0);
+        
+        for result in &results {
+            assert!(!result.operation_name.is_empty());
+            assert!(result.operations_per_second >= 0);
+            assert!(result.total_time_ms >= 0);
+        }
+        
+        Ok(())
+    }
+
+    #[test]
+    fn test_resource_monitor_memory_usage() -> Result<(), Error> {
+        let (heap_bytes, stack_bytes, total_bytes) = AcornResourceMonitor::get_memory_usage()?;
+        
+        assert!(heap_bytes >= 0);
+        assert!(stack_bytes >= 0);
+        assert!(total_bytes >= 0);
+        assert!(total_bytes >= heap_bytes);
+        assert!(total_bytes >= stack_bytes);
+        
+        Ok(())
+    }
+
+    #[test]
+    fn test_resource_monitor_disk_usage() -> Result<(), Error> {
+        let (used_bytes, total_bytes, free_bytes) = AcornResourceMonitor::get_disk_usage("/tmp")?;
+        
+        assert!(used_bytes >= 0);
+        assert!(total_bytes >= 0);
+        assert!(free_bytes >= 0);
+        assert!(total_bytes >= used_bytes);
+        assert!(total_bytes >= free_bytes);
+        
+        Ok(())
+    }
+
+    #[test]
+    fn test_resource_monitor_system_info() -> Result<(), Error> {
+        let system_info = AcornResourceMonitor::get_system_info()?;
+        
+        // System info should be a non-empty string
+        assert!(!system_info.is_empty());
+        
+        Ok(())
+    }
+
+    #[test]
+    fn test_performance_monitoring_comprehensive_workflow() -> Result<(), Error> {
+        // Create performance monitor
+        let monitor = AcornPerformanceMonitor::new()?;
+        
+        // Create health checker
+        let health_checker = AcornHealthChecker::new()?;
+        health_checker.add_service("test-service", "http://localhost:8080/health")?;
+        
+        // Create tree for benchmarking
+        let tree = AcornTree::open_memory()?;
+        
+        // Start performance monitoring
+        monitor.start_collection()?;
+        
+        // Perform some operations
+        for i in 0..100 {
+            let data = format!(r#"{{"id": "item-{}", "value": {}}}"#, i, i);
+            tree.stash(&format!("item-{}", i), &data)?;
+        }
+        
+        // Stop monitoring
+        monitor.stop_collection()?;
+        
+        // Get metrics
+        let metrics = monitor.get_metrics()?;
+        assert!(metrics.operations_per_second >= 0);
+        
+        // Get history
+        let history = monitor.get_history()?;
+        assert!(history.len() >= 0);
+        
+        // Check health
+        let health_results = health_checker.check_all()?;
+        assert!(health_results.len() >= 0);
+        
+        // Run benchmark
+        let config = BenchmarkConfig {
+            operation_count: 50,
+            warmup_iterations: 3,
+            measurement_iterations: 5,
+            timeout_ms: 5000,
+            enable_memory_tracking: true,
+            enable_disk_tracking: false,
+            enable_network_tracking: false,
+        };
+        
+        let benchmark_results = AcornBenchmark::benchmark_tree_operations(tree, &config)?;
+        assert!(benchmark_results.len() > 0);
+        
+        // Check resource usage
+        let (heap_bytes, stack_bytes, total_bytes) = AcornResourceMonitor::get_memory_usage()?;
+        assert!(total_bytes > 0);
+        
+        Ok(())
+    }
 }
 

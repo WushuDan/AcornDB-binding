@@ -461,6 +461,99 @@ ACORN_API int acorn_mesh_coordinator_close(acorn_mesh_coordinator_handle coordin
 ACORN_API void acorn_event_manager_free_event_info(acorn_event_info* event_info);
 ACORN_API void acorn_mesh_coordinator_free_stats(acorn_mesh_stats* stats, size_t count);
 
+// Performance Monitoring - Built-in metrics collection, health checks, monitoring
+typedef uint64_t acorn_performance_monitor_handle;
+typedef uint64_t acorn_health_checker_handle;
+
+// Performance metrics
+typedef struct {
+    int64_t operations_per_second;
+    int64_t memory_usage_bytes;
+    int64_t cache_hit_rate_percent;
+    int64_t sync_latency_ms;
+    int64_t disk_io_bytes;
+    int64_t network_bytes;
+    int64_t cpu_usage_percent;
+    int64_t timestamp;
+} acorn_performance_metrics;
+
+// Health check status
+typedef enum {
+    ACORN_HEALTH_UNKNOWN = 0,
+    ACORN_HEALTH_HEALTHY = 1,
+    ACORN_HEALTH_DEGRADED = 2,
+    ACORN_HEALTH_UNHEALTHY = 3
+} acorn_health_status;
+
+// Health check information
+typedef struct {
+    acorn_health_status status;
+    char* service_name;
+    char* message;
+    int64_t response_time_ms;
+    int64_t timestamp;
+    char* details;
+} acorn_health_info;
+
+// Benchmark configuration
+typedef struct {
+    int operation_count;
+    int warmup_iterations;
+    int measurement_iterations;
+    int64_t timeout_ms;
+    int enable_memory_tracking;
+    int enable_disk_tracking;
+    int enable_network_tracking;
+} acorn_benchmark_config;
+
+// Benchmark results
+typedef struct {
+    char* operation_name;
+    int64_t total_time_ms;
+    int64_t operations_per_second;
+    int64_t memory_allocated_bytes;
+    int64_t disk_io_bytes;
+    int64_t network_bytes;
+    double average_latency_ms;
+    double p50_latency_ms;
+    double p95_latency_ms;
+    double p99_latency_ms;
+    int64_t timestamp;
+} acorn_benchmark_result;
+
+// Performance monitoring
+ACORN_API int acorn_performance_monitor_create(acorn_performance_monitor_handle* out_monitor);
+ACORN_API int acorn_performance_monitor_start_collection(acorn_performance_monitor_handle monitor);
+ACORN_API int acorn_performance_monitor_stop_collection(acorn_performance_monitor_handle monitor);
+ACORN_API int acorn_performance_monitor_get_metrics(acorn_performance_monitor_handle monitor, acorn_performance_metrics* out_metrics);
+ACORN_API int acorn_performance_monitor_get_history(acorn_performance_monitor_handle monitor, acorn_performance_metrics** out_metrics, size_t* out_count);
+ACORN_API int acorn_performance_monitor_reset_metrics(acorn_performance_monitor_handle monitor);
+ACORN_API int acorn_performance_monitor_close(acorn_performance_monitor_handle monitor);
+
+// Health checking
+ACORN_API int acorn_health_checker_create(acorn_health_checker_handle* out_checker);
+ACORN_API int acorn_health_checker_add_service(acorn_health_checker_handle checker, const char* service_name, const char* health_endpoint);
+ACORN_API int acorn_health_checker_check_all(acorn_health_checker_handle checker, acorn_health_info** out_results, size_t* out_count);
+ACORN_API int acorn_health_checker_check_service(acorn_health_checker_handle checker, const char* service_name, acorn_health_info* out_result);
+ACORN_API int acorn_health_checker_get_overall_status(acorn_health_checker_handle checker, acorn_health_status* out_status);
+ACORN_API int acorn_health_checker_close(acorn_health_checker_handle checker);
+
+// Benchmarking
+ACORN_API int acorn_benchmark_tree_operations(acorn_tree_handle tree, acorn_benchmark_config* config, acorn_benchmark_result** out_results, size_t* out_count);
+ACORN_API int acorn_benchmark_sync_operations(acorn_tangle_handle tangle, acorn_benchmark_config* config, acorn_benchmark_result** out_results, size_t* out_count);
+ACORN_API int acorn_benchmark_mesh_operations(acorn_mesh_coordinator_handle coordinator, acorn_benchmark_config* config, acorn_benchmark_result** out_results, size_t* out_count);
+
+// Resource monitoring
+ACORN_API int acorn_get_memory_usage(int64_t* out_heap_bytes, int64_t* out_stack_bytes, int64_t* out_total_bytes);
+ACORN_API int acorn_get_disk_usage(const char* path, int64_t* out_used_bytes, int64_t* out_total_bytes, int64_t* out_free_bytes);
+ACORN_API int acorn_get_system_info(char** out_info, size_t* out_length);
+
+// Free performance monitoring resources
+ACORN_API void acorn_performance_monitor_free_metrics(acorn_performance_metrics* metrics, size_t count);
+ACORN_API void acorn_health_checker_free_results(acorn_health_info* results, size_t count);
+ACORN_API void acorn_benchmark_free_results(acorn_benchmark_result* results, size_t count);
+ACORN_API void acorn_free_system_info(char* info);
+
 // Memory management for buffers allocated by shim
 ACORN_API void acorn_free_buf(acorn_buf* buf);
 

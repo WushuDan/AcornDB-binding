@@ -5435,6 +5435,774 @@ impl Drop for AcornMeshCoordinator {
     }
 }
 
+/// Performance Monitoring for built-in metrics collection, health checks, and monitoring
+pub struct AcornPerformanceMonitor {
+    h: acorn_performance_monitor_handle,
+}
+
+/// Health status enumeration
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HealthStatus {
+    Unknown,
+    Healthy,
+    Degraded,
+    Unhealthy,
+}
+
+/// Performance metrics information
+#[derive(Debug, Clone)]
+pub struct PerformanceMetrics {
+    pub operations_per_second: i64,
+    pub memory_usage_bytes: i64,
+    pub cache_hit_rate_percent: i64,
+    pub sync_latency_ms: i64,
+    pub disk_io_bytes: i64,
+    pub network_bytes: i64,
+    pub cpu_usage_percent: i64,
+    pub timestamp: i64,
+}
+
+/// Health check information
+#[derive(Debug, Clone)]
+pub struct HealthInfo {
+    pub status: HealthStatus,
+    pub service_name: String,
+    pub message: String,
+    pub response_time_ms: i64,
+    pub timestamp: i64,
+    pub details: Option<String>,
+}
+
+/// Benchmark configuration
+#[derive(Debug, Clone)]
+pub struct BenchmarkConfig {
+    pub operation_count: i32,
+    pub warmup_iterations: i32,
+    pub measurement_iterations: i32,
+    pub timeout_ms: i64,
+    pub enable_memory_tracking: bool,
+    pub enable_disk_tracking: bool,
+    pub enable_network_tracking: bool,
+}
+
+/// Benchmark results
+#[derive(Debug, Clone)]
+pub struct BenchmarkResult {
+    pub operation_name: String,
+    pub total_time_ms: i64,
+    pub operations_per_second: i64,
+    pub memory_allocated_bytes: i64,
+    pub disk_io_bytes: i64,
+    pub network_bytes: i64,
+    pub average_latency_ms: f64,
+    pub p50_latency_ms: f64,
+    pub p95_latency_ms: f64,
+    pub p99_latency_ms: f64,
+    pub timestamp: i64,
+}
+
+impl AcornPerformanceMonitor {
+    /// Create a new performance monitor
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornPerformanceMonitor, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let monitor = AcornPerformanceMonitor::new()?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn new() -> Result<Self> {
+        let mut h: acorn_performance_monitor_handle = 0;
+        let rc = unsafe { acorn_performance_monitor_create(&mut h as *mut _) };
+        
+        if rc == 0 {
+            Ok(Self { h })
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+
+    /// Start collecting performance metrics
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornPerformanceMonitor, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let monitor = AcornPerformanceMonitor::new()?;
+    /// monitor.start_collection()?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn start_collection(&self) -> Result<()> {
+        let rc = unsafe { acorn_performance_monitor_start_collection(self.h) };
+        
+        if rc == 0 {
+            Ok(())
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+
+    /// Stop collecting performance metrics
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornPerformanceMonitor, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let monitor = AcornPerformanceMonitor::new()?;
+    /// monitor.start_collection()?;
+    /// // ... do work ...
+    /// monitor.stop_collection()?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn stop_collection(&self) -> Result<()> {
+        let rc = unsafe { acorn_performance_monitor_stop_collection(self.h) };
+        
+        if rc == 0 {
+            Ok(())
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+
+    /// Get current performance metrics
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornPerformanceMonitor, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let monitor = AcornPerformanceMonitor::new()?;
+    /// let metrics = monitor.get_metrics()?;
+    /// println!("Operations per second: {}", metrics.operations_per_second);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn get_metrics(&self) -> Result<PerformanceMetrics> {
+        let mut metrics: acorn_performance_metrics = unsafe { std::mem::zeroed() };
+        
+        let rc = unsafe { 
+            acorn_performance_monitor_get_metrics(self.h, &mut metrics as *mut _) 
+        };
+        
+        if rc == 0 {
+            Ok(PerformanceMetrics {
+                operations_per_second: metrics.operations_per_second,
+                memory_usage_bytes: metrics.memory_usage_bytes,
+                cache_hit_rate_percent: metrics.cache_hit_rate_percent,
+                sync_latency_ms: metrics.sync_latency_ms,
+                disk_io_bytes: metrics.disk_io_bytes,
+                network_bytes: metrics.network_bytes,
+                cpu_usage_percent: metrics.cpu_usage_percent,
+                timestamp: metrics.timestamp,
+            })
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+
+    /// Get performance metrics history
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornPerformanceMonitor, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let monitor = AcornPerformanceMonitor::new()?;
+    /// let history = monitor.get_history()?;
+    /// println!("Collected {} metrics samples", history.len());
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn get_history(&self) -> Result<Vec<PerformanceMetrics>> {
+        let mut metrics_ptr: *mut acorn_performance_metrics = std::ptr::null_mut();
+        let mut count: usize = 0;
+        
+        let rc = unsafe { 
+            acorn_performance_monitor_get_history(self.h, &mut metrics_ptr as *mut _, &mut count as *mut _) 
+        };
+        
+        if rc == 0 {
+            let mut metrics_list = Vec::new();
+            if !metrics_ptr.is_null() && count > 0 {
+                let metrics_slice = unsafe { std::slice::from_raw_parts(metrics_ptr, count) };
+                for metrics in metrics_slice {
+                    metrics_list.push(PerformanceMetrics {
+                        operations_per_second: metrics.operations_per_second,
+                        memory_usage_bytes: metrics.memory_usage_bytes,
+                        cache_hit_rate_percent: metrics.cache_hit_rate_percent,
+                        sync_latency_ms: metrics.sync_latency_ms,
+                        disk_io_bytes: metrics.disk_io_bytes,
+                        network_bytes: metrics.network_bytes,
+                        cpu_usage_percent: metrics.cpu_usage_percent,
+                        timestamp: metrics.timestamp,
+                    });
+                }
+                unsafe { acorn_performance_monitor_free_metrics(metrics_ptr, count); }
+            }
+            Ok(metrics_list)
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+
+    /// Reset performance metrics
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornPerformanceMonitor, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let monitor = AcornPerformanceMonitor::new()?;
+    /// monitor.reset_metrics()?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn reset_metrics(&self) -> Result<()> {
+        let rc = unsafe { acorn_performance_monitor_reset_metrics(self.h) };
+        
+        if rc == 0 {
+            Ok(())
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+}
+
+impl Drop for AcornPerformanceMonitor {
+    fn drop(&mut self) {
+        unsafe { acorn_performance_monitor_close(self.h); }
+    }
+}
+
+/// Health checker for monitoring service health
+pub struct AcornHealthChecker {
+    h: acorn_health_checker_handle,
+}
+
+impl AcornHealthChecker {
+    /// Create a new health checker
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornHealthChecker, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let checker = AcornHealthChecker::new()?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn new() -> Result<Self> {
+        let mut h: acorn_health_checker_handle = 0;
+        let rc = unsafe { acorn_health_checker_create(&mut h as *mut _) };
+        
+        if rc == 0 {
+            Ok(Self { h })
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+
+    /// Add a service to monitor
+    /// 
+    /// # Arguments
+    /// * `service_name` - Name of the service to monitor
+    /// * `health_endpoint` - Health check endpoint URL
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornHealthChecker, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let checker = AcornHealthChecker::new()?;
+    /// checker.add_service("database", "http://localhost:5432/health")?;
+    /// checker.add_service("api", "http://localhost:8080/health")?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn add_service(&self, service_name: &str, health_endpoint: &str) -> Result<()> {
+        let service_c = CString::new(service_name).map_err(|e| Error::Acorn(format!("Invalid service name: {}", e)))?;
+        let endpoint_c = CString::new(health_endpoint).map_err(|e| Error::Acorn(format!("Invalid health endpoint: {}", e)))?;
+        
+        let rc = unsafe { 
+            acorn_health_checker_add_service(self.h, service_c.as_ptr(), endpoint_c.as_ptr()) 
+        };
+        
+        if rc == 0 {
+            Ok(())
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+
+    /// Check health of all registered services
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornHealthChecker, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let checker = AcornHealthChecker::new()?;
+    /// checker.add_service("api", "http://localhost:8080/health")?;
+    /// let results = checker.check_all()?;
+    /// for result in results {
+    ///     println!("Service {}: {:?}", result.service_name, result.status);
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn check_all(&self) -> Result<Vec<HealthInfo>> {
+        let mut results_ptr: *mut acorn_health_info = std::ptr::null_mut();
+        let mut count: usize = 0;
+        
+        let rc = unsafe { 
+            acorn_health_checker_check_all(self.h, &mut results_ptr as *mut _, &mut count as *mut _) 
+        };
+        
+        if rc == 0 {
+            let mut results_list = Vec::new();
+            if !results_ptr.is_null() && count > 0 {
+                let results_slice = unsafe { std::slice::from_raw_parts(results_ptr, count) };
+                for result in results_slice {
+                    let status = match result.status {
+                        0 => HealthStatus::Unknown,
+                        1 => HealthStatus::Healthy,
+                        2 => HealthStatus::Degraded,
+                        3 => HealthStatus::Unhealthy,
+                        _ => HealthStatus::Unknown,
+                    };
+                    
+                    results_list.push(HealthInfo {
+                        status,
+                        service_name: unsafe { CStr::from_ptr(result.service_name).to_string_lossy().into_owned() },
+                        message: unsafe { CStr::from_ptr(result.message).to_string_lossy().into_owned() },
+                        response_time_ms: result.response_time_ms,
+                        timestamp: result.timestamp,
+                        details: if result.details.is_null() {
+                            None
+                        } else {
+                            Some(unsafe { CStr::from_ptr(result.details).to_string_lossy().into_owned() })
+                        },
+                    });
+                }
+                unsafe { acorn_health_checker_free_results(results_ptr, count); }
+            }
+            Ok(results_list)
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+
+    /// Check health of a specific service
+    /// 
+    /// # Arguments
+    /// * `service_name` - Name of the service to check
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornHealthChecker, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let checker = AcornHealthChecker::new()?;
+    /// checker.add_service("api", "http://localhost:8080/health")?;
+    /// let result = checker.check_service("api")?;
+    /// println!("API status: {:?}", result.status);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn check_service(&self, service_name: &str) -> Result<HealthInfo> {
+        let service_c = CString::new(service_name).map_err(|e| Error::Acorn(format!("Invalid service name: {}", e)))?;
+        
+        let mut result: acorn_health_info = unsafe { std::mem::zeroed() };
+        
+        let rc = unsafe { 
+            acorn_health_checker_check_service(self.h, service_c.as_ptr(), &mut result as *mut _) 
+        };
+        
+        if rc == 0 {
+            let status = match result.status {
+                0 => HealthStatus::Unknown,
+                1 => HealthStatus::Healthy,
+                2 => HealthStatus::Degraded,
+                3 => HealthStatus::Unhealthy,
+                _ => HealthStatus::Unknown,
+            };
+            
+            Ok(HealthInfo {
+                status,
+                service_name: unsafe { CStr::from_ptr(result.service_name).to_string_lossy().into_owned() },
+                message: unsafe { CStr::from_ptr(result.message).to_string_lossy().into_owned() },
+                response_time_ms: result.response_time_ms,
+                timestamp: result.timestamp,
+                details: if result.details.is_null() {
+                    None
+                } else {
+                    Some(unsafe { CStr::from_ptr(result.details).to_string_lossy().into_owned() })
+                },
+            })
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+
+    /// Get overall health status
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornHealthChecker, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let checker = AcornHealthChecker::new()?;
+    /// let overall_status = checker.get_overall_status()?;
+    /// println!("Overall status: {:?}", overall_status);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn get_overall_status(&self) -> Result<HealthStatus> {
+        let mut status: i32 = 0;
+        
+        let rc = unsafe { 
+            acorn_health_checker_get_overall_status(self.h, &mut status as *mut _) 
+        };
+        
+        if rc == 0 {
+            Ok(match status {
+                0 => HealthStatus::Unknown,
+                1 => HealthStatus::Healthy,
+                2 => HealthStatus::Degraded,
+                3 => HealthStatus::Unhealthy,
+                _ => HealthStatus::Unknown,
+            })
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+}
+
+impl Drop for AcornHealthChecker {
+    fn drop(&mut self) {
+        unsafe { acorn_health_checker_close(self.h); }
+    }
+}
+
+/// Benchmark utilities for performance testing
+pub struct AcornBenchmark;
+
+impl AcornBenchmark {
+    /// Benchmark tree operations
+    /// 
+    /// # Arguments
+    /// * `tree` - Tree to benchmark
+    /// * `config` - Benchmark configuration
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornTree, AcornBenchmark, BenchmarkConfig, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let tree = AcornTree::open_memory()?;
+    /// let config = BenchmarkConfig {
+    ///     operation_count: 1000,
+    ///     warmup_iterations: 10,
+    ///     measurement_iterations: 100,
+    ///     timeout_ms: 30000,
+    ///     enable_memory_tracking: true,
+    ///     enable_disk_tracking: false,
+    ///     enable_network_tracking: false,
+    /// };
+    /// let results = AcornBenchmark::benchmark_tree_operations(tree, &config)?;
+    /// for result in results {
+    ///     println!("{}: {} ops/sec", result.operation_name, result.operations_per_second);
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn benchmark_tree_operations(tree: AcornTree, config: &BenchmarkConfig) -> Result<Vec<BenchmarkResult>> {
+        let mut config_c = acorn_benchmark_config {
+            operation_count: config.operation_count,
+            warmup_iterations: config.warmup_iterations,
+            measurement_iterations: config.measurement_iterations,
+            timeout_ms: config.timeout_ms,
+            enable_memory_tracking: if config.enable_memory_tracking { 1 } else { 0 },
+            enable_disk_tracking: if config.enable_disk_tracking { 1 } else { 0 },
+            enable_network_tracking: if config.enable_network_tracking { 1 } else { 0 },
+        };
+        
+        let mut results_ptr: *mut acorn_benchmark_result = std::ptr::null_mut();
+        let mut count: usize = 0;
+        
+        let rc = unsafe { 
+            acorn_benchmark_tree_operations(tree.h, &mut config_c as *mut _, &mut results_ptr as *mut _, &mut count as *mut _) 
+        };
+        
+        if rc == 0 {
+            let mut results_list = Vec::new();
+            if !results_ptr.is_null() && count > 0 {
+                let results_slice = unsafe { std::slice::from_raw_parts(results_ptr, count) };
+                for result in results_slice {
+                    results_list.push(BenchmarkResult {
+                        operation_name: unsafe { CStr::from_ptr(result.operation_name).to_string_lossy().into_owned() },
+                        total_time_ms: result.total_time_ms,
+                        operations_per_second: result.operations_per_second,
+                        memory_allocated_bytes: result.memory_allocated_bytes,
+                        disk_io_bytes: result.disk_io_bytes,
+                        network_bytes: result.network_bytes,
+                        average_latency_ms: result.average_latency_ms,
+                        p50_latency_ms: result.p50_latency_ms,
+                        p95_latency_ms: result.p95_latency_ms,
+                        p99_latency_ms: result.p99_latency_ms,
+                        timestamp: result.timestamp,
+                    });
+                }
+                unsafe { acorn_benchmark_free_results(results_ptr, count); }
+            }
+            Ok(results_list)
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+
+    /// Benchmark sync operations
+    /// 
+    /// # Arguments
+    /// * `tangle` - Tangle to benchmark
+    /// * `config` - Benchmark configuration
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornTree, AcornTangle, AcornBenchmark, BenchmarkConfig, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let local_tree = AcornTree::open_memory()?;
+    /// let remote_tree = AcornTree::open_memory()?;
+    /// let tangle = AcornTangle::new(local_tree, remote_tree, "benchmark-tangle")?;
+    /// let config = BenchmarkConfig {
+    ///     operation_count: 1000,
+    ///     warmup_iterations: 10,
+    ///     measurement_iterations: 100,
+    ///     timeout_ms: 30000,
+    ///     enable_memory_tracking: true,
+    ///     enable_disk_tracking: false,
+    ///     enable_network_tracking: true,
+    /// };
+    /// let results = AcornBenchmark::benchmark_sync_operations(tangle, &config)?;
+    /// for result in results {
+    ///     println!("{}: {} ops/sec", result.operation_name, result.operations_per_second);
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn benchmark_sync_operations(tangle: AcornTangle, config: &BenchmarkConfig) -> Result<Vec<BenchmarkResult>> {
+        let mut config_c = acorn_benchmark_config {
+            operation_count: config.operation_count,
+            warmup_iterations: config.warmup_iterations,
+            measurement_iterations: config.measurement_iterations,
+            timeout_ms: config.timeout_ms,
+            enable_memory_tracking: if config.enable_memory_tracking { 1 } else { 0 },
+            enable_disk_tracking: if config.enable_disk_tracking { 1 } else { 0 },
+            enable_network_tracking: if config.enable_network_tracking { 1 } else { 0 },
+        };
+        
+        let mut results_ptr: *mut acorn_benchmark_result = std::ptr::null_mut();
+        let mut count: usize = 0;
+        
+        let rc = unsafe { 
+            acorn_benchmark_sync_operations(tangle.h, &mut config_c as *mut _, &mut results_ptr as *mut _, &mut count as *mut _) 
+        };
+        
+        if rc == 0 {
+            let mut results_list = Vec::new();
+            if !results_ptr.is_null() && count > 0 {
+                let results_slice = unsafe { std::slice::from_raw_parts(results_ptr, count) };
+                for result in results_slice {
+                    results_list.push(BenchmarkResult {
+                        operation_name: unsafe { CStr::from_ptr(result.operation_name).to_string_lossy().into_owned() },
+                        total_time_ms: result.total_time_ms,
+                        operations_per_second: result.operations_per_second,
+                        memory_allocated_bytes: result.memory_allocated_bytes,
+                        disk_io_bytes: result.disk_io_bytes,
+                        network_bytes: result.network_bytes,
+                        average_latency_ms: result.average_latency_ms,
+                        p50_latency_ms: result.p50_latency_ms,
+                        p95_latency_ms: result.p95_latency_ms,
+                        p99_latency_ms: result.p99_latency_ms,
+                        timestamp: result.timestamp,
+                    });
+                }
+                unsafe { acorn_benchmark_free_results(results_ptr, count); }
+            }
+            Ok(results_list)
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+
+    /// Benchmark mesh operations
+    /// 
+    /// # Arguments
+    /// * `coordinator` - Mesh coordinator to benchmark
+    /// * `config` - Benchmark configuration
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornMeshCoordinator, AcornTree, AcornBenchmark, BenchmarkConfig, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let coordinator = AcornMeshCoordinator::new()?;
+    /// let tree_a = AcornTree::open_memory()?;
+    /// let tree_b = AcornTree::open_memory()?;
+    /// coordinator.add_node("node-a", tree_a)?;
+    /// coordinator.add_node("node-b", tree_b)?;
+    /// let config = BenchmarkConfig {
+    ///     operation_count: 1000,
+    ///     warmup_iterations: 10,
+    ///     measurement_iterations: 100,
+    ///     timeout_ms: 30000,
+    ///     enable_memory_tracking: true,
+    ///     enable_disk_tracking: false,
+    ///     enable_network_tracking: true,
+    /// };
+    /// let results = AcornBenchmark::benchmark_mesh_operations(coordinator, &config)?;
+    /// for result in results {
+    ///     println!("{}: {} ops/sec", result.operation_name, result.operations_per_second);
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn benchmark_mesh_operations(coordinator: AcornMeshCoordinator, config: &BenchmarkConfig) -> Result<Vec<BenchmarkResult>> {
+        let mut config_c = acorn_benchmark_config {
+            operation_count: config.operation_count,
+            warmup_iterations: config.warmup_iterations,
+            measurement_iterations: config.measurement_iterations,
+            timeout_ms: config.timeout_ms,
+            enable_memory_tracking: if config.enable_memory_tracking { 1 } else { 0 },
+            enable_disk_tracking: if config.enable_disk_tracking { 1 } else { 0 },
+            enable_network_tracking: if config.enable_network_tracking { 1 } else { 0 },
+        };
+        
+        let mut results_ptr: *mut acorn_benchmark_result = std::ptr::null_mut();
+        let mut count: usize = 0;
+        
+        let rc = unsafe { 
+            acorn_benchmark_mesh_operations(coordinator.h, &mut config_c as *mut _, &mut results_ptr as *mut _, &mut count as *mut _) 
+        };
+        
+        if rc == 0 {
+            let mut results_list = Vec::new();
+            if !results_ptr.is_null() && count > 0 {
+                let results_slice = unsafe { std::slice::from_raw_parts(results_ptr, count) };
+                for result in results_slice {
+                    results_list.push(BenchmarkResult {
+                        operation_name: unsafe { CStr::from_ptr(result.operation_name).to_string_lossy().into_owned() },
+                        total_time_ms: result.total_time_ms,
+                        operations_per_second: result.operations_per_second,
+                        memory_allocated_bytes: result.memory_allocated_bytes,
+                        disk_io_bytes: result.disk_io_bytes,
+                        network_bytes: result.network_bytes,
+                        average_latency_ms: result.average_latency_ms,
+                        p50_latency_ms: result.p50_latency_ms,
+                        p95_latency_ms: result.p95_latency_ms,
+                        p99_latency_ms: result.p99_latency_ms,
+                        timestamp: result.timestamp,
+                    });
+                }
+                unsafe { acorn_benchmark_free_results(results_ptr, count); }
+            }
+            Ok(results_list)
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+}
+
+/// Resource monitoring utilities
+pub struct AcornResourceMonitor;
+
+impl AcornResourceMonitor {
+    /// Get current memory usage
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornResourceMonitor, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let (heap_bytes, stack_bytes, total_bytes) = AcornResourceMonitor::get_memory_usage()?;
+    /// println!("Memory usage: {} bytes total (heap: {}, stack: {})", total_bytes, heap_bytes, stack_bytes);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn get_memory_usage() -> Result<(i64, i64, i64)> {
+        let mut heap_bytes: i64 = 0;
+        let mut stack_bytes: i64 = 0;
+        let mut total_bytes: i64 = 0;
+        
+        let rc = unsafe { 
+            acorn_get_memory_usage(&mut heap_bytes as *mut _, &mut stack_bytes as *mut _, &mut total_bytes as *mut _) 
+        };
+        
+        if rc == 0 {
+            Ok((heap_bytes, stack_bytes, total_bytes))
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+
+    /// Get disk usage for a path
+    /// 
+    /// # Arguments
+    /// * `path` - Path to check disk usage for
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornResourceMonitor, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let (used_bytes, total_bytes, free_bytes) = AcornResourceMonitor::get_disk_usage("/tmp")?;
+    /// println!("Disk usage: {} bytes used, {} bytes free, {} bytes total", used_bytes, free_bytes, total_bytes);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn get_disk_usage(path: &str) -> Result<(i64, i64, i64)> {
+        let path_c = CString::new(path).map_err(|e| Error::Acorn(format!("Invalid path: {}", e)))?;
+        
+        let mut used_bytes: i64 = 0;
+        let mut total_bytes: i64 = 0;
+        let mut free_bytes: i64 = 0;
+        
+        let rc = unsafe { 
+            acorn_get_disk_usage(path_c.as_ptr(), &mut used_bytes as *mut _, &mut total_bytes as *mut _, &mut free_bytes as *mut _) 
+        };
+        
+        if rc == 0 {
+            Ok((used_bytes, total_bytes, free_bytes))
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+
+    /// Get system information
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornResourceMonitor, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let system_info = AcornResourceMonitor::get_system_info()?;
+    /// println!("System info: {}", system_info);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn get_system_info() -> Result<String> {
+        let mut info_ptr: *mut u8 = std::ptr::null_mut();
+        let mut length: usize = 0;
+        
+        let rc = unsafe { 
+            acorn_get_system_info(&mut info_ptr as *mut _, &mut length as *mut _) 
+        };
+        
+        if rc == 0 {
+            if !info_ptr.is_null() && length > 0 {
+                let info_slice = unsafe { std::slice::from_raw_parts(info_ptr, length) };
+                let info_str = String::from_utf8_lossy(info_slice).into_owned();
+                unsafe { acorn_free_system_info(info_ptr); }
+                Ok(info_str)
+            } else {
+                Ok(String::new())
+            }
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
