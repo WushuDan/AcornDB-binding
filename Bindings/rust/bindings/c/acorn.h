@@ -352,6 +352,43 @@ ACORN_API void acorn_nursery_free_types(char** types, size_t count);
 ACORN_API void acorn_nursery_free_metadata(acorn_trunk_metadata* metadata, size_t count);
 ACORN_API void acorn_nursery_free_catalog(char* catalog);
 
+// Advanced Tree Features - Auto-ID detection, TTL enforcement, statistics
+typedef uint64_t acorn_tree_stats_handle;
+
+// Tree statistics information
+typedef struct {
+    int total_stashed;
+    int total_tossed;
+    int squabbles_resolved;
+    int smushes_performed;
+    int active_tangles;
+    int64_t last_sync_timestamp;
+} acorn_tree_stats;
+
+// TTL enforcement information
+typedef struct {
+    int ttl_enforcement_enabled;
+    int64_t cleanup_interval_ms;
+    int expiring_nuts_count;
+} acorn_ttl_info;
+
+// Advanced tree operations
+ACORN_API int acorn_tree_stash_auto_id(acorn_tree_handle tree, const char* json, size_t len);
+ACORN_API int acorn_tree_get_stats(acorn_tree_handle tree, acorn_tree_stats* out_stats);
+ACORN_API int acorn_tree_get_ttl_info(acorn_tree_handle tree, acorn_ttl_info* out_ttl_info);
+ACORN_API int acorn_tree_set_ttl_enforcement(acorn_tree_handle tree, int enabled);
+ACORN_API int acorn_tree_set_cleanup_interval(acorn_tree_handle tree, int64_t interval_ms);
+ACORN_API int acorn_tree_cleanup_expired_nuts(acorn_tree_handle tree, int* out_removed_count);
+ACORN_API int acorn_tree_get_expiring_nuts_count(acorn_tree_handle tree, int64_t timespan_ms, int* out_count);
+ACORN_API int acorn_tree_get_expiring_nuts(acorn_tree_handle tree, int64_t timespan_ms, char*** out_ids, size_t* out_count);
+ACORN_API int acorn_tree_get_all_nuts(acorn_tree_handle tree, char** out_json, size_t* out_length);
+ACORN_API int acorn_tree_get_nut_count(acorn_tree_handle tree, int* out_count);
+ACORN_API int acorn_tree_get_last_sync_timestamp(acorn_tree_handle tree, int64_t* out_timestamp);
+
+// Free advanced tree resources
+ACORN_API void acorn_tree_free_expiring_nuts(char** ids, size_t count);
+ACORN_API void acorn_tree_free_all_nuts(char* json);
+
 // Memory management for buffers allocated by shim
 ACORN_API void acorn_free_buf(acorn_buf* buf);
 

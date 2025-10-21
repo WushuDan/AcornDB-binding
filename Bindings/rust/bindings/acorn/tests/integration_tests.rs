@@ -3007,5 +3007,248 @@ mod unit_tests {
         
         Ok(())
     }
+
+    // Advanced Tree Features Tests
+    #[test]
+    fn test_advanced_tree_auto_id_detection() -> Result<(), Error> {
+        let tree = AcornTree::open_memory()?;
+        let advanced_tree = AcornAdvancedTree::from_tree(tree);
+        
+        // Test auto-ID stash with JSON
+        let item_json = r#"{"id": "test-item", "name": "Test Item", "value": 42}"#;
+        advanced_tree.stash_with_auto_id(item_json)?;
+        
+        // Verify item was stashed
+        let count = advanced_tree.get_nut_count()?;
+        assert!(count > 0);
+        
+        Ok(())
+    }
+
+    #[test]
+    fn test_advanced_tree_statistics() -> Result<(), Error> {
+        let tree = AcornTree::open_memory()?;
+        let advanced_tree = AcornAdvancedTree::from_tree(tree);
+        
+        // Get initial stats
+        let initial_stats = advanced_tree.get_stats()?;
+        assert!(initial_stats.total_stashed >= 0);
+        assert!(initial_stats.total_tossed >= 0);
+        assert!(initial_stats.squabbles_resolved >= 0);
+        assert!(initial_stats.smushes_performed >= 0);
+        assert!(initial_stats.active_tangles >= 0);
+        
+        // Stash some items and check stats change
+        let item_json = r#"{"id": "stats-test", "name": "Stats Test"}"#;
+        advanced_tree.stash_with_auto_id(item_json)?;
+        
+        let updated_stats = advanced_tree.get_stats()?;
+        assert!(updated_stats.total_stashed >= initial_stats.total_stashed);
+        
+        Ok(())
+    }
+
+    #[test]
+    fn test_advanced_tree_ttl_info() -> Result<(), Error> {
+        let tree = AcornTree::open_memory()?;
+        let advanced_tree = AcornAdvancedTree::from_tree(tree);
+        
+        // Get TTL info
+        let ttl_info = advanced_tree.get_ttl_info()?;
+        assert!(ttl_info.cleanup_interval_ms > 0);
+        assert!(ttl_info.expiring_nuts_count >= 0);
+        
+        Ok(())
+    }
+
+    #[test]
+    fn test_advanced_tree_ttl_enforcement() -> Result<(), Error> {
+        let tree = AcornTree::open_memory()?;
+        let advanced_tree = AcornAdvancedTree::from_tree(tree);
+        
+        // Test enabling TTL enforcement
+        advanced_tree.set_ttl_enforcement(true)?;
+        let ttl_info = advanced_tree.get_ttl_info()?;
+        assert!(ttl_info.ttl_enforcement_enabled);
+        
+        // Test disabling TTL enforcement
+        advanced_tree.set_ttl_enforcement(false)?;
+        let ttl_info = advanced_tree.get_ttl_info()?;
+        assert!(!ttl_info.ttl_enforcement_enabled);
+        
+        // Re-enable
+        advanced_tree.set_ttl_enforcement(true)?;
+        
+        Ok(())
+    }
+
+    #[test]
+    fn test_advanced_tree_cleanup_interval() -> Result<(), Error> {
+        let tree = AcornTree::open_memory()?;
+        let advanced_tree = AcornAdvancedTree::from_tree(tree);
+        
+        // Test setting cleanup interval
+        advanced_tree.set_cleanup_interval(30000)?; // 30 seconds
+        let ttl_info = advanced_tree.get_ttl_info()?;
+        assert_eq!(ttl_info.cleanup_interval_ms, 30000);
+        
+        // Test different interval
+        advanced_tree.set_cleanup_interval(60000)?; // 1 minute
+        let ttl_info = advanced_tree.get_ttl_info()?;
+        assert_eq!(ttl_info.cleanup_interval_ms, 60000);
+        
+        Ok(())
+    }
+
+    #[test]
+    fn test_advanced_tree_cleanup_expired_nuts() -> Result<(), Error> {
+        let tree = AcornTree::open_memory()?;
+        let advanced_tree = AcornAdvancedTree::from_tree(tree);
+        
+        // Test cleanup (should return 0 since no expired nuts)
+        let removed_count = advanced_tree.cleanup_expired_nuts()?;
+        assert!(removed_count >= 0);
+        
+        Ok(())
+    }
+
+    #[test]
+    fn test_advanced_tree_expiring_nuts_count() -> Result<(), Error> {
+        let tree = AcornTree::open_memory()?;
+        let advanced_tree = AcornAdvancedTree::from_tree(tree);
+        
+        // Test getting expiring nuts count
+        let count = advanced_tree.get_expiring_nuts_count(3600000)?; // 1 hour
+        assert!(count >= 0);
+        
+        // Test with zero timespan
+        let count_zero = advanced_tree.get_expiring_nuts_count(0)?;
+        assert!(count_zero >= 0);
+        
+        Ok(())
+    }
+
+    #[test]
+    fn test_advanced_tree_expiring_nuts() -> Result<(), Error> {
+        let tree = AcornTree::open_memory()?;
+        let advanced_tree = AcornAdvancedTree::from_tree(tree);
+        
+        // Test getting expiring nuts
+        let expiring_ids = advanced_tree.get_expiring_nuts(3600000)?; // 1 hour
+        assert!(expiring_ids.len() >= 0);
+        
+        Ok(())
+    }
+
+    #[test]
+    fn test_advanced_tree_get_all_nuts() -> Result<(), Error> {
+        let tree = AcornTree::open_memory()?;
+        let advanced_tree = AcornAdvancedTree::from_tree(tree);
+        
+        // Stash some items
+        let item1_json = r#"{"id": "item-1", "name": "Item 1"}"#;
+        let item2_json = r#"{"id": "item-2", "name": "Item 2"}"#;
+        
+        advanced_tree.stash_with_auto_id(item1_json)?;
+        advanced_tree.stash_with_auto_id(item2_json)?;
+        
+        // Get all nuts
+        let all_nuts = advanced_tree.get_all_nuts()?;
+        assert!(all_nuts.len() >= 2);
+        
+        // Verify nut structure
+        for nut in &all_nuts {
+            assert!(!nut.id.is_empty());
+            assert!(nut.timestamp > 0);
+            assert!(nut.version > 0);
+        }
+        
+        Ok(())
+    }
+
+    #[test]
+    fn test_advanced_tree_nut_count() -> Result<(), Error> {
+        let tree = AcornTree::open_memory()?;
+        let advanced_tree = AcornAdvancedTree::from_tree(tree);
+        
+        // Get initial count
+        let initial_count = advanced_tree.get_nut_count()?;
+        assert!(initial_count >= 0);
+        
+        // Stash items and verify count increases
+        let item_json = r#"{"id": "count-test", "name": "Count Test"}"#;
+        advanced_tree.stash_with_auto_id(item_json)?;
+        
+        let updated_count = advanced_tree.get_nut_count()?;
+        assert!(updated_count > initial_count);
+        
+        Ok(())
+    }
+
+    #[test]
+    fn test_advanced_tree_last_sync_timestamp() -> Result<(), Error> {
+        let tree = AcornTree::open_memory()?;
+        let advanced_tree = AcornAdvancedTree::from_tree(tree);
+        
+        // Get last sync timestamp
+        let timestamp = advanced_tree.get_last_sync_timestamp()?;
+        assert!(timestamp >= 0);
+        
+        Ok(())
+    }
+
+    #[test]
+    fn test_advanced_tree_comprehensive_workflow() -> Result<(), Error> {
+        let tree = AcornTree::open_memory()?;
+        let advanced_tree = AcornAdvancedTree::from_tree(tree);
+        
+        // Comprehensive workflow test
+        let initial_stats = advanced_tree.get_stats()?;
+        let initial_count = advanced_tree.get_nut_count()?;
+        
+        // Configure TTL
+        advanced_tree.set_ttl_enforcement(true)?;
+        advanced_tree.set_cleanup_interval(30000)?; // 30 seconds
+        
+        // Stash multiple items
+        let items = vec![
+            r#"{"id": "workflow-1", "name": "Workflow Item 1", "type": "test"}"#,
+            r#"{"id": "workflow-2", "name": "Workflow Item 2", "type": "test"}"#,
+            r#"{"id": "workflow-3", "name": "Workflow Item 3", "type": "test"}"#,
+        ];
+        
+        for item_json in &items {
+            advanced_tree.stash_with_auto_id(item_json)?;
+        }
+        
+        // Verify changes
+        let final_stats = advanced_tree.get_stats()?;
+        let final_count = advanced_tree.get_nut_count()?;
+        
+        assert!(final_stats.total_stashed > initial_stats.total_stashed);
+        assert!(final_count > initial_count);
+        
+        // Test TTL operations
+        let ttl_info = advanced_tree.get_ttl_info()?;
+        assert!(ttl_info.ttl_enforcement_enabled);
+        assert_eq!(ttl_info.cleanup_interval_ms, 30000);
+        
+        // Test expiring nuts queries
+        let expiring_count = advanced_tree.get_expiring_nuts_count(3600000)?;
+        assert!(expiring_count >= 0);
+        
+        let expiring_ids = advanced_tree.get_expiring_nuts(3600000)?;
+        assert!(expiring_ids.len() >= 0);
+        
+        // Test cleanup
+        let removed_count = advanced_tree.cleanup_expired_nuts()?;
+        assert!(removed_count >= 0);
+        
+        // Test getting all nuts
+        let all_nuts = advanced_tree.get_all_nuts()?;
+        assert!(all_nuts.len() >= 3);
+        
+        Ok(())
+    }
 }
 

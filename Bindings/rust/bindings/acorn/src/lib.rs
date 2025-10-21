@@ -4395,6 +4395,407 @@ impl Drop for AcornNursery {
     }
 }
 
+/// Advanced Tree Features for enhanced tree management
+pub struct AcornAdvancedTree {
+    tree_h: acorn_tree_handle,
+}
+
+/// Tree statistics information
+#[derive(Debug, Clone, Deserialize)]
+pub struct TreeStats {
+    pub total_stashed: i32,
+    pub total_tossed: i32,
+    pub squabbles_resolved: i32,
+    pub smushes_performed: i32,
+    pub active_tangles: i32,
+    pub last_sync_timestamp: i64,
+}
+
+/// TTL enforcement information
+#[derive(Debug, Clone, Deserialize)]
+pub struct TtlInfo {
+    pub ttl_enforcement_enabled: bool,
+    pub cleanup_interval_ms: i64,
+    pub expiring_nuts_count: i32,
+}
+
+/// Nut metadata information
+#[derive(Debug, Clone, Deserialize)]
+pub struct NutInfo {
+    pub id: String,
+    pub timestamp: i64,
+    pub expires_at: Option<i64>,
+    pub version: i32,
+    pub payload: serde_json::Value,
+}
+
+impl AcornAdvancedTree {
+    /// Create an advanced tree wrapper from an existing tree handle
+    /// 
+    /// # Arguments
+    /// * `tree_h` - Existing tree handle
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornTree, AcornAdvancedTree, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let tree = AcornTree::open_memory()?;
+    /// let advanced_tree = AcornAdvancedTree::from_tree(tree);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn from_tree(tree: AcornTree) -> Self {
+        Self { tree_h: tree.h }
+    }
+
+    /// Stash an item with auto-ID detection
+    /// 
+    /// # Arguments
+    /// * `json` - JSON string of the item to stash
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornTree, AcornAdvancedTree, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let tree = AcornTree::open_memory()?;
+    /// let advanced_tree = AcornAdvancedTree::from_tree(tree);
+    /// let item_json = r#"{"id": "user-1", "name": "Alice", "age": 30}"#;
+    /// advanced_tree.stash_with_auto_id(item_json)?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn stash_with_auto_id(&self, json: &str) -> Result<()> {
+        let json_c = CString::new(json).map_err(|e| Error::Acorn(format!("Invalid JSON: {}", e)))?;
+        
+        let rc = unsafe { 
+            acorn_tree_stash_auto_id(self.tree_h, json_c.as_ptr(), json.len()) 
+        };
+        
+        if rc == 0 {
+            Ok(())
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+
+    /// Get tree statistics
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornTree, AcornAdvancedTree, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let tree = AcornTree::open_memory()?;
+    /// let advanced_tree = AcornAdvancedTree::from_tree(tree);
+    /// let stats = advanced_tree.get_stats()?;
+    /// println!("Total stashed: {}", stats.total_stashed);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn get_stats(&self) -> Result<TreeStats> {
+        let mut stats: acorn_tree_stats = unsafe { std::mem::zeroed() };
+        
+        let rc = unsafe { 
+            acorn_tree_get_stats(self.tree_h, &mut stats as *mut _) 
+        };
+        
+        if rc == 0 {
+            Ok(TreeStats {
+                total_stashed: stats.total_stashed,
+                total_tossed: stats.total_tossed,
+                squabbles_resolved: stats.squabbles_resolved,
+                smushes_performed: stats.smushes_performed,
+                active_tangles: stats.active_tangles,
+                last_sync_timestamp: stats.last_sync_timestamp,
+            })
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+
+    /// Get TTL enforcement information
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornTree, AcornAdvancedTree, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let tree = AcornTree::open_memory()?;
+    /// let advanced_tree = AcornAdvancedTree::from_tree(tree);
+    /// let ttl_info = advanced_tree.get_ttl_info()?;
+    /// println!("TTL enabled: {}", ttl_info.ttl_enforcement_enabled);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn get_ttl_info(&self) -> Result<TtlInfo> {
+        let mut ttl_info: acorn_ttl_info = unsafe { std::mem::zeroed() };
+        
+        let rc = unsafe { 
+            acorn_tree_get_ttl_info(self.tree_h, &mut ttl_info as *mut _) 
+        };
+        
+        if rc == 0 {
+            Ok(TtlInfo {
+                ttl_enforcement_enabled: ttl_info.ttl_enforcement_enabled != 0,
+                cleanup_interval_ms: ttl_info.cleanup_interval_ms,
+                expiring_nuts_count: ttl_info.expiring_nuts_count,
+            })
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+
+    /// Set TTL enforcement enabled/disabled
+    /// 
+    /// # Arguments
+    /// * `enabled` - Whether to enable TTL enforcement
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornTree, AcornAdvancedTree, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let tree = AcornTree::open_memory()?;
+    /// let advanced_tree = AcornAdvancedTree::from_tree(tree);
+    /// advanced_tree.set_ttl_enforcement(true)?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn set_ttl_enforcement(&self, enabled: bool) -> Result<()> {
+        let rc = unsafe { 
+            acorn_tree_set_ttl_enforcement(self.tree_h, if enabled { 1 } else { 0 }) 
+        };
+        
+        if rc == 0 {
+            Ok(())
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+
+    /// Set cleanup interval for TTL enforcement
+    /// 
+    /// # Arguments
+    /// * `interval_ms` - Cleanup interval in milliseconds
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornTree, AcornAdvancedTree, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let tree = AcornTree::open_memory()?;
+    /// let advanced_tree = AcornAdvancedTree::from_tree(tree);
+    /// advanced_tree.set_cleanup_interval(30000)?; // 30 seconds
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn set_cleanup_interval(&self, interval_ms: i64) -> Result<()> {
+        let rc = unsafe { 
+            acorn_tree_set_cleanup_interval(self.tree_h, interval_ms) 
+        };
+        
+        if rc == 0 {
+            Ok(())
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+
+    /// Cleanup expired nuts manually
+    /// 
+    /// # Returns
+    /// Number of expired nuts that were removed
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornTree, AcornAdvancedTree, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let tree = AcornTree::open_memory()?;
+    /// let advanced_tree = AcornAdvancedTree::from_tree(tree);
+    /// let removed_count = advanced_tree.cleanup_expired_nuts()?;
+    /// println!("Removed {} expired nuts", removed_count);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn cleanup_expired_nuts(&self) -> Result<i32> {
+        let mut removed_count: i32 = 0;
+        
+        let rc = unsafe { 
+            acorn_tree_cleanup_expired_nuts(self.tree_h, &mut removed_count as *mut _) 
+        };
+        
+        if rc == 0 {
+            Ok(removed_count)
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+
+    /// Get count of nuts expiring within a timespan
+    /// 
+    /// # Arguments
+    /// * `timespan_ms` - Timespan in milliseconds
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornTree, AcornAdvancedTree, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let tree = AcornTree::open_memory()?;
+    /// let advanced_tree = AcornAdvancedTree::from_tree(tree);
+    /// let count = advanced_tree.get_expiring_nuts_count(60000)?; // Next minute
+    /// println!("{} nuts expiring in the next minute", count);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn get_expiring_nuts_count(&self, timespan_ms: i64) -> Result<i32> {
+        let mut count: i32 = 0;
+        
+        let rc = unsafe { 
+            acorn_tree_get_expiring_nuts_count(self.tree_h, timespan_ms, &mut count as *mut _) 
+        };
+        
+        if rc == 0 {
+            Ok(count)
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+
+    /// Get IDs of nuts expiring within a timespan
+    /// 
+    /// # Arguments
+    /// * `timespan_ms` - Timespan in milliseconds
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornTree, AcornAdvancedTree, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let tree = AcornTree::open_memory()?;
+    /// let advanced_tree = AcornAdvancedTree::from_tree(tree);
+    /// let expiring_ids = advanced_tree.get_expiring_nuts(60000)?; // Next minute
+    /// for id in expiring_ids {
+    ///     println!("Nut {} is expiring soon", id);
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn get_expiring_nuts(&self, timespan_ms: i64) -> Result<Vec<String>> {
+        let mut ids_ptr: *mut *mut u8 = std::ptr::null_mut();
+        let mut count: usize = 0;
+        
+        let rc = unsafe { 
+            acorn_tree_get_expiring_nuts(self.tree_h, timespan_ms, &mut ids_ptr as *mut _, &mut count as *mut _) 
+        };
+        
+        if rc == 0 {
+            let mut ids = Vec::new();
+            if !ids_ptr.is_null() && count > 0 {
+                let ids_slice = unsafe { std::slice::from_raw_parts(ids_ptr, count) };
+                for id_ptr in ids_slice {
+                    if !id_ptr.is_null() {
+                        let id = unsafe { CStr::from_ptr(id_ptr as *const i8).to_string_lossy().into_owned() };
+                        ids.push(id);
+                    }
+                }
+                unsafe { acorn_tree_free_expiring_nuts(ids_ptr, count); }
+            }
+            Ok(ids)
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+
+    /// Get all nuts with metadata
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornTree, AcornAdvancedTree, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let tree = AcornTree::open_memory()?;
+    /// let advanced_tree = AcornAdvancedTree::from_tree(tree);
+    /// let all_nuts = advanced_tree.get_all_nuts()?;
+    /// for nut in all_nuts {
+    ///     println!("Nut {}: version {}, timestamp {}", nut.id, nut.version, nut.timestamp);
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn get_all_nuts(&self) -> Result<Vec<NutInfo>> {
+        let mut json_ptr: *mut u8 = std::ptr::null_mut();
+        let mut length: usize = 0;
+        
+        let rc = unsafe { 
+            acorn_tree_get_all_nuts(self.tree_h, &mut json_ptr as *mut _, &mut length as *mut _) 
+        };
+        
+        if rc == 0 {
+            if !json_ptr.is_null() && length > 0 {
+                let json_slice = unsafe { std::slice::from_raw_parts(json_ptr, length) };
+                let json_str = String::from_utf8_lossy(json_slice).into_owned();
+                unsafe { acorn_tree_free_all_nuts(json_ptr); }
+                
+                let nuts: Vec<NutInfo> = serde_json::from_str(&json_str)
+                    .map_err(|e| Error::Acorn(format!("Failed to parse nuts JSON: {}", e)))?;
+                Ok(nuts)
+            } else {
+                Ok(Vec::new())
+            }
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+
+    /// Get the current nut count
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornTree, AcornAdvancedTree, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let tree = AcornTree::open_memory()?;
+    /// let advanced_tree = AcornAdvancedTree::from_tree(tree);
+    /// let count = advanced_tree.get_nut_count()?;
+    /// println!("Tree contains {} nuts", count);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn get_nut_count(&self) -> Result<i32> {
+        let mut count: i32 = 0;
+        
+        let rc = unsafe { 
+            acorn_tree_get_nut_count(self.tree_h, &mut count as *mut _) 
+        };
+        
+        if rc == 0 {
+            Ok(count)
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+
+    /// Get the last sync timestamp
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornTree, AcornAdvancedTree, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let tree = AcornTree::open_memory()?;
+    /// let advanced_tree = AcornAdvancedTree::from_tree(tree);
+    /// let timestamp = advanced_tree.get_last_sync_timestamp()?;
+    /// println!("Last sync: {}", timestamp);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn get_last_sync_timestamp(&self) -> Result<i64> {
+        let mut timestamp: i64 = 0;
+        
+        let rc = unsafe { 
+            acorn_tree_get_last_sync_timestamp(self.tree_h, &mut timestamp as *mut _) 
+        };
+        
+        if rc == 0 {
+            Ok(timestamp)
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
