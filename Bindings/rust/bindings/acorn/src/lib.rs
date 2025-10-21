@@ -4040,6 +4040,361 @@ impl Drop for AcornGit {
     }
 }
 
+/// Nursery System for dynamic trunk discovery and creation
+pub struct AcornNursery {
+    h: acorn_nursery_handle,
+}
+
+/// Trunk metadata information
+#[derive(Debug, Clone, Deserialize)]
+pub struct TrunkMetadata {
+    pub type_id: String,
+    pub display_name: String,
+    pub description: String,
+    pub category: String,
+    pub is_durable: bool,
+    pub supports_history: bool,
+    pub supports_sync: bool,
+    pub supports_async: bool,
+    pub required_config_keys: Vec<String>,
+    pub optional_config_keys: Vec<String>,
+    pub is_built_in: bool,
+}
+
+impl AcornNursery {
+    /// Create a new Nursery instance
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornNursery, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let nursery = AcornNursery::new()?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn new() -> Result<Self> {
+        let mut h: acorn_nursery_handle = 0;
+        let rc = unsafe { acorn_nursery_create(&mut h as *mut _) };
+        
+        if rc == 0 {
+            Ok(Self { h })
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+
+    /// Get all available trunk types
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornNursery, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let nursery = AcornNursery::new()?;
+    /// let types = nursery.get_available_types()?;
+    /// for trunk_type in types {
+    ///     println!("Available trunk: {}", trunk_type);
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn get_available_types(&self) -> Result<Vec<String>> {
+        let mut types_ptr: *mut *mut u8 = std::ptr::null_mut();
+        let mut count: usize = 0;
+        
+        let rc = unsafe { 
+            acorn_nursery_get_available_types(self.h, &mut types_ptr as *mut _, &mut count as *mut _) 
+        };
+        
+        if rc == 0 {
+            let mut types = Vec::new();
+            if !types_ptr.is_null() && count > 0 {
+                let types_slice = unsafe { std::slice::from_raw_parts(types_ptr, count) };
+                for type_ptr in types_slice {
+                    if !type_ptr.is_null() {
+                        let type_str = unsafe { CStr::from_ptr(type_ptr as *const i8).to_string_lossy().into_owned() };
+                        types.push(type_str);
+                    }
+                }
+                unsafe { acorn_nursery_free_types(types_ptr, count); }
+            }
+            Ok(types)
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+
+    /// Get metadata for a specific trunk type
+    /// 
+    /// # Arguments
+    /// * `type_id` - The trunk type identifier
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornNursery, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let nursery = AcornNursery::new()?;
+    /// let metadata = nursery.get_metadata("file")?;
+    /// println!("File trunk: {}", metadata.description);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn get_metadata(&self, type_id: &str) -> Result<TrunkMetadata> {
+        let type_id_c = CString::new(type_id).map_err(|e| Error::Acorn(format!("Invalid type ID: {}", e)))?;
+        
+        let mut metadata: acorn_trunk_metadata = unsafe { std::mem::zeroed() };
+        
+        let rc = unsafe { 
+            acorn_nursery_get_metadata(self.h, type_id_c.as_ptr(), &mut metadata as *mut _) 
+        };
+        
+        if rc == 0 {
+            let mut required_keys = Vec::new();
+            if !metadata.required_config_keys.is_null() && metadata.required_config_keys_count > 0 {
+                let keys_slice = unsafe { std::slice::from_raw_parts(metadata.required_config_keys, metadata.required_config_keys_count) };
+                for key_ptr in keys_slice {
+                    if !key_ptr.is_null() {
+                        let key = unsafe { CStr::from_ptr(key_ptr).to_string_lossy().into_owned() };
+                        required_keys.push(key);
+                    }
+                }
+            }
+
+            let mut optional_keys = Vec::new();
+            if !metadata.optional_config_keys.is_null() && metadata.optional_config_keys_count > 0 {
+                let keys_slice = unsafe { std::slice::from_raw_parts(metadata.optional_config_keys, metadata.optional_config_keys_count) };
+                for key_ptr in keys_slice {
+                    if !key_ptr.is_null() {
+                        let key = unsafe { CStr::from_ptr(key_ptr).to_string_lossy().into_owned() };
+                        optional_keys.push(key);
+                    }
+                }
+            }
+
+            Ok(TrunkMetadata {
+                type_id: unsafe { CStr::from_ptr(metadata.type_id).to_string_lossy().into_owned() },
+                display_name: unsafe { CStr::from_ptr(metadata.display_name).to_string_lossy().into_owned() },
+                description: unsafe { CStr::from_ptr(metadata.description).to_string_lossy().into_owned() },
+                category: unsafe { CStr::from_ptr(metadata.category).to_string_lossy().into_owned() },
+                is_durable: metadata.is_durable != 0,
+                supports_history: metadata.supports_history != 0,
+                supports_sync: metadata.supports_sync != 0,
+                supports_async: metadata.supports_async != 0,
+                required_config_keys: required_keys,
+                optional_config_keys: optional_keys,
+                is_built_in: metadata.is_built_in != 0,
+            })
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+
+    /// Get metadata for all trunk types
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornNursery, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let nursery = AcornNursery::new()?;
+    /// let all_metadata = nursery.get_all_metadata()?;
+    /// for metadata in all_metadata {
+    ///     println!("[{}] {}: {}", metadata.category, metadata.type_id, metadata.description);
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn get_all_metadata(&self) -> Result<Vec<TrunkMetadata>> {
+        let mut metadata_ptr: *mut acorn_trunk_metadata = std::ptr::null_mut();
+        let mut count: usize = 0;
+        
+        let rc = unsafe { 
+            acorn_nursery_get_all_metadata(self.h, &mut metadata_ptr as *mut _, &mut count as *mut _) 
+        };
+        
+        if rc == 0 {
+            let mut metadata_list = Vec::new();
+            if !metadata_ptr.is_null() && count > 0 {
+                let metadata_slice = unsafe { std::slice::from_raw_parts(metadata_ptr, count) };
+                for metadata in metadata_slice {
+                    let mut required_keys = Vec::new();
+                    if !metadata.required_config_keys.is_null() && metadata.required_config_keys_count > 0 {
+                        let keys_slice = unsafe { std::slice::from_raw_parts(metadata.required_config_keys, metadata.required_config_keys_count) };
+                        for key_ptr in keys_slice {
+                            if !key_ptr.is_null() {
+                                let key = unsafe { CStr::from_ptr(key_ptr).to_string_lossy().into_owned() };
+                                required_keys.push(key);
+                            }
+                        }
+                    }
+
+                    let mut optional_keys = Vec::new();
+                    if !metadata.optional_config_keys.is_null() && metadata.optional_config_keys_count > 0 {
+                        let keys_slice = unsafe { std::slice::from_raw_parts(metadata.optional_config_keys, metadata.optional_config_keys_count) };
+                        for key_ptr in keys_slice {
+                            if !key_ptr.is_null() {
+                                let key = unsafe { CStr::from_ptr(key_ptr).to_string_lossy().into_owned() };
+                                optional_keys.push(key);
+                            }
+                        }
+                    }
+
+                    metadata_list.push(TrunkMetadata {
+                        type_id: unsafe { CStr::from_ptr(metadata.type_id).to_string_lossy().into_owned() },
+                        display_name: unsafe { CStr::from_ptr(metadata.display_name).to_string_lossy().into_owned() },
+                        description: unsafe { CStr::from_ptr(metadata.description).to_string_lossy().into_owned() },
+                        category: unsafe { CStr::from_ptr(metadata.category).to_string_lossy().into_owned() },
+                        is_durable: metadata.is_durable != 0,
+                        supports_history: metadata.supports_history != 0,
+                        supports_sync: metadata.supports_sync != 0,
+                        supports_async: metadata.supports_async != 0,
+                        required_config_keys: required_keys,
+                        optional_config_keys: optional_keys,
+                        is_built_in: metadata.is_built_in != 0,
+                    });
+                }
+                unsafe { acorn_nursery_free_metadata(metadata_ptr, count); }
+            }
+            Ok(metadata_list)
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+
+    /// Check if a trunk type is available
+    /// 
+    /// # Arguments
+    /// * `type_id` - The trunk type identifier
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornNursery, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let nursery = AcornNursery::new()?;
+    /// let has_file = nursery.has_trunk("file")?;
+    /// println!("Has file trunk: {}", has_file);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn has_trunk(&self, type_id: &str) -> Result<bool> {
+        let type_id_c = CString::new(type_id).map_err(|e| Error::Acorn(format!("Invalid type ID: {}", e)))?;
+        
+        let mut has_trunk: i32 = 0;
+        let rc = unsafe { 
+            acorn_nursery_has_trunk(self.h, type_id_c.as_ptr(), &mut has_trunk as *mut _) 
+        };
+        
+        if rc == 0 {
+            Ok(has_trunk != 0)
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+
+    /// Grow a trunk instance by type ID and configuration
+    /// 
+    /// # Arguments
+    /// * `type_id` - The trunk type identifier
+    /// * `config_json` - Configuration as JSON string
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornNursery, AcornStorage, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let nursery = AcornNursery::new()?;
+    /// let config = r#"{"path": "./data"}"#;
+    /// let storage = nursery.grow_trunk("file", config)?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn grow_trunk(&self, type_id: &str, config_json: &str) -> Result<AcornStorage> {
+        let type_id_c = CString::new(type_id).map_err(|e| Error::Acorn(format!("Invalid type ID: {}", e)))?;
+        let config_c = CString::new(config_json).map_err(|e| Error::Acorn(format!("Invalid config JSON: {}", e)))?;
+        
+        let mut storage_h: acorn_storage_handle = 0;
+        let rc = unsafe { 
+            acorn_nursery_grow_trunk(self.h, type_id_c.as_ptr(), config_c.as_ptr(), &mut storage_h as *mut _) 
+        };
+        
+        if rc == 0 {
+            Ok(AcornStorage { h: storage_h })
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+
+    /// Validate configuration for a trunk type
+    /// 
+    /// # Arguments
+    /// * `type_id` - The trunk type identifier
+    /// * `config_json` - Configuration as JSON string
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornNursery, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let nursery = AcornNursery::new()?;
+    /// let config = r#"{"path": "./data"}"#;
+    /// let is_valid = nursery.validate_config("file", config)?;
+    /// println!("Config is valid: {}", is_valid);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn validate_config(&self, type_id: &str, config_json: &str) -> Result<bool> {
+        let type_id_c = CString::new(type_id).map_err(|e| Error::Acorn(format!("Invalid type ID: {}", e)))?;
+        let config_c = CString::new(config_json).map_err(|e| Error::Acorn(format!("Invalid config JSON: {}", e)))?;
+        
+        let mut is_valid: i32 = 0;
+        let rc = unsafe { 
+            acorn_nursery_validate_config(self.h, type_id_c.as_ptr(), config_c.as_ptr(), &mut is_valid as *mut _) 
+        };
+        
+        if rc == 0 {
+            Ok(is_valid != 0)
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+
+    /// Get a formatted catalog of all trunks
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornNursery, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let nursery = AcornNursery::new()?;
+    /// let catalog = nursery.get_catalog()?;
+    /// println!("{}", catalog);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn get_catalog(&self) -> Result<String> {
+        let mut catalog_ptr: *mut u8 = std::ptr::null_mut();
+        let mut length: usize = 0;
+        
+        let rc = unsafe { 
+            acorn_nursery_get_catalog(self.h, &mut catalog_ptr as *mut _, &mut length as *mut _) 
+        };
+        
+        if rc == 0 {
+            if !catalog_ptr.is_null() && length > 0 {
+                let catalog_slice = unsafe { std::slice::from_raw_parts(catalog_ptr, length) };
+                let catalog = String::from_utf8_lossy(catalog_slice).into_owned();
+                unsafe { acorn_nursery_free_catalog(catalog_ptr); }
+                Ok(catalog)
+            } else {
+                Ok(String::new())
+            }
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+}
+
+impl Drop for AcornNursery {
+    fn drop(&mut self) {
+        unsafe { acorn_nursery_close(self.h); }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

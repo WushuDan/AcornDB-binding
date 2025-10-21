@@ -316,6 +316,42 @@ ACORN_API int acorn_git_close(acorn_git_handle git);
 // Free Git commit info array
 ACORN_API void acorn_git_free_commit_info(acorn_git_commit_info* commits, size_t count);
 
+// Nursery System - Dynamic trunk discovery and creation
+typedef uint64_t acorn_nursery_handle;
+
+// Trunk metadata information
+typedef struct {
+    char* type_id;
+    char* display_name;
+    char* description;
+    char* category;
+    int is_durable;
+    int supports_history;
+    int supports_sync;
+    int supports_async;
+    char** required_config_keys;
+    size_t required_config_keys_count;
+    char** optional_config_keys;
+    size_t optional_config_keys_count;
+    int is_built_in;
+} acorn_trunk_metadata;
+
+// Nursery operations
+ACORN_API int acorn_nursery_create(acorn_nursery_handle* out_nursery);
+ACORN_API int acorn_nursery_get_available_types(acorn_nursery_handle nursery, char*** out_types, size_t* out_count);
+ACORN_API int acorn_nursery_get_metadata(acorn_nursery_handle nursery, const char* type_id, acorn_trunk_metadata* out_metadata);
+ACORN_API int acorn_nursery_get_all_metadata(acorn_nursery_handle nursery, acorn_trunk_metadata** out_metadata, size_t* out_count);
+ACORN_API int acorn_nursery_has_trunk(acorn_nursery_handle nursery, const char* type_id, int* out_has_trunk);
+ACORN_API int acorn_nursery_grow_trunk(acorn_nursery_handle nursery, const char* type_id, const char* config_json, acorn_storage_handle* out_storage);
+ACORN_API int acorn_nursery_validate_config(acorn_nursery_handle nursery, const char* type_id, const char* config_json, int* out_valid);
+ACORN_API int acorn_nursery_get_catalog(acorn_nursery_handle nursery, char** out_catalog, size_t* out_length);
+ACORN_API int acorn_nursery_close(acorn_nursery_handle nursery);
+
+// Free nursery resources
+ACORN_API void acorn_nursery_free_types(char** types, size_t count);
+ACORN_API void acorn_nursery_free_metadata(acorn_trunk_metadata* metadata, size_t count);
+ACORN_API void acorn_nursery_free_catalog(char* catalog);
+
 // Memory management for buffers allocated by shim
 ACORN_API void acorn_free_buf(acorn_buf* buf);
 

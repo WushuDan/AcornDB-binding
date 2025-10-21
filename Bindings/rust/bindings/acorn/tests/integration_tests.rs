@@ -2849,5 +2849,163 @@ mod unit_tests {
         
         Ok(())
     }
+
+    // Nursery System Tests
+    #[test]
+    fn test_nursery_basic_operations() -> Result<(), Error> {
+        let nursery = AcornNursery::new()?;
+        
+        // Test basic operations
+        let types = nursery.get_available_types()?;
+        assert!(!types.is_empty());
+        
+        // Test has_trunk
+        let has_file = nursery.has_trunk("file")?;
+        assert!(has_file);
+        
+        Ok(())
+    }
+
+    #[test]
+    fn test_nursery_metadata() -> Result<(), Error> {
+        let nursery = AcornNursery::new()?;
+        
+        // Test getting metadata for file trunk
+        let metadata = nursery.get_metadata("file")?;
+        assert_eq!(metadata.type_id, "file");
+        assert!(!metadata.description.is_empty());
+        assert!(!metadata.category.is_empty());
+        
+        // Test getting all metadata
+        let all_metadata = nursery.get_all_metadata()?;
+        assert!(!all_metadata.is_empty());
+        
+        // Verify file trunk is in all metadata
+        let file_metadata = all_metadata.iter().find(|m| m.type_id == "file");
+        assert!(file_metadata.is_some());
+        
+        Ok(())
+    }
+
+    #[test]
+    fn test_nursery_config_validation() -> Result<(), Error> {
+        let nursery = AcornNursery::new()?;
+        
+        // Test valid file config
+        let valid_config = r#"{"path": "./test-data"}"#;
+        let is_valid = nursery.validate_config("file", valid_config)?;
+        assert!(is_valid);
+        
+        // Test invalid config
+        let invalid_config = r#"{"invalid": "config"}"#;
+        let is_invalid = nursery.validate_config("file", invalid_config)?;
+        assert!(!is_invalid);
+        
+        Ok(())
+    }
+
+    #[test]
+    fn test_nursery_trunk_creation() -> Result<(), Error> {
+        let nursery = AcornNursery::new()?;
+        
+        // Test creating file trunk
+        let config = r#"{"path": "./test-nursery"}"#;
+        let storage = nursery.grow_trunk("file", config)?;
+        
+        // Test using the created storage
+        let mut tree = AcornTree::open_with_storage(storage)?;
+        let item = TestData {
+            id: "test-item".to_string(),
+            value: 42,
+            name: "test".to_string(),
+        };
+        
+        tree.stash(&item.id, &item)?;
+        let retrieved: Option<TestData> = tree.crack(&item.id)?;
+        assert!(retrieved.is_some());
+        assert_eq!(retrieved.unwrap().value, 42);
+        
+        Ok(())
+    }
+
+    #[test]
+    fn test_nursery_catalog() -> Result<(), Error> {
+        let nursery = AcornNursery::new()?;
+        
+        // Test getting catalog
+        let catalog = nursery.get_catalog()?;
+        assert!(!catalog.is_empty());
+        assert!(catalog.contains("Nursery Catalog"));
+        
+        Ok(())
+    }
+
+    #[test]
+    fn test_nursery_error_handling() -> Result<(), Error> {
+        let nursery = AcornNursery::new()?;
+        
+        // Test nonexistent trunk type
+        let has_nonexistent = nursery.has_trunk("nonexistent")?;
+        assert!(!has_nonexistent);
+        
+        // Test getting metadata for nonexistent trunk
+        match nursery.get_metadata("nonexistent") {
+            Ok(_) => panic!("Expected error for nonexistent trunk"),
+            Err(_) => {} // Expected
+        }
+        
+        // Test growing nonexistent trunk
+        match nursery.grow_trunk("nonexistent", r#"{}"#) {
+            Ok(_) => panic!("Expected error for nonexistent trunk"),
+            Err(_) => {} // Expected
+        }
+        
+        Ok(())
+    }
+
+    #[test]
+    fn test_nursery_multiple_storage_types() -> Result<(), Error> {
+        let nursery = AcornNursery::new()?;
+        
+        let mut trees = Vec::new();
+        
+        // Create file storage
+        if nursery.has_trunk("file")? {
+            let file_config = r#"{"path": "./test-multi-file"}"#;
+            if nursery.validate_config("file", file_config)? {
+                let file_storage = nursery.grow_trunk("file", file_config)?;
+                let mut file_tree = AcornTree::open_with_storage(file_storage)?;
+                trees.push(("file", file_tree));
+            }
+        }
+        
+        // Create memory storage
+        if nursery.has_trunk("memory")? {
+            let memory_config = r#"{}"#;
+            if nursery.validate_config("memory", memory_config)? {
+                let memory_storage = nursery.grow_trunk("memory", memory_config)?;
+                let mut memory_tree = AcornTree::open_with_storage(memory_storage)?;
+                trees.push(("memory", memory_tree));
+            }
+        }
+        
+        // Store data in all trees
+        for (trunk_name, tree) in &mut trees {
+            let item = TestData {
+                id: format!("test-{}", trunk_name),
+                value: 100,
+                name: format!("test-{}", trunk_name),
+            };
+            
+            tree.stash(&item.id, &item)?;
+            let retrieved: Option<TestData> = tree.crack(&item.id)?;
+            assert!(retrieved.is_some());
+            assert_eq!(retrieved.unwrap().value, 100);
+        }
+        
+        assert_eq!(trees.len(), 2); // Should have both file and memory
+        
+        Ok(())
+    }
 }
 

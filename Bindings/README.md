@@ -811,7 +811,7 @@ The bindings use Rust's `Result<T, Error>` type:
 - [x] **Git Integration**: Bind Git-as-database, version history, Git operations, custom Git providers
 
 ### Phase 4: AcornDB Ecosystem Features (Binding Existing Features)
-- [ ] **Nursery System**: Bind dynamic trunk discovery, trunk factories, trunk metadata, validation
+- [x] **Nursery System**: Bind dynamic trunk discovery, trunk factories, trunk metadata, validation
 - [ ] **Advanced Tree Features**: Bind auto-ID detection, INutment interface, TTL enforcement, statistics
 - [ ] **Event Management**: Bind internal event system, tangle support, advanced mesh primitives
 - [ ] **Performance Monitoring**: Bind built-in metrics collection, health checks, monitoring
@@ -872,7 +872,7 @@ The core Rust bindings are **COMPLETE**! All major functionality has been implem
 - ✅ **Git Integration**: Bind Git-as-database, version history, Git operations
 
 **Phase 4: AcornDB Ecosystem Features**
-- 🔄 **Nursery System**: Bind dynamic trunk discovery, trunk factories, metadata
+- ✅ **Nursery System**: Bind dynamic trunk discovery, trunk factories, metadata
 - 🔄 **Advanced Tree Features**: Bind auto-ID detection, INutment interface, TTL enforcement
 - 🔄 **Event Management**: Bind internal event system, tangle support, mesh primitives
 - 🔄 **Performance Monitoring**: Bind built-in metrics collection, health checks
