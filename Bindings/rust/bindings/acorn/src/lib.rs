@@ -3761,6 +3761,285 @@ impl AcornQueryOldest {
     }
 }
 
+/// Git integration for AcornDB
+pub struct AcornGit {
+    h: acorn_git_handle,
+}
+
+/// Git commit information
+#[derive(Debug, Clone, Deserialize)]
+pub struct GitCommitInfo {
+    pub sha: String,
+    pub message: String,
+    pub author: String,
+    pub email: String,
+    pub timestamp: i64,
+}
+
+/// Git repository information
+#[derive(Debug, Clone, Deserialize)]
+pub struct GitInfo {
+    pub repository_path: String,
+    pub author_name: String,
+    pub author_email: String,
+    pub has_remote: bool,
+    pub is_initialized: bool,
+}
+
+impl AcornGit {
+    /// Create a new Git integration instance
+    /// 
+    /// # Arguments
+    /// * `repo_path` - Path to Git repository
+    /// * `author_name` - Git author name
+    /// * `author_email` - Git author email
+    /// * `auto_push` - Automatically push to remote after each commit
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornGit, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let git = AcornGit::new("./my-repo", "AcornDB", "acorn@acorndb.dev", false)?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn new(repo_path: &str, author_name: &str, author_email: &str, auto_push: bool) -> Result<Self> {
+        let repo_path_c = CString::new(repo_path).map_err(|e| Error::Acorn(format!("Invalid repo path: {}", e)))?;
+        let author_name_c = CString::new(author_name).map_err(|e| Error::Acorn(format!("Invalid author name: {}", e)))?;
+        let author_email_c = CString::new(author_email).map_err(|e| Error::Acorn(format!("Invalid author email: {}", e)))?;
+        
+        let mut h: acorn_git_handle = 0;
+        let rc = unsafe { 
+            acorn_git_create(
+                repo_path_c.as_ptr(), 
+                author_name_c.as_ptr(), 
+                author_email_c.as_ptr(), 
+                if auto_push { 1 } else { 0 },
+                &mut h as *mut _
+            ) 
+        };
+        
+        if rc == 0 {
+            Ok(Self { h })
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+
+    /// Push changes to remote repository
+    /// 
+    /// # Arguments
+    /// * `remote_name` - Remote name (default: "origin")
+    /// * `branch` - Branch name (default: "main")
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornGit, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let git = AcornGit::new("./my-repo", "AcornDB", "acorn@acorndb.dev", false)?;
+    /// git.push("origin", "main")?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn push(&self, remote_name: &str, branch: &str) -> Result<()> {
+        let remote_name_c = CString::new(remote_name).map_err(|e| Error::Acorn(format!("Invalid remote name: {}", e)))?;
+        let branch_c = CString::new(branch).map_err(|e| Error::Acorn(format!("Invalid branch name: {}", e)))?;
+        
+        let rc = unsafe { 
+            acorn_git_push(self.h, remote_name_c.as_ptr(), branch_c.as_ptr()) 
+        };
+        
+        if rc == 0 {
+            Ok(())
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+
+    /// Pull changes from remote repository
+    /// 
+    /// # Arguments
+    /// * `remote_name` - Remote name (default: "origin")
+    /// * `branch` - Branch name (default: "main")
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornGit, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let git = AcornGit::new("./my-repo", "AcornDB", "acorn@acorndb.dev", false)?;
+    /// git.pull("origin", "main")?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn pull(&self, remote_name: &str, branch: &str) -> Result<()> {
+        let remote_name_c = CString::new(remote_name).map_err(|e| Error::Acorn(format!("Invalid remote name: {}", e)))?;
+        let branch_c = CString::new(branch).map_err(|e| Error::Acorn(format!("Invalid branch name: {}", e)))?;
+        
+        let rc = unsafe { 
+            acorn_git_pull(self.h, remote_name_c.as_ptr(), branch_c.as_ptr()) 
+        };
+        
+        if rc == 0 {
+            Ok(())
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+
+    /// Get commit history for a specific file
+    /// 
+    /// # Arguments
+    /// * `file_path` - Path to the file within the repository
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornGit, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let git = AcornGit::new("./my-repo", "AcornDB", "acorn@acorndb.dev", false)?;
+    /// let commits = git.get_file_history("data.json")?;
+    /// for commit in commits {
+    ///     println!("Commit {}: {}", commit.sha, commit.message);
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn get_file_history(&self, file_path: &str) -> Result<Vec<GitCommitInfo>> {
+        let file_path_c = CString::new(file_path).map_err(|e| Error::Acorn(format!("Invalid file path: {}", e)))?;
+        
+        let mut commits_ptr: *mut acorn_git_commit_info = std::ptr::null_mut();
+        let mut count: usize = 0;
+        
+        let rc = unsafe { 
+            acorn_git_get_file_history(self.h, file_path_c.as_ptr(), &mut commits_ptr as *mut _, &mut count as *mut _) 
+        };
+        
+        if rc == 0 {
+            let mut commits = Vec::new();
+            if !commits_ptr.is_null() && count > 0 {
+                let commits_slice = unsafe { std::slice::from_raw_parts(commits_ptr, count) };
+                for commit in commits_slice {
+                    commits.push(GitCommitInfo {
+                        sha: unsafe { CStr::from_ptr(commit.sha).to_string_lossy().into_owned() },
+                        message: unsafe { CStr::from_ptr(commit.message).to_string_lossy().into_owned() },
+                        author: unsafe { CStr::from_ptr(commit.author).to_string_lossy().into_owned() },
+                        email: unsafe { CStr::from_ptr(commit.email).to_string_lossy().into_owned() },
+                        timestamp: commit.timestamp,
+                    });
+                }
+                unsafe { acorn_git_free_commit_info(commits_ptr, count); }
+            }
+            Ok(commits)
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+
+    /// Read file content at a specific commit
+    /// 
+    /// # Arguments
+    /// * `file_path` - Path to the file within the repository
+    /// * `commit_sha` - Commit SHA to read from
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornGit, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let git = AcornGit::new("./my-repo", "AcornDB", "acorn@acorndb.dev", false)?;
+    /// let content = git.read_file_at_commit("data.json", "abc123")?;
+    /// println!("File content: {}", content);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn read_file_at_commit(&self, file_path: &str, commit_sha: &str) -> Result<String> {
+        let file_path_c = CString::new(file_path).map_err(|e| Error::Acorn(format!("Invalid file path: {}", e)))?;
+        let commit_sha_c = CString::new(commit_sha).map_err(|e| Error::Acorn(format!("Invalid commit SHA: {}", e)))?;
+        
+        let mut content_ptr: *mut u8 = std::ptr::null_mut();
+        let mut length: usize = 0;
+        
+        let rc = unsafe { 
+            acorn_git_read_file_at_commit(self.h, file_path_c.as_ptr(), commit_sha_c.as_ptr(), &mut content_ptr as *mut _, &mut length as *mut _) 
+        };
+        
+        if rc == 0 {
+            if !content_ptr.is_null() && length > 0 {
+                let content_slice = unsafe { std::slice::from_raw_parts(content_ptr, length) };
+                let content = String::from_utf8_lossy(content_slice).into_owned();
+                unsafe { acorn_free_buf(&mut acorn_buf { data: content_ptr, len: length }); }
+                Ok(content)
+            } else {
+                Ok(String::new())
+            }
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+
+    /// Check if the repository has a remote configured
+    /// 
+    /// # Arguments
+    /// * `remote_name` - Remote name to check (default: "origin")
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornGit, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let git = AcornGit::new("./my-repo", "AcornDB", "acorn@acorndb.dev", false)?;
+    /// let has_remote = git.has_remote("origin")?;
+    /// println!("Has remote: {}", has_remote);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn has_remote(&self, remote_name: &str) -> Result<bool> {
+        let remote_name_c = CString::new(remote_name).map_err(|e| Error::Acorn(format!("Invalid remote name: {}", e)))?;
+        
+        let mut has_remote: i32 = 0;
+        let rc = unsafe { 
+            acorn_git_has_remote(self.h, remote_name_c.as_ptr(), &mut has_remote as *mut _) 
+        };
+        
+        if rc == 0 {
+            Ok(has_remote != 0)
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+
+    /// Squash commits since a specific commit
+    /// 
+    /// # Arguments
+    /// * `since_commit` - Commit SHA to squash since
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornGit, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let git = AcornGit::new("./my-repo", "AcornDB", "acorn@acorndb.dev", false)?;
+    /// git.squash_commits("abc123")?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn squash_commits(&self, since_commit: &str) -> Result<()> {
+        let since_commit_c = CString::new(since_commit).map_err(|e| Error::Acorn(format!("Invalid commit SHA: {}", e)))?;
+        
+        let rc = unsafe { 
+            acorn_git_squash_commits(self.h, since_commit_c.as_ptr()) 
+        };
+        
+        if rc == 0 {
+            Ok(())
+        } else {
+            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+        }
+    }
+}
+
+impl Drop for AcornGit {
+    fn drop(&mut self) {
+        unsafe { acorn_git_close(self.h); }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

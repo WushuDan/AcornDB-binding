@@ -2729,5 +2729,125 @@ mod unit_tests {
         assert_eq!(count, 75);
         assert!(count_time.as_millis() < 1000); // Should be fast
     }
+
+    // Git Integration Tests
+    #[test]
+    fn test_git_integration_basic() -> Result<(), Error> {
+        let git = AcornGit::new("./test-git-repo", "Test User", "test@example.com", false)?;
+        
+        // Test basic Git operations
+        let has_remote = git.has_remote("origin")?;
+        assert!(!has_remote); // Should not have remote by default
+        
+        Ok(())
+    }
+
+    #[test]
+    fn test_git_storage_backend() -> Result<(), Error> {
+        let git_storage = AcornStorage::git(
+            "./test-git-storage",
+            "Test User",
+            "test@example.com",
+            false
+        )?;
+        
+        let mut tree = AcornTree::open_with_storage(git_storage)?;
+        
+        // Test basic operations with Git storage
+        let item = TestData {
+            id: "test-item".to_string(),
+            value: 42,
+            name: "test".to_string(),
+        };
+        
+        tree.stash(&item.id, &item)?;
+        let retrieved: Option<TestData> = tree.crack(&item.id)?;
+        assert!(retrieved.is_some());
+        assert_eq!(retrieved.unwrap().value, 42);
+        
+        Ok(())
+    }
+
+    #[test]
+    fn test_git_file_history() -> Result<(), Error> {
+        let git = AcornGit::new("./test-git-history", "Test User", "test@example.com", false)?;
+        
+        // Test file history operations
+        let commits = git.get_file_history("test-file.json")?;
+        // Should be empty for new repository
+        assert_eq!(commits.len(), 0);
+        
+        Ok(())
+    }
+
+    #[test]
+    fn test_git_commit_operations() -> Result<(), Error> {
+        let git = AcornGit::new("./test-git-commits", "Test User", "test@example.com", false)?;
+        
+        // Test commit operations
+        let content = git.read_file_at_commit("test-file.json", "abc123")?;
+        assert_eq!(content, ""); // Should be empty for non-existent commit
+        
+        Ok(())
+    }
+
+    #[test]
+    fn test_git_remote_operations() -> Result<(), Error> {
+        let git = AcornGit::new("./test-git-remote", "Test User", "test@example.com", false)?;
+        
+        // Test remote operations (should not fail even without remote)
+        let has_origin = git.has_remote("origin")?;
+        assert!(!has_origin);
+        
+        let has_upstream = git.has_remote("upstream")?;
+        assert!(!has_upstream);
+        
+        Ok(())
+    }
+
+    #[test]
+    fn test_git_squash_operations() -> Result<(), Error> {
+        let git = AcornGit::new("./test-git-squash", "Test User", "test@example.com", false)?;
+        
+        // Test squash operations (should not fail even without commits)
+        git.squash_commits("abc123")?;
+        
+        Ok(())
+    }
+
+    #[test]
+    fn test_git_integration_with_tree() -> Result<(), Error> {
+        // Create Git storage
+        let git_storage = AcornStorage::git(
+            "./test-git-tree-integration",
+            "Test User",
+            "test@example.com",
+            false
+        )?;
+        
+        let mut tree = AcornTree::open_with_storage(git_storage)?;
+        
+        // Add multiple items (each creates a Git commit)
+        for i in 0..5 {
+            let item = TestData {
+                id: format!("git-item-{}", i),
+                value: i * 10,
+                name: format!("item-{}", i),
+            };
+            tree.stash(&item.id, &item)?;
+        }
+        
+        // Query items
+        let all_items: Vec<TestData> = tree.query().collect()?;
+        assert_eq!(all_items.len(), 5);
+        
+        // Query specific items
+        let high_value_items: Vec<TestData> = tree.query()
+            .where_condition(|item| item["value"].as_u64().unwrap_or(0) > 20)
+            .collect()?;
+        assert_eq!(high_value_items.len(), 3); // items 3, 4, 5 (values 30, 40, 50)
+        
+        Ok(())
+    }
 }
 

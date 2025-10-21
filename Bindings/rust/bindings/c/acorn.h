@@ -290,6 +290,32 @@ ACORN_API int acorn_create_sampled_stream(acorn_tree_handle tree, int sample_ms,
 ACORN_API int acorn_stream_subscribe(acorn_reactive_stream_handle stream, void (*callback)(const char* id, const char* json, size_t len, acorn_change_type change_type, void* user_data), void* user_data, acorn_sub_handle* out_subscription);
 ACORN_API int acorn_stream_close(acorn_reactive_stream_handle stream);
 
+// Git integration support
+typedef uint64_t acorn_git_handle;
+
+// Git commit information
+typedef struct {
+    char* sha;
+    char* message;
+    char* author;
+    char* email;
+    int64_t timestamp;
+} acorn_git_commit_info;
+
+// Git operations
+ACORN_API int acorn_git_create(const char* repo_path, const char* author_name, const char* author_email, int auto_push, acorn_git_handle* out_git);
+ACORN_API int acorn_git_push(acorn_git_handle git, const char* remote_name, const char* branch);
+ACORN_API int acorn_git_pull(acorn_git_handle git, const char* remote_name, const char* branch);
+ACORN_API int acorn_git_get_commit_log(acorn_git_handle git, const char* file_path, acorn_git_commit_info** out_commits, size_t* out_count);
+ACORN_API int acorn_git_get_file_history(acorn_git_handle git, const char* file_path, acorn_git_commit_info** out_commits, size_t* out_count);
+ACORN_API int acorn_git_read_file_at_commit(acorn_git_handle git, const char* file_path, const char* commit_sha, char** out_content, size_t* out_length);
+ACORN_API int acorn_git_squash_commits(acorn_git_handle git, const char* since_commit);
+ACORN_API int acorn_git_has_remote(acorn_git_handle git, const char* remote_name, int* out_has_remote);
+ACORN_API int acorn_git_close(acorn_git_handle git);
+
+// Free Git commit info array
+ACORN_API void acorn_git_free_commit_info(acorn_git_commit_info* commits, size_t count);
+
 // Memory management for buffers allocated by shim
 ACORN_API void acorn_free_buf(acorn_buf* buf);
 
