@@ -269,6 +269,27 @@ ACORN_API int acorn_document_store_close(acorn_document_store_handle document_st
 // Open tree with document store
 ACORN_API int acorn_open_tree_with_document_store(acorn_document_store_handle document_store, acorn_tree_handle* out_tree);
 
+// Reactive programming support
+typedef uint64_t acorn_reactive_stream_handle;
+
+// Change types
+typedef enum {
+    ACORN_CHANGE_STASH = 0,
+    ACORN_CHANGE_TOSS = 1,
+    ACORN_CHANGE_SQUABBLE = 2
+} acorn_change_type;
+
+// Reactive stream creation
+ACORN_API int acorn_create_change_stream(acorn_tree_handle tree, acorn_reactive_stream_handle* out_stream);
+ACORN_API int acorn_create_filtered_stream(acorn_tree_handle tree, acorn_change_type change_type, acorn_reactive_stream_handle* out_stream);
+ACORN_API int acorn_create_buffered_stream(acorn_tree_handle tree, int buffer_ms, acorn_reactive_stream_handle* out_stream);
+ACORN_API int acorn_create_throttled_stream(acorn_tree_handle tree, int throttle_ms, acorn_reactive_stream_handle* out_stream);
+ACORN_API int acorn_create_sampled_stream(acorn_tree_handle tree, int sample_ms, acorn_reactive_stream_handle* out_stream);
+
+// Reactive stream operations
+ACORN_API int acorn_stream_subscribe(acorn_reactive_stream_handle stream, void (*callback)(const char* id, const char* json, size_t len, acorn_change_type change_type, void* user_data), void* user_data, acorn_sub_handle* out_subscription);
+ACORN_API int acorn_stream_close(acorn_reactive_stream_handle stream);
+
 // Memory management for buffers allocated by shim
 ACORN_API void acorn_free_buf(acorn_buf* buf);
 

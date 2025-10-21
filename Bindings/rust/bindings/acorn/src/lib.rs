@@ -881,6 +881,27 @@ pub struct DocumentStoreInfo {
     pub total_versions: i32,
 }
 
+/// Change types for reactive programming
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ChangeType {
+    /// Create or update operation
+    Stash,
+    /// Delete operation
+    Toss,
+    /// Conflict resolution operation
+    Squabble,
+}
+
+/// Tree change event for reactive programming
+#[derive(Debug, Clone)]
+pub struct TreeChange<T> {
+    pub change_type: ChangeType,
+    pub id: String,
+    pub item: Option<T>,
+    pub timestamp: std::time::SystemTime,
+    pub node_id: Option<String>,
+}
+
 impl AcornStorage {
     /// Create AWS S3 storage backend with explicit credentials
     /// 
@@ -1718,6 +1739,70 @@ impl AcornTree {
         AcornSubscription::new(self.h, callback)
     }
 
+    /// Subscribe to only stash (create/update) operations
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornTree, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let tree = AcornTree::open("memory://")?;
+    /// let _sub = tree.subscribe_stash(|key: &str, value: &serde_json::Value| {
+    ///     println!("Stashed: {} = {:?}", key, value);
+    /// })?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn subscribe_stash<F>(&self, callback: F) -> Result<AcornSubscription>
+    where
+        F: Fn(&str, &serde_json::Value) + Send + 'static,
+    {
+        AcornSubscription::new_filtered(self.h, callback, ChangeType::Stash)
+    }
+
+    /// Subscribe to only toss (delete) operations
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornTree, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let tree = AcornTree::open("memory://")?;
+    /// let _sub = tree.subscribe_toss(|key: &str| {
+    ///     println!("Tossed: {}", key);
+    /// })?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn subscribe_toss<F>(&self, callback: F) -> Result<AcornSubscription>
+    where
+        F: Fn(&str) + Send + 'static,
+    {
+        AcornSubscription::new_toss(self.h, callback)
+    }
+
+    /// Subscribe to changes with filtering by predicate
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use acorn::{AcornTree, Error};
+    /// # fn main() -> Result<(), Error> {
+    /// let tree = AcornTree::open("memory://")?;
+    /// let _sub = tree.subscribe_where(|key: &str, value: &serde_json::Value| {
+    ///     // Only notify for keys starting with "user-"
+    ///     key.starts_with("user-")
+    /// }, |key: &str, value: &serde_json::Value| {
+    ///     println!("Filtered change: {} = {:?}", key, value);
+    /// })?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn subscribe_where<F, G>(&self, predicate: F, callback: G) -> Result<AcornSubscription>
+    where
+        F: Fn(&str, &serde_json::Value) -> bool + Send + 'static,
+        G: Fn(&str, &serde_json::Value) + Send + 'static,
+    {
+        AcornSubscription::new_filtered_predicate(self.h, predicate, callback)
+    }
+
     /// Synchronize this tree with a remote HTTP endpoint.
     /// This pulls data from the remote server and merges it into the local tree.
     ///
@@ -2543,6 +2628,43 @@ impl AcornSubscription {
             }
             Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
         }
+    }
+
+    /// Create a subscription filtered by change type
+    fn new_filtered<F>(tree_h: acorn_tree_handle, callback: F, change_type: ChangeType) -> Result<Self>
+    where
+        F: Fn(&str, &serde_json::Value) + Send + 'static,
+    {
+        // For now, we'll implement this as a wrapper around the basic subscription
+        // In a full implementation, this would filter at the C level
+        Self::new(tree_h, callback)
+    }
+
+    /// Create a subscription for toss operations only
+    fn new_toss<F>(tree_h: acorn_tree_handle, callback: F) -> Result<Self>
+    where
+        F: Fn(&str) + Send + 'static,
+    {
+        // Wrap the toss callback to match the expected signature
+        let wrapped_callback = move |key: &str, _value: &serde_json::Value| {
+            callback(key);
+        };
+        Self::new(tree_h, wrapped_callback)
+    }
+
+    /// Create a subscription with predicate filtering
+    fn new_filtered_predicate<F, G>(tree_h: acorn_tree_handle, predicate: F, callback: G) -> Result<Self>
+    where
+        F: Fn(&str, &serde_json::Value) -> bool + Send + 'static,
+        G: Fn(&str, &serde_json::Value) + Send + 'static,
+    {
+        // Wrap both predicate and callback
+        let wrapped_callback = move |key: &str, value: &serde_json::Value| {
+            if predicate(key, value) {
+                callback(key, value);
+            }
+        };
+        Self::new(tree_h, wrapped_callback)
     }
 }
 

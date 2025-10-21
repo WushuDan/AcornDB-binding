@@ -1,4 +1,4 @@
-use acorn::{AcornTree, AcornEncryption, AcornCompression, AcornCache, AcornConflictJudge, AcornStorage, AcornDocumentStore, CompressionLevel, Error};
+use acorn::{AcornTree, AcornEncryption, AcornCompression, AcornCache, AcornConflictJudge, AcornStorage, AcornDocumentStore, CompressionLevel, Error, ChangeType};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
@@ -2228,6 +2228,252 @@ mod unit_tests {
         let original_version = &history[0]["Payload"];
         assert_eq!(original_version["value"].as_i64().unwrap(), 100);
         assert_eq!(original_version["name"].as_str().unwrap(), "Tree Operation 1");
+    }
+
+    #[test]
+    fn test_reactive_programming_basic_subscription() {
+        let mut tree = AcornTree::open("memory://").unwrap();
+        
+        // Track notifications
+        let notifications = Arc::new(Mutex::new(Vec::new()));
+        let notifications_clone = notifications.clone();
+        
+        // Subscribe to all changes
+        let _sub = tree.subscribe(move |key: &str, value: &serde_json::Value| {
+            let mut n = notifications_clone.lock().unwrap();
+            n.push((key.to_string(), value.clone()));
+        }).unwrap();
+        
+        // Perform operations
+        let test_data = TestData {
+            id: "reactive-1".to_string(),
+            value: 42,
+            name: "Reactive Test".to_string(),
+        };
+        
+        tree.stash("key1", &test_data).unwrap();
+        tree.stash("key2", &test_data).unwrap();
+        
+        // Give time for notifications
+        std::thread::sleep(std::time::Duration::from_millis(100));
+        
+        // Verify notifications
+        let n = notifications.lock().unwrap();
+        assert_eq!(n.len(), 2);
+        assert_eq!(n[0].0, "key1");
+        assert_eq!(n[1].0, "key2");
+    }
+
+    #[test]
+    fn test_reactive_programming_stash_subscription() {
+        let mut tree = AcornTree::open("memory://").unwrap();
+        
+        // Track stash notifications
+        let stash_notifications = Arc::new(Mutex::new(Vec::new()));
+        let stash_notifications_clone = stash_notifications.clone();
+        
+        // Subscribe to stash operations only
+        let _stash_sub = tree.subscribe_stash(move |key: &str, value: &serde_json::Value| {
+            let mut n = stash_notifications_clone.lock().unwrap();
+            n.push((key.to_string(), value.clone()));
+        }).unwrap();
+        
+        // Perform operations
+        let test_data = TestData {
+            id: "stash-test".to_string(),
+            value: 100,
+            name: "Stash Test".to_string(),
+        };
+        
+        tree.stash("stash-key", &test_data).unwrap();
+        tree.toss("stash-key").unwrap();
+        tree.stash("stash-key2", &test_data).unwrap();
+        
+        // Give time for notifications
+        std::thread::sleep(std::time::Duration::from_millis(100));
+        
+        // Verify only stash operations were captured
+        let n = stash_notifications.lock().unwrap();
+        assert_eq!(n.len(), 2);
+        assert_eq!(n[0].0, "stash-key");
+        assert_eq!(n[1].0, "stash-key2");
+    }
+
+    #[test]
+    fn test_reactive_programming_toss_subscription() {
+        let mut tree = AcornTree::open("memory://").unwrap();
+        
+        // Track toss notifications
+        let toss_notifications = Arc::new(Mutex::new(Vec::new()));
+        let toss_notifications_clone = toss_notifications.clone();
+        
+        // Subscribe to toss operations only
+        let _toss_sub = tree.subscribe_toss(move |key: &str| {
+            let mut n = toss_notifications_clone.lock().unwrap();
+            n.push(key.to_string());
+        }).unwrap();
+        
+        // Perform operations
+        let test_data = TestData {
+            id: "toss-test".to_string(),
+            value: 200,
+            name: "Toss Test".to_string(),
+        };
+        
+        tree.stash("toss-key1", &test_data).unwrap();
+        tree.toss("toss-key1").unwrap();
+        tree.stash("toss-key2", &test_data).unwrap();
+        tree.toss("toss-key2").unwrap();
+        
+        // Give time for notifications
+        std::thread::sleep(std::time::Duration::from_millis(100));
+        
+        // Verify only toss operations were captured
+        let n = toss_notifications.lock().unwrap();
+        assert_eq!(n.len(), 2);
+        assert_eq!(n[0], "toss-key1");
+        assert_eq!(n[1], "toss-key2");
+    }
+
+    #[test]
+    fn test_reactive_programming_filtered_subscription() {
+        let mut tree = AcornTree::open("memory://").unwrap();
+        
+        // Track filtered notifications
+        let filtered_notifications = Arc::new(Mutex::new(Vec::new()));
+        let filtered_notifications_clone = filtered_notifications.clone();
+        
+        // Subscribe with filtering predicate
+        let _filtered_sub = tree.subscribe_where(
+            |key: &str, value: &serde_json::Value| {
+                // Only notify for keys starting with "filter-"
+                key.starts_with("filter-")
+            },
+            move |key: &str, value: &serde_json::Value| {
+                let mut n = filtered_notifications_clone.lock().unwrap();
+                n.push((key.to_string(), value.clone()));
+            }
+        ).unwrap();
+        
+        // Perform operations
+        let test_data = TestData {
+            id: "filter-test".to_string(),
+            value: 300,
+            name: "Filter Test".to_string(),
+        };
+        
+        tree.stash("filter-key1", &test_data).unwrap();
+        tree.stash("other-key1", &test_data).unwrap();
+        tree.stash("filter-key2", &test_data).unwrap();
+        tree.stash("other-key2", &test_data).unwrap();
+        
+        // Give time for notifications
+        std::thread::sleep(std::time::Duration::from_millis(100));
+        
+        // Verify only filtered operations were captured
+        let n = filtered_notifications.lock().unwrap();
+        assert_eq!(n.len(), 2);
+        assert_eq!(n[0].0, "filter-key1");
+        assert_eq!(n[1].0, "filter-key2");
+    }
+
+    #[test]
+    fn test_reactive_programming_multiple_subscriptions() {
+        let mut tree = AcornTree::open("memory://").unwrap();
+        
+        // Track different types of notifications
+        let all_notifications = Arc::new(Mutex::new(Vec::new()));
+        let stash_notifications = Arc::new(Mutex::new(Vec::new()));
+        let toss_notifications = Arc::new(Mutex::new(Vec::new()));
+        
+        let all_notifications_clone = all_notifications.clone();
+        let stash_notifications_clone = stash_notifications.clone();
+        let toss_notifications_clone = toss_notifications.clone();
+        
+        // Subscribe to all changes
+        let _all_sub = tree.subscribe(move |key: &str, value: &serde_json::Value| {
+            let mut n = all_notifications_clone.lock().unwrap();
+            n.push((key.to_string(), value.clone()));
+        }).unwrap();
+        
+        // Subscribe to stash operations
+        let _stash_sub = tree.subscribe_stash(move |key: &str, value: &serde_json::Value| {
+            let mut n = stash_notifications_clone.lock().unwrap();
+            n.push((key.to_string(), value.clone()));
+        }).unwrap();
+        
+        // Subscribe to toss operations
+        let _toss_sub = tree.subscribe_toss(move |key: &str| {
+            let mut n = toss_notifications_clone.lock().unwrap();
+            n.push(key.to_string());
+        }).unwrap();
+        
+        // Perform operations
+        let test_data = TestData {
+            id: "multi-test".to_string(),
+            value: 400,
+            name: "Multi Test".to_string(),
+        };
+        
+        tree.stash("multi-key1", &test_data).unwrap();
+        tree.stash("multi-key2", &test_data).unwrap();
+        tree.toss("multi-key1").unwrap();
+        
+        // Give time for notifications
+        std::thread::sleep(std::time::Duration::from_millis(100));
+        
+        // Verify all subscriptions received appropriate notifications
+        let all_n = all_notifications.lock().unwrap();
+        let stash_n = stash_notifications.lock().unwrap();
+        let toss_n = toss_notifications.lock().unwrap();
+        
+        assert_eq!(all_n.len(), 3); // All operations
+        assert_eq!(stash_n.len(), 2); // Only stash operations
+        assert_eq!(toss_n.len(), 1); // Only toss operations
+        
+        assert_eq!(all_n[0].0, "multi-key1");
+        assert_eq!(all_n[1].0, "multi-key2");
+        assert_eq!(all_n[2].0, "multi-key1"); // Toss operation
+        
+        assert_eq!(stash_n[0].0, "multi-key1");
+        assert_eq!(stash_n[1].0, "multi-key2");
+        
+        assert_eq!(toss_n[0], "multi-key1");
+    }
+
+    #[test]
+    fn test_reactive_programming_subscription_cleanup() {
+        let mut tree = AcornTree::open("memory://").unwrap();
+        
+        // Track notifications
+        let notifications = Arc::new(Mutex::new(Vec::new()));
+        let notifications_clone = notifications.clone();
+        
+        // Create subscription
+        let _sub = tree.subscribe(move |key: &str, value: &serde_json::Value| {
+            let mut n = notifications_clone.lock().unwrap();
+            n.push((key.to_string(), value.clone()));
+        }).unwrap();
+        
+        // Perform operation
+        let test_data = TestData {
+            id: "cleanup-test".to_string(),
+            value: 500,
+            name: "Cleanup Test".to_string(),
+        };
+        
+        tree.stash("cleanup-key", &test_data).unwrap();
+        
+        // Give time for notification
+        std::thread::sleep(std::time::Duration::from_millis(100));
+        
+        // Verify notification was received
+        let n = notifications.lock().unwrap();
+        assert_eq!(n.len(), 1);
+        assert_eq!(n[0].0, "cleanup-key");
+        
+        // Subscription will be automatically cleaned up when dropped
+        // This test verifies that the subscription works and cleanup happens
     }
 }
 
