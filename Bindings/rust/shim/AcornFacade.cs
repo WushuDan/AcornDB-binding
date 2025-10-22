@@ -1554,3 +1554,4 @@ internal static class AcornFacade
         public bool HasChangeLog { get; set; }
         public int TotalVersions { get; set; }
     }
+}

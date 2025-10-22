@@ -311,8 +311,8 @@
 //! - **Discord**: [AcornDB Discord](https://discord.gg/acorn-db)
 
 use acorn_sys::*;
-use serde::{de::DeserializeOwned, Serialize};
-use std::{ffi::CString, ptr, fmt, backtrace::Backtrace};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use std::{ffi::{CStr, CString}, ptr, fmt};
 
 /// Comprehensive error types for AcornDB Rust bindings
 #[derive(thiserror::Error, Debug)]
@@ -800,14 +800,14 @@ impl AcornEncryption {
     /// # }
     /// ```
     pub fn from_password(password: &str, salt: &str) -> Result<Self> {
-        let password_c = CString::new(password).map_err(|e| Error::Acorn(format!("Invalid password: {}", e)))?;
-        let salt_c = CString::new(salt).map_err(|e| Error::Acorn(format!("Invalid salt: {}", e)))?;
+        let password_c = CString::new(password).map_err(|e| Error::acorn(format!("Invalid password: {}", e)))?;
+        let salt_c = CString::new(salt).map_err(|e| Error::acorn(format!("Invalid salt: {}", e)))?;
         let mut h: acorn_encryption_handle = 0;
         let rc = unsafe { acorn_encryption_from_password(password_c.as_ptr(), salt_c.as_ptr(), &mut h as *mut _) };
-        if rc == 0 { 
-            Ok(Self { h }) 
-        } else { 
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() })) 
+        if rc == 0 {
+            Ok(Self { h })
+        } else {
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -826,14 +826,14 @@ impl AcornEncryption {
     /// # }
     /// ```
     pub fn from_key_iv(key_base64: &str, iv_base64: &str) -> Result<Self> {
-        let key_c = CString::new(key_base64).map_err(|e| Error::Acorn(format!("Invalid key: {}", e)))?;
-        let iv_c = CString::new(iv_base64).map_err(|e| Error::Acorn(format!("Invalid IV: {}", e)))?;
+        let key_c = CString::new(key_base64).map_err(|e| Error::acorn(format!("Invalid key: {}", e)))?;
+        let iv_c = CString::new(iv_base64).map_err(|e| Error::acorn(format!("Invalid IV: {}", e)))?;
         let mut h: acorn_encryption_handle = 0;
         let rc = unsafe { acorn_encryption_from_key_iv(key_c.as_ptr(), iv_c.as_ptr(), &mut h as *mut _) };
-        if rc == 0 { 
-            Ok(Self { h }) 
-        } else { 
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() })) 
+        if rc == 0 {
+            Ok(Self { h })
+        } else {
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -860,15 +860,15 @@ impl AcornEncryption {
         let mut iv_buf = acorn_buf { data: ptr::null_mut(), len: 0 };
         let rc = unsafe { acorn_encryption_generate_key_iv(&mut key_buf as *mut _, &mut iv_buf as *mut _) };
         if rc != 0 {
-            return Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }));
+            return Err(Error::acorn(unsafe { acorn_sys::last_error_string() }));
         }
 
         // Convert buffers to strings
         let key_slice = unsafe { std::slice::from_raw_parts(key_buf.data, key_buf.len) };
         let iv_slice = unsafe { std::slice::from_raw_parts(iv_buf.data, iv_buf.len) };
-        
-        let key = String::from_utf8(key_slice.to_vec()).map_err(|e| Error::Acorn(format!("Invalid key UTF-8: {}", e)))?;
-        let iv = String::from_utf8(iv_slice.to_vec()).map_err(|e| Error::Acorn(format!("Invalid IV UTF-8: {}", e)))?;
+
+        let key = String::from_utf8(key_slice.to_vec()).map_err(|e| Error::acorn(format!("Invalid key UTF-8: {}", e)))?;
+        let iv = String::from_utf8(iv_slice.to_vec()).map_err(|e| Error::acorn(format!("Invalid IV UTF-8: {}", e)))?;
 
         // Free the buffers
         unsafe { 
@@ -884,11 +884,11 @@ impl AcornEncryption {
         let mut key_buf = acorn_buf { data: ptr::null_mut(), len: 0 };
         let rc = unsafe { acorn_encryption_export_key(self.h, &mut key_buf as *mut _) };
         if rc != 0 {
-            return Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }));
+            return Err(Error::acorn(unsafe { acorn_sys::last_error_string() }));
         }
 
         let key_slice = unsafe { std::slice::from_raw_parts(key_buf.data, key_buf.len) };
-        let key = String::from_utf8(key_slice.to_vec()).map_err(|e| Error::Acorn(format!("Invalid key UTF-8: {}", e)))?;
+        let key = String::from_utf8(key_slice.to_vec()).map_err(|e| Error::acorn(format!("Invalid key UTF-8: {}", e)))?;
 
         unsafe { acorn_free_buf(&mut key_buf as *mut _) };
         Ok(key)
@@ -899,11 +899,11 @@ impl AcornEncryption {
         let mut iv_buf = acorn_buf { data: ptr::null_mut(), len: 0 };
         let rc = unsafe { acorn_encryption_export_iv(self.h, &mut iv_buf as *mut _) };
         if rc != 0 {
-            return Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }));
+            return Err(Error::acorn(unsafe { acorn_sys::last_error_string() }));
         }
 
         let iv_slice = unsafe { std::slice::from_raw_parts(iv_buf.data, iv_buf.len) };
-        let iv = String::from_utf8(iv_slice.to_vec()).map_err(|e| Error::Acorn(format!("Invalid IV UTF-8: {}", e)))?;
+        let iv = String::from_utf8(iv_slice.to_vec()).map_err(|e| Error::acorn(format!("Invalid IV UTF-8: {}", e)))?;
 
         unsafe { acorn_free_buf(&mut iv_buf as *mut _) };
         Ok(iv)
@@ -911,15 +911,15 @@ impl AcornEncryption {
 
     /// Encrypt plaintext data
     pub fn encrypt(&self, plaintext: &str) -> Result<String> {
-        let plaintext_c = CString::new(plaintext).map_err(|e| Error::Acorn(format!("Invalid plaintext: {}", e)))?;
+        let plaintext_c = CString::new(plaintext).map_err(|e| Error::acorn(format!("Invalid plaintext: {}", e)))?;
         let mut ciphertext_buf = acorn_buf { data: ptr::null_mut(), len: 0 };
         let rc = unsafe { acorn_encryption_encrypt(self.h, plaintext_c.as_ptr(), &mut ciphertext_buf as *mut _) };
         if rc != 0 {
-            return Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }));
+            return Err(Error::acorn(unsafe { acorn_sys::last_error_string() }));
         }
 
         let ciphertext_slice = unsafe { std::slice::from_raw_parts(ciphertext_buf.data, ciphertext_buf.len) };
-        let ciphertext = String::from_utf8(ciphertext_slice.to_vec()).map_err(|e| Error::Acorn(format!("Invalid ciphertext UTF-8: {}", e)))?;
+        let ciphertext = String::from_utf8(ciphertext_slice.to_vec()).map_err(|e| Error::acorn(format!("Invalid ciphertext UTF-8: {}", e)))?;
 
         unsafe { acorn_free_buf(&mut ciphertext_buf as *mut _) };
         Ok(ciphertext)
@@ -927,15 +927,15 @@ impl AcornEncryption {
 
     /// Decrypt ciphertext data
     pub fn decrypt(&self, ciphertext: &str) -> Result<String> {
-        let ciphertext_c = CString::new(ciphertext).map_err(|e| Error::Acorn(format!("Invalid ciphertext: {}", e)))?;
+        let ciphertext_c = CString::new(ciphertext).map_err(|e| Error::acorn(format!("Invalid ciphertext: {}", e)))?;
         let mut plaintext_buf = acorn_buf { data: ptr::null_mut(), len: 0 };
         let rc = unsafe { acorn_encryption_decrypt(self.h, ciphertext_c.as_ptr(), &mut plaintext_buf as *mut _) };
         if rc != 0 {
-            return Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }));
+            return Err(Error::acorn(unsafe { acorn_sys::last_error_string() }));
         }
 
         let plaintext_slice = unsafe { std::slice::from_raw_parts(plaintext_buf.data, plaintext_buf.len) };
-        let plaintext = String::from_utf8(plaintext_slice.to_vec()).map_err(|e| Error::Acorn(format!("Invalid plaintext UTF-8: {}", e)))?;
+        let plaintext = String::from_utf8(plaintext_slice.to_vec()).map_err(|e| Error::acorn(format!("Invalid plaintext UTF-8: {}", e)))?;
 
         unsafe { acorn_free_buf(&mut plaintext_buf as *mut _) };
         Ok(plaintext)
@@ -945,7 +945,7 @@ impl AcornEncryption {
     pub fn is_enabled(&self) -> Result<bool> {
         let rc = unsafe { acorn_encryption_is_enabled(self.h) };
         if rc == -1 {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         } else {
             Ok(rc == 1)
         }
@@ -1001,7 +1001,7 @@ impl AcornCompression {
         if rc == 0 { 
             Ok(Self { h }) 
         } else { 
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() })) 
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() })) 
         }
     }
 
@@ -1024,7 +1024,7 @@ impl AcornCompression {
         if rc == 0 { 
             Ok(Self { h }) 
         } else { 
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() })) 
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() })) 
         }
     }
 
@@ -1044,7 +1044,7 @@ impl AcornCompression {
         if rc == 0 { 
             Ok(Self { h }) 
         } else { 
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() })) 
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() })) 
         }
     }
 
@@ -1068,7 +1068,7 @@ impl AcornCompression {
     /// # }
     /// ```
     pub fn compress(&self, data: &str) -> Result<String> {
-        let data_c = CString::new(data).map_err(|e| Error::Acorn(format!("Invalid data: {}", e)))?;
+        let data_c = CString::new(data).map_err(|e| Error::acorn(format!("Invalid data: {}", e)))?;
         let mut buf = acorn_buf { data: ptr::null_mut(), len: 0 };
         let rc = unsafe { acorn_compression_compress(self.h, data_c.as_ptr(), &mut buf as *mut _) };
         if rc == 0 {
@@ -1079,7 +1079,7 @@ impl AcornCompression {
             unsafe { acorn_free_buf(&mut buf); }
             Ok(result_str)
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -1104,7 +1104,7 @@ impl AcornCompression {
     /// # }
     /// ```
     pub fn decompress(&self, compressed_data: &str) -> Result<String> {
-        let compressed_c = CString::new(compressed_data).map_err(|e| Error::Acorn(format!("Invalid compressed data: {}", e)))?;
+        let compressed_c = CString::new(compressed_data).map_err(|e| Error::acorn(format!("Invalid compressed data: {}", e)))?;
         let mut buf = acorn_buf { data: ptr::null_mut(), len: 0 };
         let rc = unsafe { acorn_compression_decompress(self.h, compressed_c.as_ptr(), &mut buf as *mut _) };
         if rc == 0 {
@@ -1115,7 +1115,7 @@ impl AcornCompression {
             unsafe { acorn_free_buf(&mut buf); }
             Ok(result_str)
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -1142,7 +1142,7 @@ impl AcornCompression {
         if rc >= 0 {
             Ok(rc == 1)
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -1173,7 +1173,7 @@ impl AcornCompression {
             unsafe { acorn_free_buf(&mut buf); }
             Ok(result_str)
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -1201,8 +1201,8 @@ impl AcornCompression {
     /// # }
     /// ```
     pub fn get_stats(&self, original_data: &str, compressed_data: &str) -> Result<CompressionStats> {
-        let original_c = CString::new(original_data).map_err(|e| Error::Acorn(format!("Invalid original data: {}", e)))?;
-        let compressed_c = CString::new(compressed_data).map_err(|e| Error::Acorn(format!("Invalid compressed data: {}", e)))?;
+        let original_c = CString::new(original_data).map_err(|e| Error::acorn(format!("Invalid original data: {}", e)))?;
+        let compressed_c = CString::new(compressed_data).map_err(|e| Error::acorn(format!("Invalid compressed data: {}", e)))?;
         
         let mut original_size: i32 = 0;
         let mut compressed_size: i32 = 0;
@@ -1229,7 +1229,7 @@ impl AcornCompression {
                 space_saved,
             })
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 }
@@ -1271,7 +1271,7 @@ impl AcornCache {
         if rc == 0 { 
             Ok(Self { h }) 
         } else { 
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() })) 
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() })) 
         }
     }
 
@@ -1291,7 +1291,7 @@ impl AcornCache {
         if rc == 0 { 
             Ok(Self { h }) 
         } else { 
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() })) 
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() })) 
         }
     }
 
@@ -1315,7 +1315,7 @@ impl AcornCache {
         if rc == 0 {
             Ok(())
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -1358,7 +1358,7 @@ impl AcornCache {
                 utilization_percentage,
             })
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -1385,7 +1385,7 @@ impl AcornCache {
         if rc >= 0 {
             Ok(rc == 1)
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -1412,7 +1412,7 @@ impl AcornCache {
         if rc == 0 {
             Ok(())
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 }
@@ -1456,7 +1456,7 @@ impl AcornConflictJudge {
         if rc == 0 { 
             Ok(Self { h }) 
         } else { 
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() })) 
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() })) 
         }
     }
 
@@ -1476,7 +1476,7 @@ impl AcornConflictJudge {
         if rc == 0 { 
             Ok(Self { h }) 
         } else { 
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() })) 
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() })) 
         }
     }
 
@@ -1496,7 +1496,7 @@ impl AcornConflictJudge {
         if rc == 0 { 
             Ok(Self { h }) 
         } else { 
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() })) 
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() })) 
         }
     }
 
@@ -1516,7 +1516,7 @@ impl AcornConflictJudge {
         if rc == 0 { 
             Ok(Self { h }) 
         } else { 
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() })) 
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() })) 
         }
     }
 
@@ -1547,7 +1547,7 @@ impl AcornConflictJudge {
             unsafe { acorn_free_buf(&mut buf); }
             Ok(result_str)
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -1574,8 +1574,8 @@ impl AcornConflictJudge {
     /// # }
     /// ```
     pub fn resolve_conflict(&self, local_json: &str, incoming_json: &str) -> Result<String> {
-        let local_c = CString::new(local_json).map_err(|e| Error::Acorn(format!("Invalid local JSON: {}", e)))?;
-        let incoming_c = CString::new(incoming_json).map_err(|e| Error::Acorn(format!("Invalid incoming JSON: {}", e)))?;
+        let local_c = CString::new(local_json).map_err(|e| Error::acorn(format!("Invalid local JSON: {}", e)))?;
+        let incoming_c = CString::new(incoming_json).map_err(|e| Error::acorn(format!("Invalid incoming JSON: {}", e)))?;
         let mut buf = acorn_buf { data: ptr::null_mut(), len: 0 };
         let rc = unsafe { acorn_conflict_judge_resolve(self.h, local_c.as_ptr(), incoming_c.as_ptr(), &mut buf as *mut _) };
         if rc == 0 {
@@ -1586,7 +1586,7 @@ impl AcornConflictJudge {
             unsafe { acorn_free_buf(&mut buf); }
             Ok(result_str)
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 }
@@ -1623,7 +1623,7 @@ pub enum StorageType {
 }
 
 /// Storage backend information
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct StorageInfo {
     pub trunk_type: String,
     pub supports_history: bool,
@@ -1688,11 +1688,11 @@ impl AcornStorage {
     /// # }
     /// ```
     pub fn s3(access_key: &str, secret_key: &str, bucket_name: &str, region: &str, prefix: Option<&str>) -> Result<Self> {
-        let access_key_c = CString::new(access_key).map_err(|e| Error::Acorn(format!("Invalid access key: {}", e)))?;
-        let secret_key_c = CString::new(secret_key).map_err(|e| Error::Acorn(format!("Invalid secret key: {}", e)))?;
-        let bucket_name_c = CString::new(bucket_name).map_err(|e| Error::Acorn(format!("Invalid bucket name: {}", e)))?;
-        let region_c = CString::new(region).map_err(|e| Error::Acorn(format!("Invalid region: {}", e)))?;
-        let prefix_c = CString::new(prefix.unwrap_or("")).map_err(|e| Error::Acorn(format!("Invalid prefix: {}", e)))?;
+        let access_key_c = CString::new(access_key).map_err(|e| Error::acorn(format!("Invalid access key: {}", e)))?;
+        let secret_key_c = CString::new(secret_key).map_err(|e| Error::acorn(format!("Invalid secret key: {}", e)))?;
+        let bucket_name_c = CString::new(bucket_name).map_err(|e| Error::acorn(format!("Invalid bucket name: {}", e)))?;
+        let region_c = CString::new(region).map_err(|e| Error::acorn(format!("Invalid region: {}", e)))?;
+        let prefix_c = CString::new(prefix.unwrap_or("")).map_err(|e| Error::acorn(format!("Invalid prefix: {}", e)))?;
         
         let mut h: acorn_storage_handle = 0;
         let rc = unsafe { 
@@ -1708,7 +1708,7 @@ impl AcornStorage {
         if rc == 0 { 
             Ok(Self { h }) 
         } else { 
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() })) 
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() })) 
         }
     }
 
@@ -1728,9 +1728,9 @@ impl AcornStorage {
     /// # }
     /// ```
     pub fn s3_default(bucket_name: &str, region: &str, prefix: Option<&str>) -> Result<Self> {
-        let bucket_name_c = CString::new(bucket_name).map_err(|e| Error::Acorn(format!("Invalid bucket name: {}", e)))?;
-        let region_c = CString::new(region).map_err(|e| Error::Acorn(format!("Invalid region: {}", e)))?;
-        let prefix_c = CString::new(prefix.unwrap_or("")).map_err(|e| Error::Acorn(format!("Invalid prefix: {}", e)))?;
+        let bucket_name_c = CString::new(bucket_name).map_err(|e| Error::acorn(format!("Invalid bucket name: {}", e)))?;
+        let region_c = CString::new(region).map_err(|e| Error::acorn(format!("Invalid region: {}", e)))?;
+        let prefix_c = CString::new(prefix.unwrap_or("")).map_err(|e| Error::acorn(format!("Invalid prefix: {}", e)))?;
         
         let mut h: acorn_storage_handle = 0;
         let rc = unsafe { 
@@ -1744,7 +1744,7 @@ impl AcornStorage {
         if rc == 0 { 
             Ok(Self { h }) 
         } else { 
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() })) 
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() })) 
         }
     }
 
@@ -1766,11 +1766,11 @@ impl AcornStorage {
     /// # }
     /// ```
     pub fn s3_compatible(access_key: &str, secret_key: &str, bucket_name: &str, service_url: &str, prefix: Option<&str>) -> Result<Self> {
-        let access_key_c = CString::new(access_key).map_err(|e| Error::Acorn(format!("Invalid access key: {}", e)))?;
-        let secret_key_c = CString::new(secret_key).map_err(|e| Error::Acorn(format!("Invalid secret key: {}", e)))?;
-        let bucket_name_c = CString::new(bucket_name).map_err(|e| Error::Acorn(format!("Invalid bucket name: {}", e)))?;
-        let service_url_c = CString::new(service_url).map_err(|e| Error::Acorn(format!("Invalid service URL: {}", e)))?;
-        let prefix_c = CString::new(prefix.unwrap_or("")).map_err(|e| Error::Acorn(format!("Invalid prefix: {}", e)))?;
+        let access_key_c = CString::new(access_key).map_err(|e| Error::acorn(format!("Invalid access key: {}", e)))?;
+        let secret_key_c = CString::new(secret_key).map_err(|e| Error::acorn(format!("Invalid secret key: {}", e)))?;
+        let bucket_name_c = CString::new(bucket_name).map_err(|e| Error::acorn(format!("Invalid bucket name: {}", e)))?;
+        let service_url_c = CString::new(service_url).map_err(|e| Error::acorn(format!("Invalid service URL: {}", e)))?;
+        let prefix_c = CString::new(prefix.unwrap_or("")).map_err(|e| Error::acorn(format!("Invalid prefix: {}", e)))?;
         
         let mut h: acorn_storage_handle = 0;
         let rc = unsafe { 
@@ -1786,7 +1786,7 @@ impl AcornStorage {
         if rc == 0 { 
             Ok(Self { h }) 
         } else { 
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() })) 
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() })) 
         }
     }
 
@@ -1806,9 +1806,9 @@ impl AcornStorage {
     /// # }
     /// ```
     pub fn azure_blob(connection_string: &str, container_name: &str, prefix: Option<&str>) -> Result<Self> {
-        let connection_string_c = CString::new(connection_string).map_err(|e| Error::Acorn(format!("Invalid connection string: {}", e)))?;
-        let container_name_c = CString::new(container_name).map_err(|e| Error::Acorn(format!("Invalid container name: {}", e)))?;
-        let prefix_c = CString::new(prefix.unwrap_or("")).map_err(|e| Error::Acorn(format!("Invalid prefix: {}", e)))?;
+        let connection_string_c = CString::new(connection_string).map_err(|e| Error::acorn(format!("Invalid connection string: {}", e)))?;
+        let container_name_c = CString::new(container_name).map_err(|e| Error::acorn(format!("Invalid container name: {}", e)))?;
+        let prefix_c = CString::new(prefix.unwrap_or("")).map_err(|e| Error::acorn(format!("Invalid prefix: {}", e)))?;
         
         let mut h: acorn_storage_handle = 0;
         let rc = unsafe { 
@@ -1822,7 +1822,7 @@ impl AcornStorage {
         if rc == 0 { 
             Ok(Self { h }) 
         } else { 
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() })) 
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() })) 
         }
     }
 
@@ -1841,8 +1841,8 @@ impl AcornStorage {
     /// # }
     /// ```
     pub fn sqlite(database_path: &str, table_name: Option<&str>) -> Result<Self> {
-        let database_path_c = CString::new(database_path).map_err(|e| Error::Acorn(format!("Invalid database path: {}", e)))?;
-        let table_name_c = CString::new(table_name.unwrap_or("")).map_err(|e| Error::Acorn(format!("Invalid table name: {}", e)))?;
+        let database_path_c = CString::new(database_path).map_err(|e| Error::acorn(format!("Invalid database path: {}", e)))?;
+        let table_name_c = CString::new(table_name.unwrap_or("")).map_err(|e| Error::acorn(format!("Invalid table name: {}", e)))?;
         
         let mut h: acorn_storage_handle = 0;
         let rc = unsafe { 
@@ -1855,7 +1855,7 @@ impl AcornStorage {
         if rc == 0 { 
             Ok(Self { h }) 
         } else { 
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() })) 
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() })) 
         }
     }
 
@@ -1875,9 +1875,9 @@ impl AcornStorage {
     /// # }
     /// ```
     pub fn postgresql(connection_string: &str, table_name: Option<&str>, schema: &str) -> Result<Self> {
-        let connection_string_c = CString::new(connection_string).map_err(|e| Error::Acorn(format!("Invalid connection string: {}", e)))?;
-        let table_name_c = CString::new(table_name.unwrap_or("")).map_err(|e| Error::Acorn(format!("Invalid table name: {}", e)))?;
-        let schema_c = CString::new(schema).map_err(|e| Error::Acorn(format!("Invalid schema: {}", e)))?;
+        let connection_string_c = CString::new(connection_string).map_err(|e| Error::acorn(format!("Invalid connection string: {}", e)))?;
+        let table_name_c = CString::new(table_name.unwrap_or("")).map_err(|e| Error::acorn(format!("Invalid table name: {}", e)))?;
+        let schema_c = CString::new(schema).map_err(|e| Error::acorn(format!("Invalid schema: {}", e)))?;
         
         let mut h: acorn_storage_handle = 0;
         let rc = unsafe { 
@@ -1891,7 +1891,7 @@ impl AcornStorage {
         if rc == 0 { 
             Ok(Self { h }) 
         } else { 
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() })) 
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() })) 
         }
     }
 
@@ -1911,9 +1911,9 @@ impl AcornStorage {
     /// # }
     /// ```
     pub fn mysql(connection_string: &str, table_name: Option<&str>, database: Option<&str>) -> Result<Self> {
-        let connection_string_c = CString::new(connection_string).map_err(|e| Error::Acorn(format!("Invalid connection string: {}", e)))?;
-        let table_name_c = CString::new(table_name.unwrap_or("")).map_err(|e| Error::Acorn(format!("Invalid table name: {}", e)))?;
-        let database_c = CString::new(database.unwrap_or("")).map_err(|e| Error::Acorn(format!("Invalid database: {}", e)))?;
+        let connection_string_c = CString::new(connection_string).map_err(|e| Error::acorn(format!("Invalid connection string: {}", e)))?;
+        let table_name_c = CString::new(table_name.unwrap_or("")).map_err(|e| Error::acorn(format!("Invalid table name: {}", e)))?;
+        let database_c = CString::new(database.unwrap_or("")).map_err(|e| Error::acorn(format!("Invalid database: {}", e)))?;
         
         let mut h: acorn_storage_handle = 0;
         let rc = unsafe { 
@@ -1927,7 +1927,7 @@ impl AcornStorage {
         if rc == 0 { 
             Ok(Self { h }) 
         } else { 
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() })) 
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() })) 
         }
     }
 
@@ -1947,9 +1947,9 @@ impl AcornStorage {
     /// # }
     /// ```
     pub fn sqlserver(connection_string: &str, table_name: Option<&str>, schema: &str) -> Result<Self> {
-        let connection_string_c = CString::new(connection_string).map_err(|e| Error::Acorn(format!("Invalid connection string: {}", e)))?;
-        let table_name_c = CString::new(table_name.unwrap_or("")).map_err(|e| Error::Acorn(format!("Invalid table name: {}", e)))?;
-        let schema_c = CString::new(schema).map_err(|e| Error::Acorn(format!("Invalid schema: {}", e)))?;
+        let connection_string_c = CString::new(connection_string).map_err(|e| Error::acorn(format!("Invalid connection string: {}", e)))?;
+        let table_name_c = CString::new(table_name.unwrap_or("")).map_err(|e| Error::acorn(format!("Invalid table name: {}", e)))?;
+        let schema_c = CString::new(schema).map_err(|e| Error::acorn(format!("Invalid schema: {}", e)))?;
         
         let mut h: acorn_storage_handle = 0;
         let rc = unsafe { 
@@ -1963,7 +1963,7 @@ impl AcornStorage {
         if rc == 0 { 
             Ok(Self { h }) 
         } else { 
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() })) 
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() })) 
         }
     }
 
@@ -1984,9 +1984,9 @@ impl AcornStorage {
     /// # }
     /// ```
     pub fn git(repo_path: &str, author_name: &str, author_email: &str, auto_push: bool) -> Result<Self> {
-        let repo_path_c = CString::new(repo_path).map_err(|e| Error::Acorn(format!("Invalid repo path: {}", e)))?;
-        let author_name_c = CString::new(author_name).map_err(|e| Error::Acorn(format!("Invalid author name: {}", e)))?;
-        let author_email_c = CString::new(author_email).map_err(|e| Error::Acorn(format!("Invalid author email: {}", e)))?;
+        let repo_path_c = CString::new(repo_path).map_err(|e| Error::acorn(format!("Invalid repo path: {}", e)))?;
+        let author_name_c = CString::new(author_name).map_err(|e| Error::acorn(format!("Invalid author name: {}", e)))?;
+        let author_email_c = CString::new(author_email).map_err(|e| Error::acorn(format!("Invalid author email: {}", e)))?;
         
         let mut h: acorn_storage_handle = 0;
         let rc = unsafe { 
@@ -2001,7 +2001,7 @@ impl AcornStorage {
         if rc == 0 { 
             Ok(Self { h }) 
         } else { 
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() })) 
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() })) 
         }
     }
 
@@ -2035,10 +2035,10 @@ impl AcornStorage {
             
             // Parse JSON response
             let info: StorageInfo = serde_json::from_str(&result_str)
-                .map_err(|e| Error::Acorn(format!("Failed to parse storage info: {}", e)))?;
+                .map_err(|e| Error::acorn(format!("Failed to parse storage info: {}", e)))?;
             Ok(info)
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -2067,7 +2067,7 @@ impl AcornStorage {
         if rc >= 0 {
             Ok(rc == 1)
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 }
@@ -2093,7 +2093,7 @@ impl AcornDocumentStore {
     /// # }
     /// ```
     pub fn new(custom_path: Option<&str>) -> Result<Self> {
-        let custom_path_c = CString::new(custom_path.unwrap_or("")).map_err(|e| Error::Acorn(format!("Invalid custom path: {}", e)))?;
+        let custom_path_c = CString::new(custom_path.unwrap_or("")).map_err(|e| Error::acorn(format!("Invalid custom path: {}", e)))?;
         
         let mut h: acorn_document_store_handle = 0;
         let rc = unsafe { 
@@ -2105,7 +2105,7 @@ impl AcornDocumentStore {
         if rc == 0 { 
             Ok(Self { h }) 
         } else { 
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() })) 
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() })) 
         }
     }
 
@@ -2128,21 +2128,21 @@ impl AcornDocumentStore {
     /// # }
     /// ```
     pub fn get_history(&self, id: &str) -> Result<String> {
-        let id_c = CString::new(id).map_err(|e| Error::Acorn(format!("Invalid ID: {}", e)))?;
+        let id_c = CString::new(id).map_err(|e| Error::acorn(format!("Invalid ID: {}", e)))?;
         
-        let mut buf = acorn_buf { ptr: std::ptr::null_mut(), len: 0 };
+        let mut buf = acorn_buf { data: std::ptr::null_mut(), len: 0 };
         let rc = unsafe { 
             acorn_document_store_get_history(self.h, id_c.as_ptr(), &mut buf as *mut _) 
         };
         if rc == 0 { 
             let result = unsafe { 
-                std::slice::from_raw_parts(buf.ptr as *const u8, buf.len as usize) 
+                std::slice::from_raw_parts(buf.data as *const u8, buf.len as usize) 
             };
-            let json = std::str::from_utf8(result).map_err(|e| Error::Acorn(format!("Invalid UTF-8: {}", e)))?;
+            let json = std::str::from_utf8(result).map_err(|e| Error::acorn(format!("Invalid UTF-8: {}", e)))?;
             unsafe { acorn_free_buf(&mut buf); }
             Ok(json.to_string())
         } else { 
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() })) 
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() })) 
         }
     }
 
@@ -2163,19 +2163,19 @@ impl AcornDocumentStore {
     /// # }
     /// ```
     pub fn get_info(&self) -> Result<DocumentStoreInfo> {
-        let mut buf = acorn_buf { ptr: std::ptr::null_mut(), len: 0 };
+        let mut buf = acorn_buf { data: std::ptr::null_mut(), len: 0 };
         let rc = unsafe { 
             acorn_document_store_get_info(self.h, &mut buf as *mut _) 
         };
         if rc == 0 { 
             let result = unsafe { 
-                std::slice::from_raw_parts(buf.ptr as *const u8, buf.len as usize) 
+                std::slice::from_raw_parts(buf.data as *const u8, buf.len as usize) 
             };
-            let json = std::str::from_utf8(result).map_err(|e| Error::Acorn(format!("Invalid UTF-8: {}", e)))?;
+            let json = std::str::from_utf8(result).map_err(|e| Error::acorn(format!("Invalid UTF-8: {}", e)))?;
             unsafe { acorn_free_buf(&mut buf); }
-            serde_json::from_str(json).map_err(|e| Error::Acorn(format!("Failed to parse document store info: {}", e)))
+            serde_json::from_str(json).map_err(|e| Error::acorn(format!("Failed to parse document store info: {}", e)))
         } else { 
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() })) 
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() })) 
         }
     }
 
@@ -2195,7 +2195,7 @@ impl AcornDocumentStore {
         if rc == 0 { 
             Ok(()) 
         } else { 
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() })) 
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() })) 
         }
     }
 }
@@ -2208,13 +2208,13 @@ impl Drop for AcornDocumentStore {
 
 impl AcornTree {
     pub fn open(uri: &str) -> Result<Self> {
-        let c = CString::new(uri).map_err(|e| Error::Acorn(format!("Invalid URI: {}", e)))?;
+        let c = CString::new(uri).map_err(|e| Error::acorn(format!("Invalid URI: {}", e)))?;
         let mut h: acorn_tree_handle = 0;
         let rc = unsafe { acorn_open_tree(c.as_ptr(), &mut h as *mut _) };
         if rc == 0 { 
             Ok(Self { h }) 
         } else { 
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() })) 
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() })) 
         }
     }
 
@@ -2234,13 +2234,13 @@ impl AcornTree {
     /// # }
     /// ```
     pub fn open_encrypted(uri: &str, encryption: &AcornEncryption) -> Result<Self> {
-        let c = CString::new(uri).map_err(|e| Error::Acorn(format!("Invalid URI: {}", e)))?;
+        let c = CString::new(uri).map_err(|e| Error::acorn(format!("Invalid URI: {}", e)))?;
         let mut h: acorn_tree_handle = 0;
         let rc = unsafe { acorn_open_tree_encrypted(c.as_ptr(), encryption.h, &mut h as *mut _) };
         if rc == 0 { 
             Ok(Self { h }) 
         } else { 
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() })) 
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() })) 
         }
     }
 
@@ -2261,13 +2261,13 @@ impl AcornTree {
     /// # }
     /// ```
     pub fn open_encrypted_compressed(uri: &str, encryption: &AcornEncryption, compression_level: i32) -> Result<Self> {
-        let c = CString::new(uri).map_err(|e| Error::Acorn(format!("Invalid URI: {}", e)))?;
+        let c = CString::new(uri).map_err(|e| Error::acorn(format!("Invalid URI: {}", e)))?;
         let mut h: acorn_tree_handle = 0;
         let rc = unsafe { acorn_open_tree_encrypted_compressed(c.as_ptr(), encryption.h, compression_level, &mut h as *mut _) };
         if rc == 0 { 
             Ok(Self { h }) 
         } else { 
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() })) 
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() })) 
         }
     }
 
@@ -2298,13 +2298,13 @@ impl AcornTree {
     /// # }
     /// ```
     pub fn open_compressed(uri: &str, compression: &AcornCompression) -> Result<Self> {
-        let c = CString::new(uri).map_err(|e| Error::Acorn(format!("Invalid URI: {}", e)))?;
+        let c = CString::new(uri).map_err(|e| Error::acorn(format!("Invalid URI: {}", e)))?;
         let mut h: acorn_tree_handle = 0;
         let rc = unsafe { acorn_open_tree_compressed(c.as_ptr(), compression.h, &mut h as *mut _) };
         if rc == 0 { 
             Ok(Self { h }) 
         } else { 
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() })) 
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() })) 
         }
     }
 
@@ -2335,13 +2335,13 @@ impl AcornTree {
     /// # }
     /// ```
     pub fn open_with_cache(uri: &str, cache: &AcornCache) -> Result<Self> {
-        let c = CString::new(uri).map_err(|e| Error::Acorn(format!("Invalid URI: {}", e)))?;
+        let c = CString::new(uri).map_err(|e| Error::acorn(format!("Invalid URI: {}", e)))?;
         let mut h: acorn_tree_handle = 0;
         let rc = unsafe { acorn_open_tree_with_cache(c.as_ptr(), cache.h, &mut h as *mut _) };
         if rc == 0 { 
             Ok(Self { h }) 
         } else { 
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() })) 
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() })) 
         }
     }
 
@@ -2372,13 +2372,13 @@ impl AcornTree {
     /// # }
     /// ```
     pub fn open_with_conflict_judge(uri: &str, judge: &AcornConflictJudge) -> Result<Self> {
-        let c = CString::new(uri).map_err(|e| Error::Acorn(format!("Invalid URI: {}", e)))?;
+        let c = CString::new(uri).map_err(|e| Error::acorn(format!("Invalid URI: {}", e)))?;
         let mut h: acorn_tree_handle = 0;
         let rc = unsafe { acorn_open_tree_with_conflict_judge(c.as_ptr(), judge.h, &mut h as *mut _) };
         if rc == 0 { 
             Ok(Self { h }) 
         } else { 
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() })) 
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() })) 
         }
     }
 
@@ -2413,7 +2413,7 @@ impl AcornTree {
         if rc == 0 { 
             Ok(Self { h }) 
         } else { 
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() })) 
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() })) 
         }
     }
 
@@ -2437,35 +2437,35 @@ impl AcornTree {
         if rc == 0 { 
             Ok(Self { h }) 
         } else { 
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() })) 
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() })) 
         }
     }
 
     pub fn stash<T: Serialize>(&mut self, id: &str, value: &T) -> Result<()> {
-        let json = serde_json::to_vec(value).map_err(|e| Error::Acorn(format!("Serialization error: {}", e)))?;
-        let idc = CString::new(id).map_err(|e| Error::Acorn(format!("Invalid ID: {}", e)))?;
+        let json = serde_json::to_vec(value).map_err(|e| Error::acorn(format!("Serialization error: {}", e)))?;
+        let idc = CString::new(id).map_err(|e| Error::acorn(format!("Invalid ID: {}", e)))?;
         let rc = unsafe { acorn_stash_json(self.h, idc.as_ptr(), json.as_ptr(), json.len()) };
         if rc == 0 { 
             Ok(()) 
         } else { 
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() })) 
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() })) 
         }
     }
 
     pub fn crack<T: DeserializeOwned>(&self, id: &str) -> Result<T> {
-        let idc = CString::new(id).map_err(|e| Error::Acorn(format!("Invalid ID: {}", e)))?;
+        let idc = CString::new(id).map_err(|e| Error::acorn(format!("Invalid ID: {}", e)))?;
         let mut buf = acorn_buf { data: ptr::null_mut(), len: 0 };
         let rc = unsafe { acorn_crack_json(self.h, idc.as_ptr(), &mut buf as *mut _) };
         if rc == 1 {
-            return Err(Error::NotFound);
+            return Err(Error::not_found(id, "crack"));
         }
         if rc != 0 {
-            return Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }));
+            return Err(Error::acorn(unsafe { acorn_sys::last_error_string() }));
         }
 
         // Safety: We trust the shim to return valid data
         let slice = unsafe { std::slice::from_raw_parts(buf.data, buf.len) };
-        let out = serde_json::from_slice(slice).map_err(|e| Error::Acorn(e.to_string()))?;
+        let out = serde_json::from_slice(slice).map_err(|e| Error::acorn(e.to_string()))?;
         unsafe { acorn_free_buf(&mut buf as *mut _) };
         Ok(out)
     }
@@ -2473,13 +2473,13 @@ impl AcornTree {
     /// Create an iterator over key-value pairs with the given prefix.
     /// Pass an empty string to iterate over all keys.
     pub fn iter(&self, prefix: &str) -> Result<AcornIterator> {
-        let prefix_c = CString::new(prefix).map_err(|e| Error::Acorn(format!("Invalid prefix: {}", e)))?;
+        let prefix_c = CString::new(prefix).map_err(|e| Error::acorn(format!("Invalid prefix: {}", e)))?;
         let mut iter_h: acorn_iter_handle = 0;
         let rc = unsafe { acorn_iter_start(self.h, prefix_c.as_ptr(), &mut iter_h as *mut _) };
         if rc == 0 {
             Ok(AcornIterator { h: iter_h })
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -2583,12 +2583,12 @@ impl AcornTree {
     /// # }
     /// ```
     pub fn sync_http(&self, url: &str) -> Result<()> {
-        let url_c = CString::new(url).map_err(|e| Error::Acorn(format!("Invalid URL: {}", e)))?;
+        let url_c = CString::new(url).map_err(|e| Error::acorn(format!("Invalid URL: {}", e)))?;
         let rc = unsafe { acorn_sync_http(self.h, url_c.as_ptr()) };
         if rc == 0 {
             Ok(())
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -2620,12 +2620,12 @@ impl AcornTree {
         // Prepare C-compatible arrays
         let ids: Vec<CString> = items
             .iter()
-            .map(|(id, _)| CString::new(*id).map_err(|e| Error::Acorn(format!("Invalid ID: {}", e))))
+            .map(|(id, _)| CString::new(*id).map_err(|e| Error::acorn(format!("Invalid ID: {}", e))))
             .collect::<Result<Vec<_>>>()?;
 
         let jsons: Vec<Vec<u8>> = items
             .iter()
-            .map(|(_, value)| serde_json::to_vec(value).map_err(|e| Error::Acorn(format!("Serialization error: {}", e))))
+            .map(|(_, value)| serde_json::to_vec(value).map_err(|e| Error::acorn(format!("Serialization error: {}", e))))
             .collect::<Result<Vec<_>>>()?;
 
         let id_ptrs: Vec<*const i8> = ids.iter().map(|s| s.as_ptr()).collect();
@@ -2645,7 +2645,7 @@ impl AcornTree {
         if rc == 0 {
             Ok(())
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -2679,7 +2679,7 @@ impl AcornTree {
         // Prepare C-compatible arrays
         let id_cstrings: Vec<CString> = ids
             .iter()
-            .map(|id| CString::new(*id).map_err(|e| Error::Acorn(format!("Invalid ID: {}", e))))
+            .map(|id| CString::new(*id).map_err(|e| Error::acorn(format!("Invalid ID: {}", e))))
             .collect::<Result<Vec<_>>>()?;
 
         let id_ptrs: Vec<*const i8> = id_cstrings.iter().map(|s| s.as_ptr()).collect();
@@ -2704,7 +2704,7 @@ impl AcornTree {
                     unsafe { acorn_free_buf(buf as *mut _) };
                 }
             }
-            return Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }));
+            return Err(Error::acorn(unsafe { acorn_sys::last_error_string() }));
         }
 
         // Convert results to Rust types
@@ -2714,7 +2714,7 @@ impl AcornTree {
                 results.push(None);
             } else {
                 let slice = unsafe { std::slice::from_raw_parts(out_jsons[i].data, out_jsons[i].len) };
-                let value = serde_json::from_slice(slice).map_err(|e| Error::Acorn(e.to_string()))?;
+                let value = serde_json::from_slice(slice).map_err(|e| Error::acorn(e.to_string()))?;
                 results.push(Some(value));
             }
 
@@ -2747,7 +2747,7 @@ impl AcornTree {
         // Prepare C-compatible arrays
         let id_cstrings: Vec<CString> = ids
             .iter()
-            .map(|id| CString::new(*id).map_err(|e| Error::Acorn(format!("Invalid ID: {}", e))))
+            .map(|id| CString::new(*id).map_err(|e| Error::acorn(format!("Invalid ID: {}", e))))
             .collect::<Result<Vec<_>>>()?;
 
         let id_ptrs: Vec<*const i8> = id_cstrings.iter().map(|s| s.as_ptr()).collect();
@@ -2763,7 +2763,7 @@ impl AcornTree {
         if rc == 0 {
             Ok(())
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -2817,7 +2817,7 @@ impl AcornTree {
         if rc == 0 {
             Ok(AcornTransaction { h })
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -2837,7 +2837,7 @@ impl AcornTree {
         if rc == 0 {
             Ok(AcornMesh { h })
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -2859,7 +2859,7 @@ impl AcornTree {
         if rc == 0 {
             Ok(AcornP2P { h })
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 }
@@ -2906,13 +2906,13 @@ impl AcornTransaction {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn stash<T: Serialize>(&mut self, id: &str, value: &T) -> Result<()> {
-        let json = serde_json::to_vec(value).map_err(|e| Error::Acorn(format!("Serialization error: {}", e)))?;
-        let idc = CString::new(id).map_err(|e| Error::Acorn(format!("Invalid ID: {}", e)))?;
+        let json = serde_json::to_vec(value).map_err(|e| Error::acorn(format!("Serialization error: {}", e)))?;
+        let idc = CString::new(id).map_err(|e| Error::acorn(format!("Invalid ID: {}", e)))?;
         let rc = unsafe { acorn_transaction_stash(self.h, idc.as_ptr(), json.as_ptr(), json.len()) };
         if rc == 0 {
             Ok(())
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -2929,12 +2929,12 @@ impl AcornTransaction {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn delete(&mut self, id: &str) -> Result<()> {
-        let idc = CString::new(id).map_err(|e| Error::Acorn(format!("Invalid ID: {}", e)))?;
+        let idc = CString::new(id).map_err(|e| Error::acorn(format!("Invalid ID: {}", e)))?;
         let rc = unsafe { acorn_transaction_delete(self.h, idc.as_ptr()) };
         if rc == 0 {
             Ok(())
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -2964,7 +2964,7 @@ impl AcornTransaction {
         } else if rc == 1 {
             Ok(false) // Transaction failed to commit
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -2986,7 +2986,7 @@ impl AcornTransaction {
         if rc == 0 {
             Ok(())
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 }
@@ -3011,12 +3011,12 @@ impl AcornMesh {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn add_node(&self, node_id: &str, tree: &AcornTree) -> Result<()> {
-        let idc = CString::new(node_id).map_err(|e| Error::Acorn(format!("Invalid node ID: {}", e)))?;
+        let idc = CString::new(node_id).map_err(|e| Error::acorn(format!("Invalid node ID: {}", e)))?;
         let rc = unsafe { acorn_mesh_add_node(self.h, idc.as_ptr(), tree.h) };
         if rc == 0 {
             Ok(())
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -3036,13 +3036,13 @@ impl AcornMesh {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn connect_nodes(&self, node_a: &str, node_b: &str) -> Result<()> {
-        let node_ac = CString::new(node_a).map_err(|e| Error::Acorn(format!("Invalid node A ID: {}", e)))?;
-        let node_bc = CString::new(node_b).map_err(|e| Error::Acorn(format!("Invalid node B ID: {}", e)))?;
+        let node_ac = CString::new(node_a).map_err(|e| Error::acorn(format!("Invalid node A ID: {}", e)))?;
+        let node_bc = CString::new(node_b).map_err(|e| Error::acorn(format!("Invalid node B ID: {}", e)))?;
         let rc = unsafe { acorn_mesh_connect_nodes(self.h, node_ac.as_ptr(), node_bc.as_ptr()) };
         if rc == 0 {
             Ok(())
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -3063,7 +3063,7 @@ impl AcornMesh {
         if rc == 0 {
             Ok(())
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -3084,7 +3084,7 @@ impl AcornMesh {
         if rc == 0 {
             Ok(())
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -3101,12 +3101,12 @@ impl AcornMesh {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn create_star(&self, hub_node_id: &str) -> Result<()> {
-        let hubc = CString::new(hub_node_id).map_err(|e| Error::Acorn(format!("Invalid hub node ID: {}", e)))?;
+        let hubc = CString::new(hub_node_id).map_err(|e| Error::acorn(format!("Invalid hub node ID: {}", e)))?;
         let rc = unsafe { acorn_mesh_create_star(self.h, hubc.as_ptr()) };
         if rc == 0 {
             Ok(())
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -3127,7 +3127,7 @@ impl AcornMesh {
         if rc == 0 {
             Ok(())
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 }
@@ -3157,7 +3157,7 @@ impl AcornP2P {
         if rc == 0 {
             Ok(())
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -3179,7 +3179,7 @@ impl AcornP2P {
         if rc == 0 {
             Ok(())
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -3201,7 +3201,7 @@ impl AcornP2P {
         if rc == 0 {
             Ok(())
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -3226,7 +3226,7 @@ impl AcornP2P {
         if rc == 0 {
             Ok(())
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -3251,7 +3251,7 @@ impl AcornP2P {
         if rc == 0 {
             Ok(())
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 }
@@ -3279,7 +3279,7 @@ impl AcornIterator {
         };
 
         if rc != 0 {
-            return Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }));
+            return Err(Error::acorn(unsafe { acorn_sys::last_error_string() }));
         }
 
         if done != 0 {
@@ -3292,7 +3292,7 @@ impl AcornIterator {
 
         // Extract and deserialize value
         let json_slice = unsafe { std::slice::from_raw_parts(json_buf.data, json_buf.len) };
-        let value = serde_json::from_slice(json_slice).map_err(|e| Error::Acorn(e.to_string()))?;
+        let value = serde_json::from_slice(json_slice).map_err(|e| Error::acorn(e.to_string()))?;
 
         // Free buffers
         unsafe {
@@ -3393,7 +3393,7 @@ impl AcornSubscription {
             unsafe {
                 let _ = Box::from_raw(user_data as *mut Box<dyn Fn(&str, &serde_json::Value) + Send>);
             }
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -3573,7 +3573,7 @@ impl AcornQuery {
             let mut iter_h: acorn_iter_handle = 0;
             let rc = acorn_iter_start(self.tree_h, ptr::null(), &mut iter_h as *mut _);
             if rc != 0 {
-                return Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }));
+                return Err(Error::acorn(unsafe { acorn_sys::last_error_string() }));
             }
             AcornIterator { h: iter_h }
         };
@@ -3591,7 +3591,7 @@ impl AcornQuery {
             let mut iter_h: acorn_iter_handle = 0;
             let rc = acorn_iter_start(self.tree_h, ptr::null(), &mut iter_h as *mut _);
             if rc != 0 {
-                return Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }));
+                return Err(Error::acorn(unsafe { acorn_sys::last_error_string() }));
             }
             AcornIterator { h: iter_h }
         };
@@ -3609,7 +3609,7 @@ impl AcornQuery {
             let mut count: usize = 0;
             let rc = acorn_count(self.tree_h, &mut count as *mut _);
             if rc != 0 {
-                return Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }));
+                return Err(Error::acorn(unsafe { acorn_sys::last_error_string() }));
             }
             Ok(count)
         }
@@ -3785,7 +3785,7 @@ impl AcornQuery {
             let mut iter_h: acorn_iter_handle = 0;
             let rc = acorn_iter_start(self.tree_h, ptr::null(), &mut iter_h as *mut _);
             if rc != 0 {
-                return Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }));
+                return Err(Error::acorn(unsafe { acorn_sys::last_error_string() }));
             }
             AcornIterator { h: iter_h }
         };
@@ -3796,7 +3796,7 @@ impl AcornQuery {
         while let Some((_, value)) = iter.next()? {
             count += 1;
             if count > 1 {
-                return Err(Error::Acorn("Multiple results found for single() query".to_string()));
+                return Err(Error::acorn("Multiple results found for single() query".to_string()));
             }
             result = Some(value);
         }
@@ -3867,7 +3867,7 @@ where
             let mut iter_h: acorn_iter_handle = 0;
             let rc = acorn_iter_start(self.tree_h, ptr::null(), &mut iter_h as *mut _);
             if rc != 0 {
-                return Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }));
+                return Err(Error::acorn(unsafe { acorn_sys::last_error_string() }));
             }
             AcornIterator { h: iter_h }
         };
@@ -3875,7 +3875,7 @@ where
         let mut results = Vec::new();
         while let Some((_, value)) = iter.next::<serde_json::Value>()? {
             if (self.predicate)(&value) {
-                let typed_value: T = serde_json::from_value(value).map_err(|e| Error::Acorn(e.to_string()))?;
+                let typed_value: T = serde_json::from_value(value).map_err(|e| Error::acorn(e.to_string()))?;
                 results.push(typed_value);
             }
         }
@@ -3888,14 +3888,14 @@ where
             let mut iter_h: acorn_iter_handle = 0;
             let rc = acorn_iter_start(self.tree_h, ptr::null(), &mut iter_h as *mut _);
             if rc != 0 {
-                return Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }));
+                return Err(Error::acorn(unsafe { acorn_sys::last_error_string() }));
             }
             AcornIterator { h: iter_h }
         };
 
         while let Some((_, value)) = iter.next::<serde_json::Value>()? {
             if (self.predicate)(&value) {
-                let typed_value: T = serde_json::from_value(value).map_err(|e| Error::Acorn(e.to_string()))?;
+                let typed_value: T = serde_json::from_value(value).map_err(|e| Error::acorn(e.to_string()))?;
                 return Ok(Some(typed_value));
             }
         }
@@ -3908,7 +3908,7 @@ where
             let mut iter_h: acorn_iter_handle = 0;
             let rc = acorn_iter_start(self.tree_h, ptr::null(), &mut iter_h as *mut _);
             if rc != 0 {
-                return Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }));
+                return Err(Error::acorn(unsafe { acorn_sys::last_error_string() }));
             }
             AcornIterator { h: iter_h }
         };
@@ -3959,7 +3959,7 @@ where
             let mut iter_h: acorn_iter_handle = 0;
             let rc = acorn_iter_start(self.tree_h, ptr::null(), &mut iter_h as *mut _);
             if rc != 0 {
-                return Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }));
+                return Err(Error::acorn(unsafe { acorn_sys::last_error_string() }));
             }
             AcornIterator { h: iter_h }
         };
@@ -3984,7 +3984,7 @@ where
         // Convert to typed results
         let mut results = Vec::new();
         for (_, value) in filtered_items {
-            let typed_value: T = serde_json::from_value(value).map_err(|e| Error::Acorn(e.to_string()))?;
+            let typed_value: T = serde_json::from_value(value).map_err(|e| Error::acorn(e.to_string()))?;
             results.push(typed_value);
         }
         Ok(results)
@@ -4008,7 +4008,7 @@ where
             let mut iter_h: acorn_iter_handle = 0;
             let rc = acorn_iter_start(self.tree_h, ptr::null(), &mut iter_h as *mut _);
             if rc != 0 {
-                return Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }));
+                return Err(Error::acorn(unsafe { acorn_sys::last_error_string() }));
             }
             AcornIterator { h: iter_h }
         };
@@ -4016,7 +4016,7 @@ where
         let mut results = Vec::new();
         while let Some((_, value)) = iter.next::<serde_json::Value>()? {
             if (self.predicate)(&value) {
-                let typed_value: T = serde_json::from_value(value).map_err(|e| Error::Acorn(e.to_string()))?;
+                let typed_value: T = serde_json::from_value(value).map_err(|e| Error::acorn(e.to_string()))?;
                 results.push(typed_value);
                 if results.len() >= self.count {
                     break;
@@ -4044,7 +4044,7 @@ where
             let mut iter_h: acorn_iter_handle = 0;
             let rc = acorn_iter_start(self.tree_h, ptr::null(), &mut iter_h as *mut _);
             if rc != 0 {
-                return Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }));
+                return Err(Error::acorn(unsafe { acorn_sys::last_error_string() }));
             }
             AcornIterator { h: iter_h }
         };
@@ -4056,7 +4056,7 @@ where
                 if skipped < self.count {
                     skipped += 1;
                 } else {
-                    let typed_value: T = serde_json::from_value(value).map_err(|e| Error::Acorn(e.to_string()))?;
+                    let typed_value: T = serde_json::from_value(value).map_err(|e| Error::acorn(e.to_string()))?;
                     results.push(typed_value);
                 }
             }
@@ -4102,7 +4102,7 @@ where
             let mut iter_h: acorn_iter_handle = 0;
             let rc = acorn_iter_start(self.tree_h, ptr::null(), &mut iter_h as *mut _);
             if rc != 0 {
-                return Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }));
+                return Err(Error::acorn(unsafe { acorn_sys::last_error_string() }));
             }
             AcornIterator { h: iter_h }
         };
@@ -4125,7 +4125,7 @@ where
         // Convert to typed results
         let mut results = Vec::new();
         for (_, value) in items {
-            let typed_value: T = serde_json::from_value(value).map_err(|e| Error::Acorn(e.to_string()))?;
+            let typed_value: T = serde_json::from_value(value).map_err(|e| Error::acorn(e.to_string()))?;
             results.push(typed_value);
         }
         Ok(results)
@@ -4145,7 +4145,7 @@ impl AcornQueryTake {
             let mut iter_h: acorn_iter_handle = 0;
             let rc = acorn_iter_start(self.tree_h, ptr::null(), &mut iter_h as *mut _);
             if rc != 0 {
-                return Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }));
+                return Err(Error::acorn(unsafe { acorn_sys::last_error_string() }));
             }
             AcornIterator { h: iter_h }
         };
@@ -4174,7 +4174,7 @@ impl AcornQuerySkip {
             let mut iter_h: acorn_iter_handle = 0;
             let rc = acorn_iter_start(self.tree_h, ptr::null(), &mut iter_h as *mut _);
             if rc != 0 {
-                return Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }));
+                return Err(Error::acorn(unsafe { acorn_sys::last_error_string() }));
             }
             AcornIterator { h: iter_h }
         };
@@ -4210,7 +4210,7 @@ where
             let mut iter_h: acorn_iter_handle = 0;
             let rc = acorn_iter_start(self.tree_h, ptr::null(), &mut iter_h as *mut _);
             if rc != 0 {
-                return Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }));
+                return Err(Error::acorn(unsafe { acorn_sys::last_error_string() }));
             }
             AcornIterator { h: iter_h }
         };
@@ -4236,7 +4236,7 @@ where
         // Convert to typed results
         let mut results = Vec::new();
         for (_, value) in items {
-            let typed_value: T = serde_json::from_value(value).map_err(|e| Error::Acorn(e.to_string()))?;
+            let typed_value: T = serde_json::from_value(value).map_err(|e| Error::acorn(e.to_string()))?;
             results.push(typed_value);
         }
         Ok(results)
@@ -4261,7 +4261,7 @@ where
             let mut iter_h: acorn_iter_handle = 0;
             let rc = acorn_iter_start(self.tree_h, ptr::null(), &mut iter_h as *mut _);
             if rc != 0 {
-                return Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }));
+                return Err(Error::acorn(unsafe { acorn_sys::last_error_string() }));
             }
             AcornIterator { h: iter_h }
         };
@@ -4291,7 +4291,7 @@ where
         // Convert to typed results
         let mut results = Vec::new();
         for (_, value) in items {
-            let typed_value: T = serde_json::from_value(value).map_err(|e| Error::Acorn(e.to_string()))?;
+            let typed_value: T = serde_json::from_value(value).map_err(|e| Error::acorn(e.to_string()))?;
             results.push(typed_value);
         }
         Ok(results)
@@ -4318,7 +4318,7 @@ where
             let mut iter_h: acorn_iter_handle = 0;
             let rc = acorn_iter_start(self.tree_h, ptr::null(), &mut iter_h as *mut _);
             if rc != 0 {
-                return Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }));
+                return Err(Error::acorn(unsafe { acorn_sys::last_error_string() }));
             }
             AcornIterator { h: iter_h }
         };
@@ -4346,7 +4346,7 @@ where
         // Convert to typed results
         let mut results = Vec::new();
         for (_, value) in filtered_items {
-            let typed_value: T = serde_json::from_value(value).map_err(|e| Error::Acorn(e.to_string()))?;
+            let typed_value: T = serde_json::from_value(value).map_err(|e| Error::acorn(e.to_string()))?;
             results.push(typed_value);
         }
         Ok(results)
@@ -4369,7 +4369,7 @@ impl AcornQueryTimestampRange {
             let mut iter_h: acorn_iter_handle = 0;
             let rc = acorn_iter_start(self.tree_h, ptr::null(), &mut iter_h as *mut _);
             if rc != 0 {
-                return Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }));
+                return Err(Error::acorn(unsafe { acorn_sys::last_error_string() }));
             }
             AcornIterator { h: iter_h }
         };
@@ -4399,7 +4399,7 @@ impl AcornQueryTimestampAfter {
             let mut iter_h: acorn_iter_handle = 0;
             let rc = acorn_iter_start(self.tree_h, ptr::null(), &mut iter_h as *mut _);
             if rc != 0 {
-                return Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }));
+                return Err(Error::acorn(unsafe { acorn_sys::last_error_string() }));
             }
             AcornIterator { h: iter_h }
         };
@@ -4429,7 +4429,7 @@ impl AcornQueryTimestampBefore {
             let mut iter_h: acorn_iter_handle = 0;
             let rc = acorn_iter_start(self.tree_h, ptr::null(), &mut iter_h as *mut _);
             if rc != 0 {
-                return Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }));
+                return Err(Error::acorn(unsafe { acorn_sys::last_error_string() }));
             }
             AcornIterator { h: iter_h }
         };
@@ -4459,7 +4459,7 @@ impl AcornQueryFromNode {
             let mut iter_h: acorn_iter_handle = 0;
             let rc = acorn_iter_start(self.tree_h, ptr::null(), &mut iter_h as *mut _);
             if rc != 0 {
-                return Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }));
+                return Err(Error::acorn(unsafe { acorn_sys::last_error_string() }));
             }
             AcornIterator { h: iter_h }
         };
@@ -4488,7 +4488,7 @@ impl AcornQueryNewest {
             let mut iter_h: acorn_iter_handle = 0;
             let rc = acorn_iter_start(self.tree_h, ptr::null(), &mut iter_h as *mut _);
             if rc != 0 {
-                return Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }));
+                return Err(Error::acorn(unsafe { acorn_sys::last_error_string() }));
             }
             AcornIterator { h: iter_h }
         };
@@ -4515,7 +4515,7 @@ impl AcornQueryOldest {
             let mut iter_h: acorn_iter_handle = 0;
             let rc = acorn_iter_start(self.tree_h, ptr::null(), &mut iter_h as *mut _);
             if rc != 0 {
-                return Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }));
+                return Err(Error::acorn(unsafe { acorn_sys::last_error_string() }));
             }
             AcornIterator { h: iter_h }
         };
@@ -4571,9 +4571,9 @@ impl AcornGit {
     /// # }
     /// ```
     pub fn new(repo_path: &str, author_name: &str, author_email: &str, auto_push: bool) -> Result<Self> {
-        let repo_path_c = CString::new(repo_path).map_err(|e| Error::Acorn(format!("Invalid repo path: {}", e)))?;
-        let author_name_c = CString::new(author_name).map_err(|e| Error::Acorn(format!("Invalid author name: {}", e)))?;
-        let author_email_c = CString::new(author_email).map_err(|e| Error::Acorn(format!("Invalid author email: {}", e)))?;
+        let repo_path_c = CString::new(repo_path).map_err(|e| Error::acorn(format!("Invalid repo path: {}", e)))?;
+        let author_name_c = CString::new(author_name).map_err(|e| Error::acorn(format!("Invalid author name: {}", e)))?;
+        let author_email_c = CString::new(author_email).map_err(|e| Error::acorn(format!("Invalid author email: {}", e)))?;
         
         let mut h: acorn_git_handle = 0;
         let rc = unsafe { 
@@ -4589,7 +4589,7 @@ impl AcornGit {
         if rc == 0 {
             Ok(Self { h })
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -4609,8 +4609,8 @@ impl AcornGit {
     /// # }
     /// ```
     pub fn push(&self, remote_name: &str, branch: &str) -> Result<()> {
-        let remote_name_c = CString::new(remote_name).map_err(|e| Error::Acorn(format!("Invalid remote name: {}", e)))?;
-        let branch_c = CString::new(branch).map_err(|e| Error::Acorn(format!("Invalid branch name: {}", e)))?;
+        let remote_name_c = CString::new(remote_name).map_err(|e| Error::acorn(format!("Invalid remote name: {}", e)))?;
+        let branch_c = CString::new(branch).map_err(|e| Error::acorn(format!("Invalid branch name: {}", e)))?;
         
         let rc = unsafe { 
             acorn_git_push(self.h, remote_name_c.as_ptr(), branch_c.as_ptr()) 
@@ -4619,7 +4619,7 @@ impl AcornGit {
         if rc == 0 {
             Ok(())
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -4639,8 +4639,8 @@ impl AcornGit {
     /// # }
     /// ```
     pub fn pull(&self, remote_name: &str, branch: &str) -> Result<()> {
-        let remote_name_c = CString::new(remote_name).map_err(|e| Error::Acorn(format!("Invalid remote name: {}", e)))?;
-        let branch_c = CString::new(branch).map_err(|e| Error::Acorn(format!("Invalid branch name: {}", e)))?;
+        let remote_name_c = CString::new(remote_name).map_err(|e| Error::acorn(format!("Invalid remote name: {}", e)))?;
+        let branch_c = CString::new(branch).map_err(|e| Error::acorn(format!("Invalid branch name: {}", e)))?;
         
         let rc = unsafe { 
             acorn_git_pull(self.h, remote_name_c.as_ptr(), branch_c.as_ptr()) 
@@ -4649,7 +4649,7 @@ impl AcornGit {
         if rc == 0 {
             Ok(())
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -4671,7 +4671,7 @@ impl AcornGit {
     /// # }
     /// ```
     pub fn get_file_history(&self, file_path: &str) -> Result<Vec<GitCommitInfo>> {
-        let file_path_c = CString::new(file_path).map_err(|e| Error::Acorn(format!("Invalid file path: {}", e)))?;
+        let file_path_c = CString::new(file_path).map_err(|e| Error::acorn(format!("Invalid file path: {}", e)))?;
         
         let mut commits_ptr: *mut acorn_git_commit_info = std::ptr::null_mut();
         let mut count: usize = 0;
@@ -4697,7 +4697,7 @@ impl AcornGit {
             }
             Ok(commits)
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -4718,14 +4718,14 @@ impl AcornGit {
     /// # }
     /// ```
     pub fn read_file_at_commit(&self, file_path: &str, commit_sha: &str) -> Result<String> {
-        let file_path_c = CString::new(file_path).map_err(|e| Error::Acorn(format!("Invalid file path: {}", e)))?;
-        let commit_sha_c = CString::new(commit_sha).map_err(|e| Error::Acorn(format!("Invalid commit SHA: {}", e)))?;
+        let file_path_c = CString::new(file_path).map_err(|e| Error::acorn(format!("Invalid file path: {}", e)))?;
+        let commit_sha_c = CString::new(commit_sha).map_err(|e| Error::acorn(format!("Invalid commit SHA: {}", e)))?;
         
         let mut content_ptr: *mut u8 = std::ptr::null_mut();
         let mut length: usize = 0;
         
-        let rc = unsafe { 
-            acorn_git_read_file_at_commit(self.h, file_path_c.as_ptr(), commit_sha_c.as_ptr(), &mut content_ptr as *mut _, &mut length as *mut _) 
+        let rc = unsafe {
+            acorn_git_read_file_at_commit(self.h, file_path_c.as_ptr(), commit_sha_c.as_ptr(), &mut content_ptr as *mut *mut u8 as *mut *mut i8, &mut length as *mut _)
         };
         
         if rc == 0 {
@@ -4738,7 +4738,7 @@ impl AcornGit {
                 Ok(String::new())
             }
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -4758,7 +4758,7 @@ impl AcornGit {
     /// # }
     /// ```
     pub fn has_remote(&self, remote_name: &str) -> Result<bool> {
-        let remote_name_c = CString::new(remote_name).map_err(|e| Error::Acorn(format!("Invalid remote name: {}", e)))?;
+        let remote_name_c = CString::new(remote_name).map_err(|e| Error::acorn(format!("Invalid remote name: {}", e)))?;
         
         let mut has_remote: i32 = 0;
         let rc = unsafe { 
@@ -4768,7 +4768,7 @@ impl AcornGit {
         if rc == 0 {
             Ok(has_remote != 0)
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -4787,7 +4787,7 @@ impl AcornGit {
     /// # }
     /// ```
     pub fn squash_commits(&self, since_commit: &str) -> Result<()> {
-        let since_commit_c = CString::new(since_commit).map_err(|e| Error::Acorn(format!("Invalid commit SHA: {}", e)))?;
+        let since_commit_c = CString::new(since_commit).map_err(|e| Error::acorn(format!("Invalid commit SHA: {}", e)))?;
         
         let rc = unsafe { 
             acorn_git_squash_commits(self.h, since_commit_c.as_ptr()) 
@@ -4796,7 +4796,7 @@ impl AcornGit {
         if rc == 0 {
             Ok(())
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 }
@@ -4846,7 +4846,7 @@ impl AcornNursery {
         if rc == 0 {
             Ok(Self { h })
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -4867,26 +4867,26 @@ impl AcornNursery {
     pub fn get_available_types(&self) -> Result<Vec<String>> {
         let mut types_ptr: *mut *mut u8 = std::ptr::null_mut();
         let mut count: usize = 0;
-        
-        let rc = unsafe { 
-            acorn_nursery_get_available_types(self.h, &mut types_ptr as *mut _, &mut count as *mut _) 
+
+        let rc = unsafe {
+            acorn_nursery_get_available_types(self.h, &mut types_ptr as *mut *mut *mut u8 as *mut *mut *mut i8, &mut count as *mut _)
         };
-        
+
         if rc == 0 {
             let mut types = Vec::new();
             if !types_ptr.is_null() && count > 0 {
-                let types_slice = unsafe { std::slice::from_raw_parts(types_ptr, count) };
-                for type_ptr in types_slice {
+                let types_slice = unsafe { std::slice::from_raw_parts(types_ptr as *const *const i8, count) };
+                for &type_ptr in types_slice {
                     if !type_ptr.is_null() {
-                        let type_str = unsafe { CStr::from_ptr(type_ptr as *const i8).to_string_lossy().into_owned() };
+                        let type_str = unsafe { CStr::from_ptr(type_ptr).to_string_lossy().into_owned() };
                         types.push(type_str);
                     }
                 }
-                unsafe { acorn_nursery_free_types(types_ptr, count); }
+                unsafe { acorn_nursery_free_types(types_ptr as *mut *mut i8, count); }
             }
             Ok(types)
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -4906,7 +4906,7 @@ impl AcornNursery {
     /// # }
     /// ```
     pub fn get_metadata(&self, type_id: &str) -> Result<TrunkMetadata> {
-        let type_id_c = CString::new(type_id).map_err(|e| Error::Acorn(format!("Invalid type ID: {}", e)))?;
+        let type_id_c = CString::new(type_id).map_err(|e| Error::acorn(format!("Invalid type ID: {}", e)))?;
         
         let mut metadata: acorn_trunk_metadata = unsafe { std::mem::zeroed() };
         
@@ -4918,9 +4918,9 @@ impl AcornNursery {
             let mut required_keys = Vec::new();
             if !metadata.required_config_keys.is_null() && metadata.required_config_keys_count > 0 {
                 let keys_slice = unsafe { std::slice::from_raw_parts(metadata.required_config_keys, metadata.required_config_keys_count) };
-                for key_ptr in keys_slice {
+                for &key_ptr in keys_slice {
                     if !key_ptr.is_null() {
-                        let key = unsafe { CStr::from_ptr(key_ptr).to_string_lossy().into_owned() };
+                        let key = unsafe { CStr::from_ptr(key_ptr as *const i8).to_string_lossy().into_owned() };
                         required_keys.push(key);
                     }
                 }
@@ -4929,9 +4929,9 @@ impl AcornNursery {
             let mut optional_keys = Vec::new();
             if !metadata.optional_config_keys.is_null() && metadata.optional_config_keys_count > 0 {
                 let keys_slice = unsafe { std::slice::from_raw_parts(metadata.optional_config_keys, metadata.optional_config_keys_count) };
-                for key_ptr in keys_slice {
+                for &key_ptr in keys_slice {
                     if !key_ptr.is_null() {
-                        let key = unsafe { CStr::from_ptr(key_ptr).to_string_lossy().into_owned() };
+                        let key = unsafe { CStr::from_ptr(key_ptr as *const i8).to_string_lossy().into_owned() };
                         optional_keys.push(key);
                     }
                 }
@@ -4951,7 +4951,7 @@ impl AcornNursery {
                 is_built_in: metadata.is_built_in != 0,
             })
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -4984,8 +4984,8 @@ impl AcornNursery {
                 for metadata in metadata_slice {
                     let mut required_keys = Vec::new();
                     if !metadata.required_config_keys.is_null() && metadata.required_config_keys_count > 0 {
-                        let keys_slice = unsafe { std::slice::from_raw_parts(metadata.required_config_keys, metadata.required_config_keys_count) };
-                        for key_ptr in keys_slice {
+                        let keys_slice = unsafe { std::slice::from_raw_parts(metadata.required_config_keys as *const *const i8, metadata.required_config_keys_count) };
+                        for &key_ptr in keys_slice {
                             if !key_ptr.is_null() {
                                 let key = unsafe { CStr::from_ptr(key_ptr).to_string_lossy().into_owned() };
                                 required_keys.push(key);
@@ -4995,8 +4995,8 @@ impl AcornNursery {
 
                     let mut optional_keys = Vec::new();
                     if !metadata.optional_config_keys.is_null() && metadata.optional_config_keys_count > 0 {
-                        let keys_slice = unsafe { std::slice::from_raw_parts(metadata.optional_config_keys, metadata.optional_config_keys_count) };
-                        for key_ptr in keys_slice {
+                        let keys_slice = unsafe { std::slice::from_raw_parts(metadata.optional_config_keys as *const *const i8, metadata.optional_config_keys_count) };
+                        for &key_ptr in keys_slice {
                             if !key_ptr.is_null() {
                                 let key = unsafe { CStr::from_ptr(key_ptr).to_string_lossy().into_owned() };
                                 optional_keys.push(key);
@@ -5022,7 +5022,7 @@ impl AcornNursery {
             }
             Ok(metadata_list)
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -5042,7 +5042,7 @@ impl AcornNursery {
     /// # }
     /// ```
     pub fn has_trunk(&self, type_id: &str) -> Result<bool> {
-        let type_id_c = CString::new(type_id).map_err(|e| Error::Acorn(format!("Invalid type ID: {}", e)))?;
+        let type_id_c = CString::new(type_id).map_err(|e| Error::acorn(format!("Invalid type ID: {}", e)))?;
         
         let mut has_trunk: i32 = 0;
         let rc = unsafe { 
@@ -5052,7 +5052,7 @@ impl AcornNursery {
         if rc == 0 {
             Ok(has_trunk != 0)
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -5073,8 +5073,8 @@ impl AcornNursery {
     /// # }
     /// ```
     pub fn grow_trunk(&self, type_id: &str, config_json: &str) -> Result<AcornStorage> {
-        let type_id_c = CString::new(type_id).map_err(|e| Error::Acorn(format!("Invalid type ID: {}", e)))?;
-        let config_c = CString::new(config_json).map_err(|e| Error::Acorn(format!("Invalid config JSON: {}", e)))?;
+        let type_id_c = CString::new(type_id).map_err(|e| Error::acorn(format!("Invalid type ID: {}", e)))?;
+        let config_c = CString::new(config_json).map_err(|e| Error::acorn(format!("Invalid config JSON: {}", e)))?;
         
         let mut storage_h: acorn_storage_handle = 0;
         let rc = unsafe { 
@@ -5084,7 +5084,7 @@ impl AcornNursery {
         if rc == 0 {
             Ok(AcornStorage { h: storage_h })
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -5106,8 +5106,8 @@ impl AcornNursery {
     /// # }
     /// ```
     pub fn validate_config(&self, type_id: &str, config_json: &str) -> Result<bool> {
-        let type_id_c = CString::new(type_id).map_err(|e| Error::Acorn(format!("Invalid type ID: {}", e)))?;
-        let config_c = CString::new(config_json).map_err(|e| Error::Acorn(format!("Invalid config JSON: {}", e)))?;
+        let type_id_c = CString::new(type_id).map_err(|e| Error::acorn(format!("Invalid type ID: {}", e)))?;
+        let config_c = CString::new(config_json).map_err(|e| Error::acorn(format!("Invalid config JSON: {}", e)))?;
         
         let mut is_valid: i32 = 0;
         let rc = unsafe { 
@@ -5117,7 +5117,7 @@ impl AcornNursery {
         if rc == 0 {
             Ok(is_valid != 0)
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -5137,21 +5137,21 @@ impl AcornNursery {
         let mut catalog_ptr: *mut u8 = std::ptr::null_mut();
         let mut length: usize = 0;
         
-        let rc = unsafe { 
-            acorn_nursery_get_catalog(self.h, &mut catalog_ptr as *mut _, &mut length as *mut _) 
+        let rc = unsafe {
+            acorn_nursery_get_catalog(self.h, &mut catalog_ptr as *mut *mut u8 as *mut *mut i8, &mut length as *mut _)
         };
         
         if rc == 0 {
             if !catalog_ptr.is_null() && length > 0 {
                 let catalog_slice = unsafe { std::slice::from_raw_parts(catalog_ptr, length) };
                 let catalog = String::from_utf8_lossy(catalog_slice).into_owned();
-                unsafe { acorn_nursery_free_catalog(catalog_ptr); }
+                unsafe { acorn_nursery_free_catalog(catalog_ptr as *mut i8); }
                 Ok(catalog)
             } else {
                 Ok(String::new())
             }
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 }
@@ -5232,7 +5232,7 @@ impl AcornAdvancedTree {
     /// # }
     /// ```
     pub fn stash_with_auto_id(&self, json: &str) -> Result<()> {
-        let json_c = CString::new(json).map_err(|e| Error::Acorn(format!("Invalid JSON: {}", e)))?;
+        let json_c = CString::new(json).map_err(|e| Error::acorn(format!("Invalid JSON: {}", e)))?;
         
         let rc = unsafe { 
             acorn_tree_stash_auto_id(self.tree_h, json_c.as_ptr(), json.len()) 
@@ -5241,7 +5241,7 @@ impl AcornAdvancedTree {
         if rc == 0 {
             Ok(())
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -5275,7 +5275,7 @@ impl AcornAdvancedTree {
                 last_sync_timestamp: stats.last_sync_timestamp,
             })
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -5306,7 +5306,7 @@ impl AcornAdvancedTree {
                 expiring_nuts_count: ttl_info.expiring_nuts_count,
             })
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -5333,7 +5333,7 @@ impl AcornAdvancedTree {
         if rc == 0 {
             Ok(())
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -5360,7 +5360,7 @@ impl AcornAdvancedTree {
         if rc == 0 {
             Ok(())
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -5390,7 +5390,7 @@ impl AcornAdvancedTree {
         if rc == 0 {
             Ok(removed_count)
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -5420,7 +5420,7 @@ impl AcornAdvancedTree {
         if rc == 0 {
             Ok(count)
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -5445,26 +5445,26 @@ impl AcornAdvancedTree {
     pub fn get_expiring_nuts(&self, timespan_ms: i64) -> Result<Vec<String>> {
         let mut ids_ptr: *mut *mut u8 = std::ptr::null_mut();
         let mut count: usize = 0;
-        
-        let rc = unsafe { 
-            acorn_tree_get_expiring_nuts(self.tree_h, timespan_ms, &mut ids_ptr as *mut _, &mut count as *mut _) 
+
+        let rc = unsafe {
+            acorn_tree_get_expiring_nuts(self.tree_h, timespan_ms, &mut ids_ptr as *mut *mut *mut u8 as *mut *mut *mut i8, &mut count as *mut _)
         };
-        
+
         if rc == 0 {
             let mut ids = Vec::new();
             if !ids_ptr.is_null() && count > 0 {
-                let ids_slice = unsafe { std::slice::from_raw_parts(ids_ptr, count) };
-                for id_ptr in ids_slice {
+                let ids_slice = unsafe { std::slice::from_raw_parts(ids_ptr as *const *const i8, count) };
+                for &id_ptr in ids_slice {
                     if !id_ptr.is_null() {
-                        let id = unsafe { CStr::from_ptr(id_ptr as *const i8).to_string_lossy().into_owned() };
+                        let id = unsafe { CStr::from_ptr(id_ptr).to_string_lossy().into_owned() };
                         ids.push(id);
                     }
                 }
-                unsafe { acorn_tree_free_expiring_nuts(ids_ptr, count); }
+                unsafe { acorn_tree_free_expiring_nuts(ids_ptr as *mut *mut i8, count); }
             }
             Ok(ids)
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -5487,24 +5487,24 @@ impl AcornAdvancedTree {
         let mut json_ptr: *mut u8 = std::ptr::null_mut();
         let mut length: usize = 0;
         
-        let rc = unsafe { 
-            acorn_tree_get_all_nuts(self.tree_h, &mut json_ptr as *mut _, &mut length as *mut _) 
+        let rc = unsafe {
+            acorn_tree_get_all_nuts(self.tree_h, &mut json_ptr as *mut *mut u8 as *mut *mut i8, &mut length as *mut _)
         };
         
         if rc == 0 {
             if !json_ptr.is_null() && length > 0 {
                 let json_slice = unsafe { std::slice::from_raw_parts(json_ptr, length) };
                 let json_str = String::from_utf8_lossy(json_slice).into_owned();
-                unsafe { acorn_tree_free_all_nuts(json_ptr); }
+                unsafe { acorn_tree_free_all_nuts(json_ptr as *mut i8); }
                 
                 let nuts: Vec<NutInfo> = serde_json::from_str(&json_str)
-                    .map_err(|e| Error::Acorn(format!("Failed to parse nuts JSON: {}", e)))?;
+                    .map_err(|e| Error::acorn(format!("Failed to parse nuts JSON: {}", e)))?;
                 Ok(nuts)
             } else {
                 Ok(Vec::new())
             }
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -5531,7 +5531,7 @@ impl AcornAdvancedTree {
         if rc == 0 {
             Ok(count)
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -5558,7 +5558,7 @@ impl AcornAdvancedTree {
         if rc == 0 {
             Ok(timestamp)
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 }
@@ -5625,19 +5625,19 @@ impl AcornEventManager {
     pub fn new(tree: AcornTree) -> Result<Self> {
         let mut h: acorn_event_manager_handle = 0;
         let rc = unsafe { acorn_event_manager_create(tree.h, &mut h as *mut _) };
-        
+
         if rc == 0 {
             Ok(Self { h })
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
     /// Subscribe to all events from this tree
-    /// 
+    ///
     /// # Arguments
     /// * `callback` - Function to call when events occur
-    /// 
+    ///
     /// # Example
     /// ```no_run
     /// # use acorn::{AcornTree, AcornEventManager, Error};
@@ -5654,19 +5654,53 @@ impl AcornEventManager {
     where
         F: Fn(&str, &[u8]) + Send + Sync + 'static,
     {
-        let callback = Box::new(callback);
-        let user_data = Box::into_raw(callback) as *mut std::ffi::c_void;
-        
+        // C callback wrapper for event manager
+        unsafe extern "C" fn event_callback(
+            key: *const std::os::raw::c_char,
+            json: *const u8,
+            len: usize,
+            user: *mut std::ffi::c_void,
+        ) {
+            if user.is_null() {
+                return;
+            }
+
+            // Reconstruct the callback from user data
+            let callback_ptr = user as *const Box<dyn Fn(&str, &[u8]) + Send + Sync>;
+            let callback = &**callback_ptr;
+
+            // Convert key to str
+            let key_str = if key.is_null() {
+                ""
+            } else {
+                CStr::from_ptr(key)
+                    .to_str()
+                    .unwrap_or("")
+            };
+
+            // Convert JSON bytes
+            if !json.is_null() && len > 0 {
+                let json_slice = std::slice::from_raw_parts(json, len);
+                callback(key_str, json_slice);
+            }
+        }
+
+        let callback_box = Box::new(callback);
+        let user_data = Box::into_raw(callback_box) as *mut std::ffi::c_void;
+
         let mut sub_h: acorn_sub_handle = 0;
-        let rc = unsafe { 
-            acorn_event_manager_subscribe(self.h, Some(event_callback), user_data, &mut sub_h as *mut _) 
+        let rc = unsafe {
+            acorn_event_manager_subscribe(self.h, Some(event_callback), user_data, &mut sub_h as *mut _)
         };
-        
+
         if rc == 0 {
-            Ok(AcornSubscription { h: sub_h })
+            // Create a dummy callback for AcornSubscription's _callback field
+            // The real callback is stored in user_data and will be cleaned up by Drop
+            let dummy: Box<Box<dyn Fn(&str, &serde_json::Value) + Send>> = Box::new(Box::new(|_, _| {}));
+            Ok(AcornSubscription { h: sub_h, _callback: dummy })
         } else {
             unsafe { Box::from_raw(user_data as *mut F); }
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -5692,19 +5726,53 @@ impl AcornEventManager {
     where
         F: Fn(&str, &[u8]) + Send + Sync + 'static,
     {
-        let callback = Box::new(callback);
-        let user_data = Box::into_raw(callback) as *mut std::ffi::c_void;
-        
+        // C callback wrapper for event manager (same as subscribe)
+        unsafe extern "C" fn event_callback(
+            key: *const std::os::raw::c_char,
+            json: *const u8,
+            len: usize,
+            user: *mut std::ffi::c_void,
+        ) {
+            if user.is_null() {
+                return;
+            }
+
+            // Reconstruct the callback from user data
+            let callback_ptr = user as *const Box<dyn Fn(&str, &[u8]) + Send + Sync>;
+            let callback = &**callback_ptr;
+
+            // Convert key to str
+            let key_str = if key.is_null() {
+                ""
+            } else {
+                CStr::from_ptr(key)
+                    .to_str()
+                    .unwrap_or("")
+            };
+
+            // Convert JSON bytes
+            if !json.is_null() && len > 0 {
+                let json_slice = std::slice::from_raw_parts(json, len);
+                callback(key_str, json_slice);
+            }
+        }
+
+        let callback_box = Box::new(callback);
+        let user_data = Box::into_raw(callback_box) as *mut std::ffi::c_void;
+
         let mut sub_h: acorn_sub_handle = 0;
-        let rc = unsafe { 
-            acorn_event_manager_subscribe_filtered(self.h, event_type as i32, Some(event_callback), user_data, &mut sub_h as *mut _) 
+        let rc = unsafe {
+            acorn_event_manager_subscribe_filtered(self.h, event_type as u32, Some(event_callback), user_data, &mut sub_h as *mut _)
         };
-        
+
         if rc == 0 {
-            Ok(AcornSubscription { h: sub_h })
+            // Create a dummy callback for AcornSubscription's _callback field
+            // The real callback is stored in user_data and will be cleaned up by Drop
+            let dummy: Box<Box<dyn Fn(&str, &serde_json::Value) + Send>> = Box::new(Box::new(|_, _| {}));
+            Ok(AcornSubscription { h: sub_h, _callback: dummy })
         } else {
             unsafe { Box::from_raw(user_data as *mut F); }
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -5727,17 +5795,17 @@ impl AcornEventManager {
     /// # }
     /// ```
     pub fn raise_event(&self, event_type: EventType, key: &str, json_payload: &str) -> Result<()> {
-        let key_c = CString::new(key).map_err(|e| Error::Acorn(format!("Invalid key: {}", e)))?;
-        let payload_c = CString::new(json_payload).map_err(|e| Error::Acorn(format!("Invalid JSON payload: {}", e)))?;
+        let key_c = CString::new(key).map_err(|e| Error::acorn(format!("Invalid key: {}", e)))?;
+        let payload_c = CString::new(json_payload).map_err(|e| Error::acorn(format!("Invalid JSON payload: {}", e)))?;
         
         let rc = unsafe { 
-            acorn_event_manager_raise_event(self.h, event_type as i32, key_c.as_ptr(), payload_c.as_ptr(), json_payload.len()) 
+            acorn_event_manager_raise_event(self.h, event_type as u32, key_c.as_ptr(), payload_c.as_ptr(), json_payload.len()) 
         };
         
         if rc == 0 {
             Ok(())
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -5764,7 +5832,7 @@ impl AcornEventManager {
         if rc == 0 {
             Ok(count)
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 }
@@ -5799,7 +5867,7 @@ impl AcornTangle {
     /// # }
     /// ```
     pub fn new(local_tree: AcornTree, remote_tree: AcornTree, tangle_name: &str) -> Result<Self> {
-        let name_c = CString::new(tangle_name).map_err(|e| Error::Acorn(format!("Invalid tangle name: {}", e)))?;
+        let name_c = CString::new(tangle_name).map_err(|e| Error::acorn(format!("Invalid tangle name: {}", e)))?;
         
         let mut h: acorn_tangle_handle = 0;
         let rc = unsafe { 
@@ -5809,7 +5877,7 @@ impl AcornTangle {
         if rc == 0 {
             Ok(Self { h })
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -5831,7 +5899,7 @@ impl AcornTangle {
     /// # }
     /// ```
     pub fn new_in_process(local_tree: AcornTree, remote_tree: AcornTree, tangle_name: &str) -> Result<Self> {
-        let name_c = CString::new(tangle_name).map_err(|e| Error::Acorn(format!("Invalid tangle name: {}", e)))?;
+        let name_c = CString::new(tangle_name).map_err(|e| Error::acorn(format!("Invalid tangle name: {}", e)))?;
         
         let mut h: acorn_tangle_handle = 0;
         let rc = unsafe { 
@@ -5841,7 +5909,7 @@ impl AcornTangle {
         if rc == 0 {
             Ok(Self { h })
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -5864,8 +5932,8 @@ impl AcornTangle {
     /// # }
     /// ```
     pub fn push(&self, key: &str, json_payload: &str) -> Result<()> {
-        let key_c = CString::new(key).map_err(|e| Error::Acorn(format!("Invalid key: {}", e)))?;
-        let payload_c = CString::new(json_payload).map_err(|e| Error::Acorn(format!("Invalid JSON payload: {}", e)))?;
+        let key_c = CString::new(key).map_err(|e| Error::acorn(format!("Invalid key: {}", e)))?;
+        let payload_c = CString::new(json_payload).map_err(|e| Error::acorn(format!("Invalid JSON payload: {}", e)))?;
         
         let rc = unsafe { 
             acorn_tangle_push(self.h, key_c.as_ptr(), payload_c.as_ptr(), json_payload.len()) 
@@ -5874,7 +5942,7 @@ impl AcornTangle {
         if rc == 0 {
             Ok(())
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -5897,7 +5965,7 @@ impl AcornTangle {
         if rc == 0 {
             Ok(())
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -5920,7 +5988,7 @@ impl AcornTangle {
         if rc == 0 {
             Ok(())
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -5955,7 +6023,7 @@ impl AcornTangle {
                 last_sync_timestamp: stats.last_sync_timestamp,
             })
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 }
@@ -5989,7 +6057,7 @@ impl AcornMeshCoordinator {
         if rc == 0 {
             Ok(Self { h })
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -6010,7 +6078,7 @@ impl AcornMeshCoordinator {
     /// # }
     /// ```
     pub fn add_node(&self, node_id: &str, tree: AcornTree) -> Result<()> {
-        let node_id_c = CString::new(node_id).map_err(|e| Error::Acorn(format!("Invalid node ID: {}", e)))?;
+        let node_id_c = CString::new(node_id).map_err(|e| Error::acorn(format!("Invalid node ID: {}", e)))?;
         
         let rc = unsafe { 
             acorn_mesh_coordinator_add_node(self.h, node_id_c.as_ptr(), tree.h) 
@@ -6019,7 +6087,7 @@ impl AcornMeshCoordinator {
         if rc == 0 {
             Ok(())
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -6043,8 +6111,8 @@ impl AcornMeshCoordinator {
     /// # }
     /// ```
     pub fn connect_nodes(&self, node_a: &str, node_b: &str) -> Result<()> {
-        let node_a_c = CString::new(node_a).map_err(|e| Error::Acorn(format!("Invalid node A ID: {}", e)))?;
-        let node_b_c = CString::new(node_b).map_err(|e| Error::Acorn(format!("Invalid node B ID: {}", e)))?;
+        let node_a_c = CString::new(node_a).map_err(|e| Error::acorn(format!("Invalid node A ID: {}", e)))?;
+        let node_b_c = CString::new(node_b).map_err(|e| Error::acorn(format!("Invalid node B ID: {}", e)))?;
         
         let rc = unsafe { 
             acorn_mesh_coordinator_connect_nodes(self.h, node_a_c.as_ptr(), node_b_c.as_ptr()) 
@@ -6053,7 +6121,7 @@ impl AcornMeshCoordinator {
         if rc == 0 {
             Ok(())
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -6079,16 +6147,16 @@ impl AcornMeshCoordinator {
     /// # }
     /// ```
     pub fn create_topology(&self, topology: MeshTopology, hub_node_id: &str) -> Result<()> {
-        let hub_c = CString::new(hub_node_id).map_err(|e| Error::Acorn(format!("Invalid hub node ID: {}", e)))?;
+        let hub_c = CString::new(hub_node_id).map_err(|e| Error::acorn(format!("Invalid hub node ID: {}", e)))?;
         
         let rc = unsafe { 
-            acorn_mesh_coordinator_create_topology(self.h, topology as i32, hub_c.as_ptr()) 
+            acorn_mesh_coordinator_create_topology(self.h, topology as u32, hub_c.as_ptr()) 
         };
         
         if rc == 0 {
             Ok(())
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -6109,7 +6177,7 @@ impl AcornMeshCoordinator {
         if rc == 0 {
             Ok(())
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -6129,7 +6197,7 @@ impl AcornMeshCoordinator {
     /// # }
     /// ```
     pub fn get_node_stats(&self, node_id: &str) -> Result<MeshStats> {
-        let node_id_c = CString::new(node_id).map_err(|e| Error::Acorn(format!("Invalid node ID: {}", e)))?;
+        let node_id_c = CString::new(node_id).map_err(|e| Error::acorn(format!("Invalid node ID: {}", e)))?;
         
         let mut stats: acorn_mesh_stats = unsafe { std::mem::zeroed() };
         
@@ -6147,7 +6215,7 @@ impl AcornMeshCoordinator {
                 last_sync_timestamp: stats.last_sync_timestamp,
             })
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -6191,7 +6259,7 @@ impl AcornMeshCoordinator {
             }
             Ok(stats_list)
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 }
@@ -6286,7 +6354,7 @@ impl AcornPerformanceMonitor {
         if rc == 0 {
             Ok(Self { h })
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -6307,7 +6375,7 @@ impl AcornPerformanceMonitor {
         if rc == 0 {
             Ok(())
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -6330,7 +6398,7 @@ impl AcornPerformanceMonitor {
         if rc == 0 {
             Ok(())
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -6365,7 +6433,7 @@ impl AcornPerformanceMonitor {
                 timestamp: metrics.timestamp,
             })
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -6409,7 +6477,7 @@ impl AcornPerformanceMonitor {
             }
             Ok(metrics_list)
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -6430,7 +6498,7 @@ impl AcornPerformanceMonitor {
         if rc == 0 {
             Ok(())
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 }
@@ -6464,7 +6532,7 @@ impl AcornHealthChecker {
         if rc == 0 {
             Ok(Self { h })
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -6485,8 +6553,8 @@ impl AcornHealthChecker {
     /// # }
     /// ```
     pub fn add_service(&self, service_name: &str, health_endpoint: &str) -> Result<()> {
-        let service_c = CString::new(service_name).map_err(|e| Error::Acorn(format!("Invalid service name: {}", e)))?;
-        let endpoint_c = CString::new(health_endpoint).map_err(|e| Error::Acorn(format!("Invalid health endpoint: {}", e)))?;
+        let service_c = CString::new(service_name).map_err(|e| Error::acorn(format!("Invalid service name: {}", e)))?;
+        let endpoint_c = CString::new(health_endpoint).map_err(|e| Error::acorn(format!("Invalid health endpoint: {}", e)))?;
         
         let rc = unsafe { 
             acorn_health_checker_add_service(self.h, service_c.as_ptr(), endpoint_c.as_ptr()) 
@@ -6495,7 +6563,7 @@ impl AcornHealthChecker {
         if rc == 0 {
             Ok(())
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -6552,7 +6620,7 @@ impl AcornHealthChecker {
             }
             Ok(results_list)
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -6573,7 +6641,7 @@ impl AcornHealthChecker {
     /// # }
     /// ```
     pub fn check_service(&self, service_name: &str) -> Result<HealthInfo> {
-        let service_c = CString::new(service_name).map_err(|e| Error::Acorn(format!("Invalid service name: {}", e)))?;
+        let service_c = CString::new(service_name).map_err(|e| Error::acorn(format!("Invalid service name: {}", e)))?;
         
         let mut result: acorn_health_info = unsafe { std::mem::zeroed() };
         
@@ -6603,7 +6671,7 @@ impl AcornHealthChecker {
                 },
             })
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -6622,8 +6690,8 @@ impl AcornHealthChecker {
     pub fn get_overall_status(&self) -> Result<HealthStatus> {
         let mut status: i32 = 0;
         
-        let rc = unsafe { 
-            acorn_health_checker_get_overall_status(self.h, &mut status as *mut _) 
+        let rc = unsafe {
+            acorn_health_checker_get_overall_status(self.h, &mut status as *mut i32 as *mut u32)
         };
         
         if rc == 0 {
@@ -6635,7 +6703,7 @@ impl AcornHealthChecker {
                 _ => HealthStatus::Unknown,
             })
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 }
@@ -6718,7 +6786,7 @@ impl AcornBenchmark {
             }
             Ok(results_list)
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -6792,7 +6860,7 @@ impl AcornBenchmark {
             }
             Ok(results_list)
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -6868,7 +6936,7 @@ impl AcornBenchmark {
             }
             Ok(results_list)
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 }
@@ -6900,7 +6968,7 @@ impl AcornResourceMonitor {
         if rc == 0 {
             Ok((heap_bytes, stack_bytes, total_bytes))
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -6919,7 +6987,7 @@ impl AcornResourceMonitor {
     /// # }
     /// ```
     pub fn get_disk_usage(path: &str) -> Result<(i64, i64, i64)> {
-        let path_c = CString::new(path).map_err(|e| Error::Acorn(format!("Invalid path: {}", e)))?;
+        let path_c = CString::new(path).map_err(|e| Error::acorn(format!("Invalid path: {}", e)))?;
         
         let mut used_bytes: i64 = 0;
         let mut total_bytes: i64 = 0;
@@ -6932,7 +7000,7 @@ impl AcornResourceMonitor {
         if rc == 0 {
             Ok((used_bytes, total_bytes, free_bytes))
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 
@@ -6951,21 +7019,21 @@ impl AcornResourceMonitor {
         let mut info_ptr: *mut u8 = std::ptr::null_mut();
         let mut length: usize = 0;
         
-        let rc = unsafe { 
-            acorn_get_system_info(&mut info_ptr as *mut _, &mut length as *mut _) 
+        let rc = unsafe {
+            acorn_get_system_info(&mut info_ptr as *mut *mut u8 as *mut *mut i8, &mut length as *mut _)
         };
         
         if rc == 0 {
             if !info_ptr.is_null() && length > 0 {
                 let info_slice = unsafe { std::slice::from_raw_parts(info_ptr, length) };
                 let info_str = String::from_utf8_lossy(info_slice).into_owned();
-                unsafe { acorn_free_system_info(info_ptr); }
+                unsafe { acorn_free_system_info(info_ptr as *mut i8); }
                 Ok(info_str)
             } else {
                 Ok(String::new())
             }
         } else {
-            Err(Error::Acorn(unsafe { acorn_sys::last_error_string() }))
+            Err(Error::acorn(unsafe { acorn_sys::last_error_string() }))
         }
     }
 }
@@ -6986,7 +7054,7 @@ mod tests {
     fn test_error_types() {
         // Test error types exist and can be created
         let _not_found = Error::NotFound;
-        let _acorn_error = Error::Acorn("test error".to_string());
+        let _acorn_error = Error::acorn("test error".to_string());
     }
 
     #[test]
