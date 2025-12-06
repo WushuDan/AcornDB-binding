@@ -8,7 +8,7 @@ use std::time::SystemTime;
 
 use acorn_core::{
     AcornError, AcornResult, BranchId, CapabilityAdvertiser, HistoryEvent, HistoryProvider, KeyedTrunk, Nut,
-    TombstoneProvider, Trunk, TrunkCapability, Ttl, TtlProvider,
+    TombstoneProvider, Trunk, TrunkCapability, Ttl, TtlCleaner, TtlProvider,
 };
 use parking_lot::RwLock;
 
@@ -228,6 +228,47 @@ impl Trunk<Vec<u8>> for FileTrunk {
 impl KeyedTrunk<Vec<u8>> for FileTrunk {
     fn keys(&self, branch: &BranchId) -> Vec<String> {
         FileTrunk::keys(self, branch)
+    }
+}
+
+impl TtlCleaner<Vec<u8>> for FileTrunk {
+    fn purge_expired(&self, branch: &BranchId) -> usize {
+        let mut removed = 0usize;
+        let dir = self.branch_dir(branch);
+        if let Ok(entries) = fs::read_dir(dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                    if name.ends_with(".ttl") {
+                        if let Ok(raw) = fs::read_to_string(&path) {
+                            if let Ok(ms) = raw.parse::<u128>() {
+                                let expires_at =
+                                    SystemTime::UNIX_EPOCH + std::time::Duration::from_millis(ms as u64);
+                                if SystemTime::now() >= expires_at {
+                                    let key = name.trim_end_matches(".ttl");
+                                    let data_path = self.branch_dir(branch).join(key);
+                                    let version = self.current_version(branch, key);
+                                    let _ = fs::remove_file(&path);
+                                    let _ = fs::remove_file(&data_path);
+                                    self.clear_version(branch, key);
+                                    self.tombstones
+                                        .write()
+                                        .insert((branch.clone(), key.to_string()), version);
+                                    if self.history_enabled {
+                                        let _ = self.append_history(
+                                            branch,
+                                            HistoryEvent::Delete { key: key.to_string() },
+                                        );
+                                    }
+                                    removed += 1;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        removed
     }
 }
 

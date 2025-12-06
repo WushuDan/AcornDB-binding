@@ -210,7 +210,11 @@ impl TombstoneProvider<Vec<u8>> for GitTrunk {
 
 impl CapabilityAdvertiser for GitTrunk {
     fn capabilities(&self) -> &'static [TrunkCapability] {
-        &[TrunkCapability::History, TrunkCapability::Ttl, TrunkCapability::Versions]
+        &[
+            TrunkCapability::History,
+            TrunkCapability::Ttl,
+            TrunkCapability::Versions,
+        ]
     }
 }
 
@@ -268,7 +272,11 @@ mod tests {
         TrunkContract::round_trip_bytes(&trunk).unwrap();
         TrunkContract::assert_capabilities(
             &trunk,
-            &[TrunkCapability::History, TrunkCapability::Ttl, TrunkCapability::Versions],
+            &[
+                TrunkCapability::History,
+                TrunkCapability::Ttl,
+                TrunkCapability::Versions,
+            ],
         );
         TrunkContract::ttl_expiry(&trunk).unwrap();
         TrunkContract::history_put_delete(&trunk).unwrap();

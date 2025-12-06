@@ -6,7 +6,7 @@ use std::time::SystemTime;
 
 use acorn_core::{
     AcornError, AcornResult, BranchId, CapabilityAdvertiser, HistoryEvent, HistoryProvider, KeyedTrunk, Nut,
-    TombstoneProvider, Trunk, TrunkCapability, Ttl, TtlProvider,
+    TombstoneProvider, Trunk, TrunkCapability, Ttl, TtlCleaner, TtlProvider,
 };
 use parking_lot::RwLock;
 
@@ -209,6 +209,35 @@ impl TombstoneProvider<Vec<u8>> for MemoryTrunk {
             .filter(|((b, _), _)| b == branch)
             .map(|((_, k), v)| (k.clone(), *v))
             .collect()
+    }
+}
+
+impl TtlCleaner<Vec<u8>> for MemoryTrunk {
+    fn purge_expired(&self, branch: &BranchId) -> usize {
+        let mut guard = self.inner.write();
+        let now = SystemTime::now();
+        let mut removed = 0usize;
+        let keys: Vec<_> = guard
+            .ttl
+            .iter()
+            .filter(|((b, _), expires)| b == branch && **expires <= now)
+            .map(|((_, k), _)| k.clone())
+            .collect();
+        for key in keys {
+            removed += 1;
+            guard.ttl.remove(&(branch.clone(), key.clone()));
+            guard.data.remove(&(branch.clone(), key.clone()));
+            let removed_version = guard.versions.remove(&(branch.clone(), key.clone()));
+            guard
+                .tombstones
+                .insert((branch.clone(), key.clone()), removed_version);
+            guard
+                .history
+                .entry(branch.clone())
+                .or_default()
+                .push(HistoryEvent::Delete { key });
+        }
+        removed
     }
 }
 

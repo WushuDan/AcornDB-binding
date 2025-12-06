@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 
+use std::collections::{HashMap, VecDeque};
 use std::fmt::{self, Debug};
 use std::marker::PhantomData;
 use std::time::SystemTime;
@@ -103,6 +104,12 @@ pub trait KeyedTrunk<T>: Trunk<T> {
 pub trait TombstoneProvider<T>: Trunk<T> {
     /// Return deleted keys with their last known versions (if tracked).
     fn tombstones(&self, branch: &BranchId) -> Vec<(String, Option<u64>)>;
+}
+
+/// Optional support for eager TTL cleanup.
+pub trait TtlCleaner<T>: Trunk<T> {
+    /// Purge expired entries for the given branch. Returns count removed.
+    fn purge_expired(&self, branch: &BranchId) -> usize;
 }
 
 /// Capability flags for trunks; extend as behaviors are implemented.
@@ -261,6 +268,63 @@ where
 
     pub fn delete(&self, key: &str) -> AcornResult<()> {
         self.tree.delete(key)
+    }
+}
+
+/// Minimal LRU cache skeleton for helpers/tests.
+pub struct LruCache<K, V> {
+    capacity: usize,
+    order: VecDeque<K>,
+    map: HashMap<K, V>,
+}
+
+impl<K, V> LruCache<K, V>
+where
+    K: Eq + std::hash::Hash + Clone,
+{
+    pub fn new(capacity: usize) -> Self {
+        Self {
+            capacity: capacity.max(1),
+            order: VecDeque::new(),
+            map: HashMap::new(),
+        }
+    }
+
+    pub fn put(&mut self, key: K, value: V) {
+        if self.map.contains_key(&key) {
+            self.map.insert(key.clone(), value);
+            self.touch(&key);
+        } else {
+            self.map.insert(key.clone(), value);
+            self.order.push_back(key);
+            self.evict_if_needed();
+        }
+    }
+
+    pub fn get(&mut self, key: &K) -> Option<&V> {
+        if self.map.contains_key(key) {
+            self.touch(key);
+        }
+        self.map.get(key)
+    }
+
+    fn touch(&mut self, key: &K) {
+        if let Some(pos) = self.order.iter().position(|k| k == key) {
+            self.order.remove(pos);
+            self.order.push_back(key.clone());
+        }
+    }
+
+    fn evict_if_needed(&mut self) {
+        while self.map.len() > self.capacity {
+            if let Some(old_key) = self.order.pop_front() {
+                self.map.remove(&old_key);
+            }
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        self.map.len()
     }
 }
 
