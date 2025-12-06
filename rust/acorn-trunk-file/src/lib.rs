@@ -204,9 +204,11 @@ impl HistoryProvider<Vec<u8>> for FileTrunk {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use acorn_test_harness::TrunkContract;
     use std::fs;
+    #[cfg(feature = "contract-tests")]
     use std::io::Read;
+    #[cfg(feature = "contract-tests")]
+    use acorn_test_harness::TrunkContract;
 
     #[test]
     fn put_get_delete_round_trip() {
@@ -259,6 +261,7 @@ mod tests {
         assert!(trunk.get(&branch, "key").unwrap().is_none());
     }
 
+    #[cfg(feature = "contract-tests")]
     #[test]
     fn contract_round_trip_and_capabilities() {
         let tmp_dir = tempfile::tempdir().unwrap();
@@ -267,6 +270,7 @@ mod tests {
         TrunkContract::assert_capabilities(&trunk, &[]);
     }
 
+    #[cfg(feature = "contract-tests")]
     #[test]
     fn contract_ttl_expiry() {
         let tmp_dir = tempfile::tempdir().unwrap();
@@ -274,6 +278,7 @@ mod tests {
         TrunkContract::ttl_expiry(&trunk).unwrap();
     }
 
+    #[cfg(feature = "contract-tests")]
     #[test]
     fn history_put_delete_logged() {
         let tmp_dir = tempfile::tempdir().unwrap();
