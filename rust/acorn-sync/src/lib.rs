@@ -76,8 +76,15 @@ pub enum SyncEvent {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum SyncMutation {
-    Put { key: String, value: Vec<u8> },
-    Delete { key: String },
+    Put {
+        key: String,
+        value: Vec<u8>,
+        version: Option<u64>,
+    },
+    Delete {
+        key: String,
+        version: Option<u64>,
+    },
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -107,6 +114,8 @@ pub struct SyncConflict {
     pub key: String,
     pub remote_value: Option<Vec<u8>>,
     pub local_value: Option<Vec<u8>>,
+    pub remote_version: Option<u64>,
+    pub local_version: Option<u64>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

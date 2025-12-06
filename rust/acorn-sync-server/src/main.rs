@@ -15,6 +15,11 @@ use std::sync::Arc;
 use tokio::{select, sync::broadcast};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
+#[derive(Debug, Clone, serde::Serialize)]
+struct StreamEvent {
+    message: String,
+}
+
 #[tokio::main]
 async fn main() {
     tracing_subscriber::registry()
@@ -46,7 +51,7 @@ async fn health() -> &'static str {
 #[derive(Clone)]
 struct AppState {
     trunk: Arc<Mutex<BackendTrunk>>,
-    notifier: broadcast::Sender<String>,
+    notifier: broadcast::Sender<StreamEvent>,
 }
 
 impl AppState {
@@ -109,6 +114,7 @@ async fn apply_batch(
 ) -> Result<Json<SyncApplyResponse>, (StatusCode, Json<SyncErrorResponse>)> {
     let trunk = state.trunk.lock();
     let mut applied = 0usize;
+    let mut conflicts = 0usize;
 
     for op in &payload.batch.operations {
         match op {
@@ -133,16 +139,16 @@ async fn apply_batch(
         }
     }
 
-    let _ = state.notifier.send(format!(
-        "branch:{} applied:{}",
-        payload.batch.branch.as_str(),
-        applied
-    ));
+    let _ = state.notifier.send(StreamEvent {
+        message: format!(
+            "branch:{} applied:{} conflicts:{}",
+            payload.batch.branch.as_str(),
+            applied,
+            conflicts
+        ),
+    });
 
-    Ok(Json(SyncApplyResponse {
-        applied,
-        conflicts: 0,
-    }))
+    Ok(Json(SyncApplyResponse { applied, conflicts }))
 }
 
 #[derive(Debug, serde::Deserialize)]
