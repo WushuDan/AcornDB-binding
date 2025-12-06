@@ -2,10 +2,11 @@
 
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::SystemTime;
 
 use acorn_core::{
     AcornError, AcornResult, BranchId, CapabilityAdvertiser, HistoryEvent, Nut, Trunk,
-    TrunkCapability,
+    TrunkCapability, Ttl, TtlProvider,
 };
 use parking_lot::RwLock;
 
@@ -18,6 +19,7 @@ pub struct MemoryTrunk {
 struct Inner {
     data: HashMap<(BranchId, String), Vec<u8>>,
     history: HashMap<BranchId, Vec<HistoryEvent<Vec<u8>>>>,
+    ttl: HashMap<(BranchId, String), SystemTime>,
 }
 
 impl MemoryTrunk {
@@ -32,7 +34,22 @@ impl MemoryTrunk {
 
 impl Trunk<Vec<u8>> for MemoryTrunk {
     fn get(&self, branch: &BranchId, key: &str) -> AcornResult<Option<Nut<Vec<u8>>>> {
-        let guard = self.inner.read();
+        let mut guard = self.inner.write();
+        if let Some(expires_at) = guard.ttl.get(&(branch.clone(), key.to_string())) {
+            if SystemTime::now() >= *expires_at {
+                guard.ttl.remove(&(branch.clone(), key.to_string()));
+                guard.data.remove(&(branch.clone(), key.to_string()));
+                guard
+                    .history
+                    .entry(branch.clone())
+                    .or_default()
+                    .push(HistoryEvent::Delete {
+                        key: key.to_string(),
+                    });
+                return Ok(None);
+            }
+        }
+
         Ok(guard
             .data
             .get(&(branch.clone(), key.to_string()))
@@ -77,7 +94,26 @@ impl Trunk<Vec<u8>> for MemoryTrunk {
 
 impl CapabilityAdvertiser for MemoryTrunk {
     fn capabilities(&self) -> &'static [TrunkCapability] {
-        &[TrunkCapability::History]
+        &[TrunkCapability::History, TrunkCapability::Ttl]
+    }
+}
+
+impl TtlProvider<Vec<u8>> for MemoryTrunk {
+    fn put_with_ttl(&self, branch: &BranchId, key: &str, nut: Nut<Vec<u8>>, ttl: Ttl) -> AcornResult<()> {
+        let mut guard = self.inner.write();
+        guard.ttl.insert((branch.clone(), key.to_string()), ttl.expires_at);
+        guard
+            .history
+            .entry(branch.clone())
+            .or_default()
+            .push(HistoryEvent::Put {
+                key: key.to_string(),
+                nut: Nut {
+                    value: nut.value.clone(),
+                },
+            });
+        guard.data.insert((branch.clone(), key.to_string()), nut.value);
+        Ok(())
     }
 }
 
@@ -125,5 +161,22 @@ mod tests {
             HistoryEvent::Delete { key } => assert_eq!(key, "key"),
             _ => panic!("expected delete history"),
         }
+    }
+
+    #[test]
+    fn expires_entries_with_ttl() {
+        let trunk = MemoryTrunk::new();
+        let branch = BranchId::new("ttl");
+        let ttl = Ttl {
+            expires_at: SystemTime::now() + std::time::Duration::from_millis(10),
+        };
+
+        trunk
+            .put_with_ttl(&branch, "key", Nut { value: b"live".to_vec() }, ttl)
+            .unwrap();
+        assert!(trunk.get(&branch, "key").unwrap().is_some());
+
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        assert!(trunk.get(&branch, "key").unwrap().is_none());
     }
 }

@@ -158,6 +158,16 @@ where
     }
 }
 
+impl<T, S> Tree<T, S>
+where
+    T: Clone + Send + Sync + 'static,
+    S: Trunk<T> + TtlProvider<T> + Clone,
+{
+    pub fn put_with_ttl(&self, key: &str, nut: Nut<T>, ttl: Ttl) -> AcornResult<()> {
+        self.trunk.put_with_ttl(&self.branch, key, nut, ttl)
+    }
+}
+
 /// Tree wrapper that encodes/decodes typed payloads to byte-oriented trunks.
 #[derive(Debug, Clone)]
 pub struct EncodedTree<T, S, C>
