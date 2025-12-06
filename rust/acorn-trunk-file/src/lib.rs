@@ -114,7 +114,9 @@ impl TtlProvider<Vec<u8>> for FileTrunk {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use acorn_test_harness::TrunkContract;
     use std::fs;
+    use acorn_core::CapabilityAdvertiser;
 
     #[test]
     fn put_get_delete_round_trip() {
@@ -165,5 +167,13 @@ mod tests {
 
         std::thread::sleep(std::time::Duration::from_millis(20));
         assert!(trunk.get(&branch, "key").unwrap().is_none());
+    }
+
+    #[test]
+    fn contract_round_trip_and_capabilities() {
+        let tmp_dir = tempfile::tempdir().unwrap();
+        let trunk = FileTrunk::new(tmp_dir.path());
+        TrunkContract::round_trip_bytes(&trunk).unwrap();
+        TrunkContract::assert_capabilities(&trunk, &[]);
     }
 }

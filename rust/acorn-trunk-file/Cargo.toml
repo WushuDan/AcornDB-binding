@@ -7,6 +7,7 @@ publish = false
 
 [dependencies]
 acorn-core = { path = "../acorn-core" }
+acorn-test-harness = { path = "../acorn-test-harness", optional = true }
 sqlx = { workspace = true, optional = true }
 sled = { workspace = true, optional = true }
 tokio = { workspace = true, optional = true }
@@ -18,3 +19,4 @@ default = ["filesystem"]
 filesystem = []
 sled = ["dep:sled"]
 sqlite = ["sqlx/sqlite", "dep:sqlx"]
+contract-tests = ["acorn-test-harness"]
