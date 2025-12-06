@@ -171,6 +171,7 @@ name = "acorn-trunk-mem"
 version = "0.0.1-alpha.0"
 dependencies = [
  "acorn-core",
+ "acorn-test-harness",
  "parking_lot 0.12.5",
  "serde",
  "tracing",

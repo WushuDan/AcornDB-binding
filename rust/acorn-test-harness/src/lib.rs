@@ -1,9 +1,10 @@
 #![allow(dead_code)]
 
 use acorn_core::{
-    AcornError, AcornResult, BranchId, HistoryEvent, Nut, Trunk, TrunkCapability, Ttl, TtlProvider,
+    AcornResult, BranchId, CapabilityAdvertiser, HistoryEvent, Nut, Trunk, TrunkCapability, Ttl,
+    TtlProvider,
 };
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 
 #[derive(Debug, Clone)]
 pub struct TrunkContract;
@@ -41,9 +42,9 @@ impl TrunkContract {
 
     pub fn assert_capabilities<S>(trunk: &S, expected: &[TrunkCapability])
     where
-        S: Trunk<Vec<u8>>,
+        S: Trunk<Vec<u8>> + CapabilityAdvertiser,
     {
-        let caps = trunk.capabilities();
+        let caps = CapabilityAdvertiser::capabilities(trunk);
         for cap in expected {
             assert!(
                 caps.contains(cap),
@@ -60,7 +61,7 @@ impl TrunkContract {
         let branch = BranchId::new("ttl-contract");
         let key = "ttl-key";
         let ttl = Ttl {
-            expires_at: std::time::SystemTime::now() + Duration::from_millis(5),
+            expires_at: SystemTime::now() + Duration::from_millis(5),
         };
         trunk.put_with_ttl(
             &branch,

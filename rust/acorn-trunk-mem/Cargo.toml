@@ -10,7 +10,9 @@ acorn-core = { path = "../acorn-core" }
 parking_lot = { workspace = true }
 tracing = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
+acorn-test-harness = { path = "../acorn-test-harness", optional = true }
 
 [features]
 default = []
 clock-control = []
+contract-tests = ["acorn-test-harness"]

@@ -118,8 +118,9 @@ impl TtlProvider<Vec<u8>> for MemoryTrunk {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use acorn_core::{EncodedTree, JsonCodec};
+    use acorn_core::{CapabilityAdvertiser, EncodedTree, JsonCodec};
     use serde::{Deserialize, Serialize};
+    use acorn_test_harness::TrunkContract;
 
     #[test]
     fn put_get_delete_round_trip() {
@@ -222,5 +223,13 @@ mod tests {
 
         let fetched = tree.get("key").unwrap().unwrap();
         assert_eq!(fetched.value, value);
+    }
+
+    #[test]
+    fn contract_round_trip_and_ttl() {
+        let trunk = MemoryTrunk::new();
+        TrunkContract::round_trip_bytes(&trunk).unwrap();
+        TrunkContract::assert_capabilities(&trunk, &[TrunkCapability::History, TrunkCapability::Ttl]);
+        TrunkContract::ttl_expiry(&trunk).unwrap();
     }
 }
