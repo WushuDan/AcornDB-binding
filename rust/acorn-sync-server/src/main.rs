@@ -1,3 +1,6 @@
+use acorn_core::BranchId;
+use acorn_sync::{SyncApplyRequest, SyncApplyResponse, SyncErrorResponse, SyncMutation, SyncPullResponse};
+use acorn_trunk_mem::MemoryTrunk;
 use axum::{
     extract::{ws::WebSocketUpgrade, Query, State},
     http::StatusCode,
@@ -6,14 +9,10 @@ use axum::{
     Json, Router,
 };
 use parking_lot::Mutex;
-use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
+use tokio::{select, sync::broadcast};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
-
-use acorn_core::BranchId;
-use acorn_sync::{SyncApplyRequest, SyncApplyResponse, SyncErrorResponse, SyncMutation, SyncPullResponse};
-use acorn_trunk_mem::MemoryTrunk;
 
 #[tokio::main]
 async fn main() {
@@ -22,7 +21,7 @@ async fn main() {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    let state = AppState::default();
+    let state = AppState::new();
 
     let app = Router::new()
         .route("/health", get(health))
@@ -43,9 +42,20 @@ async fn health() -> &'static str {
     "ok"
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone)]
 struct AppState {
     trunk: Arc<Mutex<MemoryTrunk>>,
+    notifier: broadcast::Sender<String>,
+}
+
+impl AppState {
+    fn new() -> Self {
+        let (tx, _rx) = broadcast::channel(64);
+        Self {
+            trunk: Arc::new(MemoryTrunk::new()),
+            notifier: tx,
+        }
+    }
 }
 
 async fn apply_batch(
@@ -71,6 +81,12 @@ async fn apply_batch(
             }
         }
     }
+
+    let _ = state.notifier.send(format!(
+        "branch:{} applied:{}",
+        payload.batch.branch.as_str(),
+        applied
+    ));
 
     Ok(Json(SyncApplyResponse {
         applied,
@@ -108,20 +124,33 @@ async fn pull_batch(
     }))
 }
 
-async fn stream_updates(ws: WebSocketUpgrade) -> impl IntoResponse {
-    ws.on_upgrade(handle_ws)
+async fn stream_updates(State(state): State<AppState>, ws: WebSocketUpgrade) -> impl IntoResponse {
+    let receiver = state.notifier.subscribe();
+    ws.on_upgrade(move |socket| handle_ws(socket, receiver))
 }
 
-async fn handle_ws(mut socket: axum::extract::ws::WebSocket) {
+async fn handle_ws(mut socket: axum::extract::ws::WebSocket, mut receiver: broadcast::Receiver<String>) {
     use axum::extract::ws::Message;
-    if let Err(e) = socket.send(Message::Text("heartbeat".into())).await {
-        tracing::warn!("failed to send heartbeat: {}", e);
-        return;
-    }
-    while let Some(msg) = socket.recv().await {
-        match msg {
-            Ok(Message::Close(_)) => break,
-            _ => {}
+    loop {
+        select! {
+            maybe_msg = receiver.recv() => {
+                match maybe_msg {
+                    Ok(text) => {
+                        if socket.send(Message::Text(text)).await.is_err() {
+                            break;
+                        }
+                    }
+                    Err(broadcast::error::RecvError::Closed) => break,
+                    Err(broadcast::error::RecvError::Lagged(_)) => continue,
+                }
+            }
+            incoming = socket.recv() => {
+                match incoming {
+                    Some(Ok(Message::Close(_))) => break,
+                    Some(Ok(_)) => continue,
+                    _ => break,
+                }
+            }
         }
     }
 }
