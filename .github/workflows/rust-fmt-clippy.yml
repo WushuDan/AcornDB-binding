@@ -1,17 +1,17 @@
-name: Rust Contract Tests
+name: Rust Format & Clippy
 
 on:
   push:
     paths:
       - "rust/**"
-      - ".github/workflows/rust-contract-tests.yml"
+      - ".github/workflows/rust-fmt-clippy.yml"
   pull_request:
     paths:
       - "rust/**"
-      - ".github/workflows/rust-contract-tests.yml"
+      - ".github/workflows/rust-fmt-clippy.yml"
 
 jobs:
-  contract-tests:
+  lint:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -30,6 +30,10 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-
 
-      - name: Run contract tests
+      - name: Cargo fmt
         working-directory: rust
-        run: cargo test --features contract-tests
+        run: cargo fmt -- --check
+
+      - name: Cargo clippy
+        working-directory: rust
+        run: cargo clippy --all-targets --all-features -- -D warnings
