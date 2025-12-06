@@ -95,6 +95,26 @@ impl TrunkContract {
         }
         saw_put && saw_delete
     }
+
+    pub fn assert_history(events: &[HistoryEvent<Vec<u8>>], key: &str) -> AcornResult<()> {
+        let mut saw_put = false;
+        let mut saw_delete = false;
+        for event in events {
+            match event {
+                HistoryEvent::Put { key: k, .. } if k == key => saw_put = true,
+                HistoryEvent::Delete { key: k } if k == key => saw_delete = true,
+                _ => {}
+            }
+        }
+
+        if !saw_put {
+            return Err(harness_err("missing put history event"));
+        }
+        if !saw_delete {
+            return Err(harness_err("missing delete history event"));
+        }
+        Ok(())
+    }
 }
 
 fn harness_err(msg: &str) -> acorn_core::AcornError {
