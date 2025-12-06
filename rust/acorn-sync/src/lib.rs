@@ -108,6 +108,7 @@ pub struct SyncApplyResponse {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct SyncPullResponse {
     pub batch: SyncBatch,
+    pub versions: Vec<(String, u64)>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

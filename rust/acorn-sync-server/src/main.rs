@@ -21,6 +21,7 @@ struct StreamEvent {
     applied: usize,
     conflicts: usize,
     conflict_keys: Vec<String>,
+    versions: Vec<(String, u64)>,
 }
 
 #[tokio::main]
@@ -180,6 +181,17 @@ async fn apply_batch(
         applied,
         conflicts: conflict_keys.len(),
         conflict_keys: conflict_keys.clone(),
+        versions: conflict_keys
+            .into_iter()
+            .filter_map(|key| {
+                state
+                    .versions
+                    .lock()
+                    .get(&(payload.batch.branch.clone(), key.clone()))
+                    .copied()
+                    .map(|v| (key, v))
+            })
+            .collect(),
     });
 
     Ok(Json(SyncApplyResponse {
@@ -209,13 +221,18 @@ async fn pull_batch(
     let branch = BranchId::new(query.branch.unwrap_or_else(|| "default".into()));
     let trunk = state.trunk.lock();
     let mut ops = Vec::new();
+    let mut versions = Vec::new();
 
     for key in trunk.keys(&branch) {
         if let Some(value) = trunk.get(&branch, &key) {
             ops.push(SyncMutation::Put {
                 key: key.clone(),
                 value,
+                version: None,
             });
+            if let Some(v) = state.versions.lock().get(&(branch.clone(), key.clone())).copied() {
+                versions.push((key, v));
+            }
         }
     }
 
@@ -224,6 +241,7 @@ async fn pull_batch(
             branch,
             operations: ops,
         },
+        versions,
     }))
 }
 
