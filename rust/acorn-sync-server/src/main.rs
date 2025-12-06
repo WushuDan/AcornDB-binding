@@ -53,6 +53,7 @@ async fn health() -> &'static str {
 #[derive(Clone)]
 struct AppState {
     trunk: Arc<Mutex<BackendTrunk>>,
+    versions: Arc<Mutex<HashMap<(BranchId, String), u64>>>,
     notifier: broadcast::Sender<StreamEvent>,
 }
 
@@ -61,6 +62,7 @@ impl AppState {
         let (tx, _rx) = broadcast::channel(64);
         Self {
             trunk: Arc::new(BackendTrunk::from_env()),
+            versions: Arc::new(Mutex::new(HashMap::new())),
             notifier: tx,
         }
     }
@@ -115,16 +117,23 @@ async fn apply_batch(
     Json(payload): Json<SyncApplyRequest>,
 ) -> Result<Json<SyncApplyResponse>, (StatusCode, Json<SyncErrorResponse>)> {
     let trunk = state.trunk.lock();
+    let mut versions = state.versions.lock();
     let mut applied = 0usize;
     let mut conflicts = 0usize;
 
     for op in &payload.batch.operations {
         match op {
             SyncMutation::Put { key, value, version } => {
-                // naive version check: if version provided and key exists, treat as conflict
-                if version.is_some() && trunk.get(&payload.batch.branch, key).is_some() {
-                    conflicts += 1;
-                    continue;
+                let current_version = versions
+                    .get(&(payload.batch.branch.clone(), key.clone()))
+                    .copied();
+                if let Some(expected) = version {
+                    if let Some(existing) = current_version {
+                        if existing != *expected {
+                            conflicts += 1;
+                            continue;
+                        }
+                    }
                 }
                 if let Err(e) = trunk.put(&payload.batch.branch, key, value.clone()) {
                     return Err((
@@ -132,10 +141,23 @@ async fn apply_batch(
                         Json(SyncErrorResponse { error: e.to_string() }),
                     ));
                 }
+                let next_version = current_version.unwrap_or(0).saturating_add(1);
+                versions.insert((payload.batch.branch.clone(), key.clone()), next_version);
                 applied += 1;
             }
             SyncMutation::Delete { key, version } => {
-                if version.is_some() && trunk.get(&payload.batch.branch, key).is_none() {
+                let current_version = versions
+                    .get(&(payload.batch.branch.clone(), key.clone()))
+                    .copied();
+                if let Some(expected) = version {
+                    if let Some(existing) = current_version {
+                        if existing != *expected {
+                            conflicts += 1;
+                            continue;
+                        }
+                    }
+                }
+                if trunk.get(&payload.batch.branch, key).is_none() {
                     conflicts += 1;
                     continue;
                 }
@@ -145,6 +167,7 @@ async fn apply_batch(
                         Json(SyncErrorResponse { error: e.to_string() }),
                     ));
                 }
+                versions.remove(&(payload.batch.branch.clone(), key.clone()));
                 applied += 1;
             }
         }
