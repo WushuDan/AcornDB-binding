@@ -1,2 +1,759 @@
 warning: acorn-canopy v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-canopy) ignoring invalid dependency `acorn-sync-server` which is missing a lib target
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.08s
+   0.084196500s  INFO prepare_target{force=false package_id=acorn-bench v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-bench) target="acorn_bench"}: cargo::core::compiler::fingerprint: fingerprint error for acorn-bench v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-bench)/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("acorn_bench", ["lib"], "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-bench/src/lib.rs", Edition2021) }
+   0.084214208s  INFO prepare_target{force=false package_id=acorn-bench v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-bench) target="acorn_bench"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/dan.hurley/dev/projects/AcornDB-binding/rust/target/debug/.fingerprint/acorn-bench-27e2bb9a30787cdf/lib-acorn_bench`
+
+Caused by:
+    No such file or directory (os error 2)
+
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: std::backtrace::Backtrace::capture
+   2: cargo_util::paths::read_bytes
+   3: cargo_util::paths::read
+   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   5: cargo::core::compiler::fingerprint::prepare_target
+   6: cargo::core::compiler::compile
+   7: <cargo::core::compiler::build_runner::BuildRunner>::compile
+   8: cargo::ops::cargo_compile::compile_ws
+   9: cargo::ops::cargo_compile::compile_with_exec
+  10: cargo::ops::cargo_compile::compile
+  11: cargo::commands::check::exec
+  12: <cargo::cli::Exec>::exec
+  13: cargo::main
+  14: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  15: std::rt::lang_start::<()>::{closure#0}
+  16: std::rt::lang_start_internal
+  17: _main
+   0.086682083s  INFO prepare_target{force=false package_id=acorn-core v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-core) target="acorn_core"}: cargo::core::compiler::fingerprint: fingerprint error for acorn-core v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-core)/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("acorn_core", ["lib"], "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-core/src/lib.rs", Edition2021) }
+   0.086688291s  INFO prepare_target{force=false package_id=acorn-core v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-core) target="acorn_core"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/dan.hurley/dev/projects/AcornDB-binding/rust/target/debug/.fingerprint/acorn-core-65bd2729c584e681/lib-acorn_core`
+
+Caused by:
+    No such file or directory (os error 2)
+
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: std::backtrace::Backtrace::capture
+   2: cargo_util::paths::read_bytes
+   3: cargo_util::paths::read
+   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   5: cargo::core::compiler::fingerprint::prepare_target
+   6: cargo::core::compiler::compile
+   7: cargo::core::compiler::compile
+   8: <cargo::core::compiler::build_runner::BuildRunner>::compile
+   9: cargo::ops::cargo_compile::compile_ws
+  10: cargo::ops::cargo_compile::compile_with_exec
+  11: cargo::ops::cargo_compile::compile
+  12: cargo::commands::check::exec
+  13: <cargo::cli::Exec>::exec
+  14: cargo::main
+  15: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  16: std::rt::lang_start::<()>::{closure#0}
+  17: std::rt::lang_start_internal
+  18: _main
+   0.087907708s  INFO prepare_target{force=false package_id=acorn-sync v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-sync) target="acorn_sync"}: cargo::core::compiler::fingerprint: fingerprint error for acorn-sync v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-sync)/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("acorn_sync", ["lib"], "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-sync/src/lib.rs", Edition2021) }
+   0.087911916s  INFO prepare_target{force=false package_id=acorn-sync v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-sync) target="acorn_sync"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/dan.hurley/dev/projects/AcornDB-binding/rust/target/debug/.fingerprint/acorn-sync-f8cf73e5eae9712f/lib-acorn_sync`
+
+Caused by:
+    No such file or directory (os error 2)
+
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: std::backtrace::Backtrace::capture
+   2: cargo_util::paths::read_bytes
+   3: cargo_util::paths::read
+   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   5: cargo::core::compiler::fingerprint::prepare_target
+   6: cargo::core::compiler::compile
+   7: cargo::core::compiler::compile
+   8: <cargo::core::compiler::build_runner::BuildRunner>::compile
+   9: cargo::ops::cargo_compile::compile_ws
+  10: cargo::ops::cargo_compile::compile_with_exec
+  11: cargo::ops::cargo_compile::compile
+  12: cargo::commands::check::exec
+  13: <cargo::cli::Exec>::exec
+  14: cargo::main
+  15: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  16: std::rt::lang_start::<()>::{closure#0}
+  17: std::rt::lang_start_internal
+  18: _main
+   0.088668583s  INFO prepare_target{force=false package_id=acorn-bench v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-bench) target="acorn_bench"}: cargo::core::compiler::fingerprint: fingerprint error for acorn-bench v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-bench)/Check { test: true }/TargetInner { name_inferred: true, ..: lib_target("acorn_bench", ["lib"], "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-bench/src/lib.rs", Edition2021) }
+   0.088674583s  INFO prepare_target{force=false package_id=acorn-bench v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-bench) target="acorn_bench"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/dan.hurley/dev/projects/AcornDB-binding/rust/target/debug/.fingerprint/acorn-bench-61469fb760af4326/test-lib-acorn_bench`
+
+Caused by:
+    No such file or directory (os error 2)
+
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: std::backtrace::Backtrace::capture
+   2: cargo_util::paths::read_bytes
+   3: cargo_util::paths::read
+   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   5: cargo::core::compiler::fingerprint::prepare_target
+   6: cargo::core::compiler::compile
+   7: <cargo::core::compiler::build_runner::BuildRunner>::compile
+   8: cargo::ops::cargo_compile::compile_ws
+   9: cargo::ops::cargo_compile::compile_with_exec
+  10: cargo::ops::cargo_compile::compile
+  11: cargo::commands::check::exec
+  12: <cargo::cli::Exec>::exec
+  13: cargo::main
+  14: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  15: std::rt::lang_start::<()>::{closure#0}
+  16: std::rt::lang_start_internal
+  17: _main
+   0.089303666s  INFO prepare_target{force=false package_id=acorn-canopy v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-canopy) target="acorn-canopy"}: cargo::core::compiler::fingerprint: fingerprint error for acorn-canopy v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-canopy)/Check { test: false }/TargetInner { name: "acorn-canopy", doc: true, ..: with_path("/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-canopy/src/main.rs", Edition2021) }
+   0.089307875s  INFO prepare_target{force=false package_id=acorn-canopy v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-canopy) target="acorn-canopy"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/dan.hurley/dev/projects/AcornDB-binding/rust/target/debug/.fingerprint/acorn-canopy-7d6e041a91edee90/bin-acorn-canopy`
+
+Caused by:
+    No such file or directory (os error 2)
+
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: std::backtrace::Backtrace::capture
+   2: cargo_util::paths::read_bytes
+   3: cargo_util::paths::read
+   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   5: cargo::core::compiler::fingerprint::prepare_target
+   6: cargo::core::compiler::compile
+   7: <cargo::core::compiler::build_runner::BuildRunner>::compile
+   8: cargo::ops::cargo_compile::compile_ws
+   9: cargo::ops::cargo_compile::compile_with_exec
+  10: cargo::ops::cargo_compile::compile
+  11: cargo::commands::check::exec
+  12: <cargo::cli::Exec>::exec
+  13: cargo::main
+  14: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  15: std::rt::lang_start::<()>::{closure#0}
+  16: std::rt::lang_start_internal
+  17: _main
+   0.089835583s  INFO prepare_target{force=false package_id=acorn-canopy v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-canopy) target="acorn-canopy"}: cargo::core::compiler::fingerprint: fingerprint error for acorn-canopy v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-canopy)/Check { test: true }/TargetInner { name: "acorn-canopy", doc: true, ..: with_path("/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-canopy/src/main.rs", Edition2021) }
+   0.089838958s  INFO prepare_target{force=false package_id=acorn-canopy v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-canopy) target="acorn-canopy"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/dan.hurley/dev/projects/AcornDB-binding/rust/target/debug/.fingerprint/acorn-canopy-fcdbe89f403d7a21/test-bin-acorn-canopy`
+
+Caused by:
+    No such file or directory (os error 2)
+
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: std::backtrace::Backtrace::capture
+   2: cargo_util::paths::read_bytes
+   3: cargo_util::paths::read
+   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   5: cargo::core::compiler::fingerprint::prepare_target
+   6: cargo::core::compiler::compile
+   7: <cargo::core::compiler::build_runner::BuildRunner>::compile
+   8: cargo::ops::cargo_compile::compile_ws
+   9: cargo::ops::cargo_compile::compile_with_exec
+  10: cargo::ops::cargo_compile::compile
+  11: cargo::commands::check::exec
+  12: <cargo::cli::Exec>::exec
+  13: cargo::main
+  14: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  15: std::rt::lang_start::<()>::{closure#0}
+  16: std::rt::lang_start_internal
+  17: _main
+   0.090731875s  INFO prepare_target{force=false package_id=acorn-cli v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-cli) target="acorn-cli"}: cargo::core::compiler::fingerprint: fingerprint error for acorn-cli v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-cli)/Check { test: false }/TargetInner { name: "acorn-cli", doc: true, ..: with_path("/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-cli/src/main.rs", Edition2021) }
+   0.090737666s  INFO prepare_target{force=false package_id=acorn-cli v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-cli) target="acorn-cli"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/dan.hurley/dev/projects/AcornDB-binding/rust/target/debug/.fingerprint/acorn-cli-1cbf67e55ec74e4c/bin-acorn-cli`
+
+Caused by:
+    No such file or directory (os error 2)
+
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: std::backtrace::Backtrace::capture
+   2: cargo_util::paths::read_bytes
+   3: cargo_util::paths::read
+   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   5: cargo::core::compiler::fingerprint::prepare_target
+   6: cargo::core::compiler::compile
+   7: <cargo::core::compiler::build_runner::BuildRunner>::compile
+   8: cargo::ops::cargo_compile::compile_ws
+   9: cargo::ops::cargo_compile::compile_with_exec
+  10: cargo::ops::cargo_compile::compile
+  11: cargo::commands::check::exec
+  12: <cargo::cli::Exec>::exec
+  13: cargo::main
+  14: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  15: std::rt::lang_start::<()>::{closure#0}
+  16: std::rt::lang_start_internal
+  17: _main
+   0.091089958s  INFO prepare_target{force=false package_id=acorn-trunk-file v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-file) target="acorn_trunk_file"}: cargo::core::compiler::fingerprint: fingerprint error for acorn-trunk-file v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-file)/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("acorn_trunk_file", ["lib"], "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-file/src/lib.rs", Edition2021) }
+   0.091094625s  INFO prepare_target{force=false package_id=acorn-trunk-file v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-file) target="acorn_trunk_file"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/dan.hurley/dev/projects/AcornDB-binding/rust/target/debug/.fingerprint/acorn-trunk-file-aa159fc33f0cb653/lib-acorn_trunk_file`
+
+Caused by:
+    No such file or directory (os error 2)
+
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: std::backtrace::Backtrace::capture
+   2: cargo_util::paths::read_bytes
+   3: cargo_util::paths::read
+   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   5: cargo::core::compiler::fingerprint::prepare_target
+   6: cargo::core::compiler::compile
+   7: cargo::core::compiler::compile
+   8: <cargo::core::compiler::build_runner::BuildRunner>::compile
+   9: cargo::ops::cargo_compile::compile_ws
+  10: cargo::ops::cargo_compile::compile_with_exec
+  11: cargo::ops::cargo_compile::compile
+  12: cargo::commands::check::exec
+  13: <cargo::cli::Exec>::exec
+  14: cargo::main
+  15: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  16: std::rt::lang_start::<()>::{closure#0}
+  17: std::rt::lang_start_internal
+  18: _main
+   0.091677166s  INFO prepare_target{force=false package_id=acorn-trunk-mem v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-mem) target="acorn_trunk_mem"}: cargo::core::compiler::fingerprint: fingerprint error for acorn-trunk-mem v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-mem)/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("acorn_trunk_mem", ["lib"], "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-mem/src/lib.rs", Edition2021) }
+   0.091682166s  INFO prepare_target{force=false package_id=acorn-trunk-mem v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-mem) target="acorn_trunk_mem"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/dan.hurley/dev/projects/AcornDB-binding/rust/target/debug/.fingerprint/acorn-trunk-mem-c38877817502ad89/lib-acorn_trunk_mem`
+
+Caused by:
+    No such file or directory (os error 2)
+
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: std::backtrace::Backtrace::capture
+   2: cargo_util::paths::read_bytes
+   3: cargo_util::paths::read
+   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   5: cargo::core::compiler::fingerprint::prepare_target
+   6: cargo::core::compiler::compile
+   7: cargo::core::compiler::compile
+   8: <cargo::core::compiler::build_runner::BuildRunner>::compile
+   9: cargo::ops::cargo_compile::compile_ws
+  10: cargo::ops::cargo_compile::compile_with_exec
+  11: cargo::ops::cargo_compile::compile
+  12: cargo::commands::check::exec
+  13: <cargo::cli::Exec>::exec
+  14: cargo::main
+  15: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  16: std::rt::lang_start::<()>::{closure#0}
+  17: std::rt::lang_start_internal
+  18: _main
+   0.092148333s  INFO prepare_target{force=false package_id=acorn-cli v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-cli) target="acorn-cli"}: cargo::core::compiler::fingerprint: fingerprint error for acorn-cli v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-cli)/Check { test: true }/TargetInner { name: "acorn-cli", doc: true, ..: with_path("/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-cli/src/main.rs", Edition2021) }
+   0.092151541s  INFO prepare_target{force=false package_id=acorn-cli v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-cli) target="acorn-cli"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/dan.hurley/dev/projects/AcornDB-binding/rust/target/debug/.fingerprint/acorn-cli-bb99c6edf2c333d6/test-bin-acorn-cli`
+
+Caused by:
+    No such file or directory (os error 2)
+
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: std::backtrace::Backtrace::capture
+   2: cargo_util::paths::read_bytes
+   3: cargo_util::paths::read
+   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   5: cargo::core::compiler::fingerprint::prepare_target
+   6: cargo::core::compiler::compile
+   7: <cargo::core::compiler::build_runner::BuildRunner>::compile
+   8: cargo::ops::cargo_compile::compile_ws
+   9: cargo::ops::cargo_compile::compile_with_exec
+  10: cargo::ops::cargo_compile::compile
+  11: cargo::commands::check::exec
+  12: <cargo::cli::Exec>::exec
+  13: cargo::main
+  14: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  15: std::rt::lang_start::<()>::{closure#0}
+  16: std::rt::lang_start_internal
+  17: _main
+   0.092497250s  INFO prepare_target{force=false package_id=acorn-core v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-core) target="acorn_core"}: cargo::core::compiler::fingerprint: fingerprint error for acorn-core v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-core)/Check { test: true }/TargetInner { name_inferred: true, ..: lib_target("acorn_core", ["lib"], "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-core/src/lib.rs", Edition2021) }
+   0.092502000s  INFO prepare_target{force=false package_id=acorn-core v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-core) target="acorn_core"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/dan.hurley/dev/projects/AcornDB-binding/rust/target/debug/.fingerprint/acorn-core-54471ca43e71504b/test-lib-acorn_core`
+
+Caused by:
+    No such file or directory (os error 2)
+
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: std::backtrace::Backtrace::capture
+   2: cargo_util::paths::read_bytes
+   3: cargo_util::paths::read
+   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   5: cargo::core::compiler::fingerprint::prepare_target
+   6: cargo::core::compiler::compile
+   7: <cargo::core::compiler::build_runner::BuildRunner>::compile
+   8: cargo::ops::cargo_compile::compile_ws
+   9: cargo::ops::cargo_compile::compile_with_exec
+  10: cargo::ops::cargo_compile::compile
+  11: cargo::commands::check::exec
+  12: <cargo::cli::Exec>::exec
+  13: cargo::main
+  14: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  15: std::rt::lang_start::<()>::{closure#0}
+  16: std::rt::lang_start_internal
+  17: _main
+   0.092737458s  INFO prepare_target{force=false package_id=acorn-sample-apps v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-sample-apps) target="acorn_sample_apps"}: cargo::core::compiler::fingerprint: fingerprint error for acorn-sample-apps v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-sample-apps)/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("acorn_sample_apps", ["lib"], "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-sample-apps/src/lib.rs", Edition2021) }
+   0.092742250s  INFO prepare_target{force=false package_id=acorn-sample-apps v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-sample-apps) target="acorn_sample_apps"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/dan.hurley/dev/projects/AcornDB-binding/rust/target/debug/.fingerprint/acorn-sample-apps-04631e365cb31625/lib-acorn_sample_apps`
+
+Caused by:
+    No such file or directory (os error 2)
+
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: std::backtrace::Backtrace::capture
+   2: cargo_util::paths::read_bytes
+   3: cargo_util::paths::read
+   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   5: cargo::core::compiler::fingerprint::prepare_target
+   6: cargo::core::compiler::compile
+   7: <cargo::core::compiler::build_runner::BuildRunner>::compile
+   8: cargo::ops::cargo_compile::compile_ws
+   9: cargo::ops::cargo_compile::compile_with_exec
+  10: cargo::ops::cargo_compile::compile
+  11: cargo::commands::check::exec
+  12: <cargo::cli::Exec>::exec
+  13: cargo::main
+  14: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  15: std::rt::lang_start::<()>::{closure#0}
+  16: std::rt::lang_start_internal
+  17: _main
+   0.093028208s  INFO prepare_target{force=false package_id=acorn-sample-apps v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-sample-apps) target="acorn_sample_apps"}: cargo::core::compiler::fingerprint: fingerprint error for acorn-sample-apps v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-sample-apps)/Check { test: true }/TargetInner { name_inferred: true, ..: lib_target("acorn_sample_apps", ["lib"], "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-sample-apps/src/lib.rs", Edition2021) }
+   0.093033083s  INFO prepare_target{force=false package_id=acorn-sample-apps v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-sample-apps) target="acorn_sample_apps"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/dan.hurley/dev/projects/AcornDB-binding/rust/target/debug/.fingerprint/acorn-sample-apps-01b8cf9ab4ebc5a9/test-lib-acorn_sample_apps`
+
+Caused by:
+    No such file or directory (os error 2)
+
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: std::backtrace::Backtrace::capture
+   2: cargo_util::paths::read_bytes
+   3: cargo_util::paths::read
+   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   5: cargo::core::compiler::fingerprint::prepare_target
+   6: cargo::core::compiler::compile
+   7: <cargo::core::compiler::build_runner::BuildRunner>::compile
+   8: cargo::ops::cargo_compile::compile_ws
+   9: cargo::ops::cargo_compile::compile_with_exec
+  10: cargo::ops::cargo_compile::compile
+  11: cargo::commands::check::exec
+  12: <cargo::cli::Exec>::exec
+  13: cargo::main
+  14: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  15: std::rt::lang_start::<()>::{closure#0}
+  16: std::rt::lang_start_internal
+  17: _main
+   0.093327583s  INFO prepare_target{force=false package_id=acorn-sync v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-sync) target="acorn_sync"}: cargo::core::compiler::fingerprint: fingerprint error for acorn-sync v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-sync)/Check { test: true }/TargetInner { name_inferred: true, ..: lib_target("acorn_sync", ["lib"], "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-sync/src/lib.rs", Edition2021) }
+   0.093332416s  INFO prepare_target{force=false package_id=acorn-sync v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-sync) target="acorn_sync"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/dan.hurley/dev/projects/AcornDB-binding/rust/target/debug/.fingerprint/acorn-sync-ed504286fb28af17/test-lib-acorn_sync`
+
+Caused by:
+    No such file or directory (os error 2)
+
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: std::backtrace::Backtrace::capture
+   2: cargo_util::paths::read_bytes
+   3: cargo_util::paths::read
+   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   5: cargo::core::compiler::fingerprint::prepare_target
+   6: cargo::core::compiler::compile
+   7: <cargo::core::compiler::build_runner::BuildRunner>::compile
+   8: cargo::ops::cargo_compile::compile_ws
+   9: cargo::ops::cargo_compile::compile_with_exec
+  10: cargo::ops::cargo_compile::compile
+  11: cargo::commands::check::exec
+  12: <cargo::cli::Exec>::exec
+  13: cargo::main
+  14: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  15: std::rt::lang_start::<()>::{closure#0}
+  16: std::rt::lang_start_internal
+  17: _main
+   0.095370916s  INFO prepare_target{force=false package_id=acorn-sync-server v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-sync-server) target="acorn-sync-server"}: cargo::core::compiler::fingerprint: fingerprint error for acorn-sync-server v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-sync-server)/Check { test: false }/TargetInner { name: "acorn-sync-server", doc: true, ..: with_path("/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-sync-server/src/main.rs", Edition2021) }
+   0.095375125s  INFO prepare_target{force=false package_id=acorn-sync-server v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-sync-server) target="acorn-sync-server"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/dan.hurley/dev/projects/AcornDB-binding/rust/target/debug/.fingerprint/acorn-sync-server-d8f0714eded9a212/bin-acorn-sync-server`
+
+Caused by:
+    No such file or directory (os error 2)
+
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: std::backtrace::Backtrace::capture
+   2: cargo_util::paths::read_bytes
+   3: cargo_util::paths::read
+   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   5: cargo::core::compiler::fingerprint::prepare_target
+   6: cargo::core::compiler::compile
+   7: <cargo::core::compiler::build_runner::BuildRunner>::compile
+   8: cargo::ops::cargo_compile::compile_ws
+   9: cargo::ops::cargo_compile::compile_with_exec
+  10: cargo::ops::cargo_compile::compile
+  11: cargo::commands::check::exec
+  12: <cargo::cli::Exec>::exec
+  13: cargo::main
+  14: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  15: std::rt::lang_start::<()>::{closure#0}
+  16: std::rt::lang_start_internal
+  17: _main
+   0.097287041s  INFO prepare_target{force=false package_id=acorn-sync-server v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-sync-server) target="acorn-sync-server"}: cargo::core::compiler::fingerprint: fingerprint error for acorn-sync-server v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-sync-server)/Check { test: true }/TargetInner { name: "acorn-sync-server", doc: true, ..: with_path("/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-sync-server/src/main.rs", Edition2021) }
+   0.097292291s  INFO prepare_target{force=false package_id=acorn-sync-server v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-sync-server) target="acorn-sync-server"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/dan.hurley/dev/projects/AcornDB-binding/rust/target/debug/.fingerprint/acorn-sync-server-983fdb2249802a44/test-bin-acorn-sync-server`
+
+Caused by:
+    No such file or directory (os error 2)
+
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: std::backtrace::Backtrace::capture
+   2: cargo_util::paths::read_bytes
+   3: cargo_util::paths::read
+   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   5: cargo::core::compiler::fingerprint::prepare_target
+   6: cargo::core::compiler::compile
+   7: <cargo::core::compiler::build_runner::BuildRunner>::compile
+   8: cargo::ops::cargo_compile::compile_ws
+   9: cargo::ops::cargo_compile::compile_with_exec
+  10: cargo::ops::cargo_compile::compile
+  11: cargo::commands::check::exec
+  12: <cargo::cli::Exec>::exec
+  13: cargo::main
+  14: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  15: std::rt::lang_start::<()>::{closure#0}
+  16: std::rt::lang_start_internal
+  17: _main
+   0.097655250s  INFO prepare_target{force=false package_id=acorn-test-harness v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-test-harness) target="acorn_test_harness"}: cargo::core::compiler::fingerprint: fingerprint error for acorn-test-harness v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-test-harness)/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("acorn_test_harness", ["lib"], "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-test-harness/src/lib.rs", Edition2021) }
+   0.097661166s  INFO prepare_target{force=false package_id=acorn-test-harness v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-test-harness) target="acorn_test_harness"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/dan.hurley/dev/projects/AcornDB-binding/rust/target/debug/.fingerprint/acorn-test-harness-a1043797e65346ab/lib-acorn_test_harness`
+
+Caused by:
+    No such file or directory (os error 2)
+
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: std::backtrace::Backtrace::capture
+   2: cargo_util::paths::read_bytes
+   3: cargo_util::paths::read
+   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   5: cargo::core::compiler::fingerprint::prepare_target
+   6: cargo::core::compiler::compile
+   7: <cargo::core::compiler::build_runner::BuildRunner>::compile
+   8: cargo::ops::cargo_compile::compile_ws
+   9: cargo::ops::cargo_compile::compile_with_exec
+  10: cargo::ops::cargo_compile::compile
+  11: cargo::commands::check::exec
+  12: <cargo::cli::Exec>::exec
+  13: cargo::main
+  14: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  15: std::rt::lang_start::<()>::{closure#0}
+  16: std::rt::lang_start_internal
+  17: _main
+   0.097920000s  INFO prepare_target{force=false package_id=acorn-test-harness v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-test-harness) target="acorn_test_harness"}: cargo::core::compiler::fingerprint: fingerprint error for acorn-test-harness v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-test-harness)/Check { test: true }/TargetInner { name_inferred: true, ..: lib_target("acorn_test_harness", ["lib"], "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-test-harness/src/lib.rs", Edition2021) }
+   0.097924000s  INFO prepare_target{force=false package_id=acorn-test-harness v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-test-harness) target="acorn_test_harness"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/dan.hurley/dev/projects/AcornDB-binding/rust/target/debug/.fingerprint/acorn-test-harness-100c6bdedbfa63be/test-lib-acorn_test_harness`
+
+Caused by:
+    No such file or directory (os error 2)
+
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: std::backtrace::Backtrace::capture
+   2: cargo_util::paths::read_bytes
+   3: cargo_util::paths::read
+   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   5: cargo::core::compiler::fingerprint::prepare_target
+   6: cargo::core::compiler::compile
+   7: <cargo::core::compiler::build_runner::BuildRunner>::compile
+   8: cargo::ops::cargo_compile::compile_ws
+   9: cargo::ops::cargo_compile::compile_with_exec
+  10: cargo::ops::cargo_compile::compile
+  11: cargo::commands::check::exec
+  12: <cargo::cli::Exec>::exec
+  13: cargo::main
+  14: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  15: std::rt::lang_start::<()>::{closure#0}
+  16: std::rt::lang_start_internal
+  17: _main
+   0.098183791s  INFO prepare_target{force=false package_id=acorn-trunk-cloud-azure v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-cloud-azure) target="acorn_trunk_cloud_azure"}: cargo::core::compiler::fingerprint: fingerprint error for acorn-trunk-cloud-azure v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-cloud-azure)/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("acorn_trunk_cloud_azure", ["lib"], "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-cloud-azure/src/lib.rs", Edition2021) }
+   0.098188041s  INFO prepare_target{force=false package_id=acorn-trunk-cloud-azure v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-cloud-azure) target="acorn_trunk_cloud_azure"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/dan.hurley/dev/projects/AcornDB-binding/rust/target/debug/.fingerprint/acorn-trunk-cloud-azure-68f875839e00049c/lib-acorn_trunk_cloud_azure`
+
+Caused by:
+    No such file or directory (os error 2)
+
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: std::backtrace::Backtrace::capture
+   2: cargo_util::paths::read_bytes
+   3: cargo_util::paths::read
+   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   5: cargo::core::compiler::fingerprint::prepare_target
+   6: cargo::core::compiler::compile
+   7: <cargo::core::compiler::build_runner::BuildRunner>::compile
+   8: cargo::ops::cargo_compile::compile_ws
+   9: cargo::ops::cargo_compile::compile_with_exec
+  10: cargo::ops::cargo_compile::compile
+  11: cargo::commands::check::exec
+  12: <cargo::cli::Exec>::exec
+  13: cargo::main
+  14: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  15: std::rt::lang_start::<()>::{closure#0}
+  16: std::rt::lang_start_internal
+  17: _main
+   0.098368083s  INFO prepare_target{force=false package_id=acorn-trunk-cloud-azure v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-cloud-azure) target="acorn_trunk_cloud_azure"}: cargo::core::compiler::fingerprint: fingerprint error for acorn-trunk-cloud-azure v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-cloud-azure)/Check { test: true }/TargetInner { name_inferred: true, ..: lib_target("acorn_trunk_cloud_azure", ["lib"], "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-cloud-azure/src/lib.rs", Edition2021) }
+   0.098372166s  INFO prepare_target{force=false package_id=acorn-trunk-cloud-azure v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-cloud-azure) target="acorn_trunk_cloud_azure"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/dan.hurley/dev/projects/AcornDB-binding/rust/target/debug/.fingerprint/acorn-trunk-cloud-azure-faf7edd1ccb2faa0/test-lib-acorn_trunk_cloud_azure`
+
+Caused by:
+    No such file or directory (os error 2)
+
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: std::backtrace::Backtrace::capture
+   2: cargo_util::paths::read_bytes
+   3: cargo_util::paths::read
+   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   5: cargo::core::compiler::fingerprint::prepare_target
+   6: cargo::core::compiler::compile
+   7: <cargo::core::compiler::build_runner::BuildRunner>::compile
+   8: cargo::ops::cargo_compile::compile_ws
+   9: cargo::ops::cargo_compile::compile_with_exec
+  10: cargo::ops::cargo_compile::compile
+  11: cargo::commands::check::exec
+  12: <cargo::cli::Exec>::exec
+  13: cargo::main
+  14: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  15: std::rt::lang_start::<()>::{closure#0}
+  16: std::rt::lang_start_internal
+  17: _main
+   0.098568041s  INFO prepare_target{force=false package_id=acorn-trunk-cloud-s3 v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-cloud-s3) target="acorn_trunk_cloud_s3"}: cargo::core::compiler::fingerprint: fingerprint error for acorn-trunk-cloud-s3 v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-cloud-s3)/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("acorn_trunk_cloud_s3", ["lib"], "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-cloud-s3/src/lib.rs", Edition2021) }
+   0.098572208s  INFO prepare_target{force=false package_id=acorn-trunk-cloud-s3 v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-cloud-s3) target="acorn_trunk_cloud_s3"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/dan.hurley/dev/projects/AcornDB-binding/rust/target/debug/.fingerprint/acorn-trunk-cloud-s3-a67cddd11c7a2cd6/lib-acorn_trunk_cloud_s3`
+
+Caused by:
+    No such file or directory (os error 2)
+
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: std::backtrace::Backtrace::capture
+   2: cargo_util::paths::read_bytes
+   3: cargo_util::paths::read
+   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   5: cargo::core::compiler::fingerprint::prepare_target
+   6: cargo::core::compiler::compile
+   7: <cargo::core::compiler::build_runner::BuildRunner>::compile
+   8: cargo::ops::cargo_compile::compile_ws
+   9: cargo::ops::cargo_compile::compile_with_exec
+  10: cargo::ops::cargo_compile::compile
+  11: cargo::commands::check::exec
+  12: <cargo::cli::Exec>::exec
+  13: cargo::main
+  14: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  15: std::rt::lang_start::<()>::{closure#0}
+  16: std::rt::lang_start_internal
+  17: _main
+   0.098734166s  INFO prepare_target{force=false package_id=acorn-trunk-cloud-s3 v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-cloud-s3) target="acorn_trunk_cloud_s3"}: cargo::core::compiler::fingerprint: fingerprint error for acorn-trunk-cloud-s3 v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-cloud-s3)/Check { test: true }/TargetInner { name_inferred: true, ..: lib_target("acorn_trunk_cloud_s3", ["lib"], "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-cloud-s3/src/lib.rs", Edition2021) }
+   0.098738666s  INFO prepare_target{force=false package_id=acorn-trunk-cloud-s3 v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-cloud-s3) target="acorn_trunk_cloud_s3"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/dan.hurley/dev/projects/AcornDB-binding/rust/target/debug/.fingerprint/acorn-trunk-cloud-s3-5258212495377665/test-lib-acorn_trunk_cloud_s3`
+
+Caused by:
+    No such file or directory (os error 2)
+
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: std::backtrace::Backtrace::capture
+   2: cargo_util::paths::read_bytes
+   3: cargo_util::paths::read
+   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   5: cargo::core::compiler::fingerprint::prepare_target
+   6: cargo::core::compiler::compile
+   7: <cargo::core::compiler::build_runner::BuildRunner>::compile
+   8: cargo::ops::cargo_compile::compile_ws
+   9: cargo::ops::cargo_compile::compile_with_exec
+  10: cargo::ops::cargo_compile::compile
+  11: cargo::commands::check::exec
+  12: <cargo::cli::Exec>::exec
+  13: cargo::main
+  14: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  15: std::rt::lang_start::<()>::{closure#0}
+  16: std::rt::lang_start_internal
+  17: _main
+   0.098943916s  INFO prepare_target{force=false package_id=acorn-trunk-datalake v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-datalake) target="acorn_trunk_datalake"}: cargo::core::compiler::fingerprint: fingerprint error for acorn-trunk-datalake v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-datalake)/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("acorn_trunk_datalake", ["lib"], "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-datalake/src/lib.rs", Edition2021) }
+   0.098948916s  INFO prepare_target{force=false package_id=acorn-trunk-datalake v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-datalake) target="acorn_trunk_datalake"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/dan.hurley/dev/projects/AcornDB-binding/rust/target/debug/.fingerprint/acorn-trunk-datalake-b39cefa9f556cba6/lib-acorn_trunk_datalake`
+
+Caused by:
+    No such file or directory (os error 2)
+
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: std::backtrace::Backtrace::capture
+   2: cargo_util::paths::read_bytes
+   3: cargo_util::paths::read
+   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   5: cargo::core::compiler::fingerprint::prepare_target
+   6: cargo::core::compiler::compile
+   7: <cargo::core::compiler::build_runner::BuildRunner>::compile
+   8: cargo::ops::cargo_compile::compile_ws
+   9: cargo::ops::cargo_compile::compile_with_exec
+  10: cargo::ops::cargo_compile::compile
+  11: cargo::commands::check::exec
+  12: <cargo::cli::Exec>::exec
+  13: cargo::main
+  14: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  15: std::rt::lang_start::<()>::{closure#0}
+  16: std::rt::lang_start_internal
+  17: _main
+   0.099136291s  INFO prepare_target{force=false package_id=acorn-trunk-datalake v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-datalake) target="acorn_trunk_datalake"}: cargo::core::compiler::fingerprint: fingerprint error for acorn-trunk-datalake v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-datalake)/Check { test: true }/TargetInner { name_inferred: true, ..: lib_target("acorn_trunk_datalake", ["lib"], "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-datalake/src/lib.rs", Edition2021) }
+   0.099141083s  INFO prepare_target{force=false package_id=acorn-trunk-datalake v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-datalake) target="acorn_trunk_datalake"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/dan.hurley/dev/projects/AcornDB-binding/rust/target/debug/.fingerprint/acorn-trunk-datalake-21e370c328195001/test-lib-acorn_trunk_datalake`
+
+Caused by:
+    No such file or directory (os error 2)
+
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: std::backtrace::Backtrace::capture
+   2: cargo_util::paths::read_bytes
+   3: cargo_util::paths::read
+   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   5: cargo::core::compiler::fingerprint::prepare_target
+   6: cargo::core::compiler::compile
+   7: <cargo::core::compiler::build_runner::BuildRunner>::compile
+   8: cargo::ops::cargo_compile::compile_ws
+   9: cargo::ops::cargo_compile::compile_with_exec
+  10: cargo::ops::cargo_compile::compile
+  11: cargo::commands::check::exec
+  12: <cargo::cli::Exec>::exec
+  13: cargo::main
+  14: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  15: std::rt::lang_start::<()>::{closure#0}
+  16: std::rt::lang_start_internal
+  17: _main
+   0.099342041s  INFO prepare_target{force=false package_id=acorn-trunk-file v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-file) target="acorn_trunk_file"}: cargo::core::compiler::fingerprint: fingerprint error for acorn-trunk-file v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-file)/Check { test: true }/TargetInner { name_inferred: true, ..: lib_target("acorn_trunk_file", ["lib"], "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-file/src/lib.rs", Edition2021) }
+   0.099347750s  INFO prepare_target{force=false package_id=acorn-trunk-file v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-file) target="acorn_trunk_file"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/dan.hurley/dev/projects/AcornDB-binding/rust/target/debug/.fingerprint/acorn-trunk-file-c17209e39accc859/test-lib-acorn_trunk_file`
+
+Caused by:
+    No such file or directory (os error 2)
+
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: std::backtrace::Backtrace::capture
+   2: cargo_util::paths::read_bytes
+   3: cargo_util::paths::read
+   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   5: cargo::core::compiler::fingerprint::prepare_target
+   6: cargo::core::compiler::compile
+   7: <cargo::core::compiler::build_runner::BuildRunner>::compile
+   8: cargo::ops::cargo_compile::compile_ws
+   9: cargo::ops::cargo_compile::compile_with_exec
+  10: cargo::ops::cargo_compile::compile
+  11: cargo::commands::check::exec
+  12: <cargo::cli::Exec>::exec
+  13: cargo::main
+  14: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  15: std::rt::lang_start::<()>::{closure#0}
+  16: std::rt::lang_start_internal
+  17: _main
+   0.099570166s  INFO prepare_target{force=false package_id=acorn-trunk-git v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-git) target="acorn_trunk_git"}: cargo::core::compiler::fingerprint: fingerprint error for acorn-trunk-git v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-git)/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("acorn_trunk_git", ["lib"], "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-git/src/lib.rs", Edition2021) }
+   0.099574583s  INFO prepare_target{force=false package_id=acorn-trunk-git v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-git) target="acorn_trunk_git"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/dan.hurley/dev/projects/AcornDB-binding/rust/target/debug/.fingerprint/acorn-trunk-git-a0ea18f6fe2f9ec6/lib-acorn_trunk_git`
+
+Caused by:
+    No such file or directory (os error 2)
+
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: std::backtrace::Backtrace::capture
+   2: cargo_util::paths::read_bytes
+   3: cargo_util::paths::read
+   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   5: cargo::core::compiler::fingerprint::prepare_target
+   6: cargo::core::compiler::compile
+   7: <cargo::core::compiler::build_runner::BuildRunner>::compile
+   8: cargo::ops::cargo_compile::compile_ws
+   9: cargo::ops::cargo_compile::compile_with_exec
+  10: cargo::ops::cargo_compile::compile
+  11: cargo::commands::check::exec
+  12: <cargo::cli::Exec>::exec
+  13: cargo::main
+  14: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  15: std::rt::lang_start::<()>::{closure#0}
+  16: std::rt::lang_start_internal
+  17: _main
+   0.099781541s  INFO prepare_target{force=false package_id=acorn-trunk-git v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-git) target="acorn_trunk_git"}: cargo::core::compiler::fingerprint: fingerprint error for acorn-trunk-git v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-git)/Check { test: true }/TargetInner { name_inferred: true, ..: lib_target("acorn_trunk_git", ["lib"], "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-git/src/lib.rs", Edition2021) }
+   0.099785958s  INFO prepare_target{force=false package_id=acorn-trunk-git v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-git) target="acorn_trunk_git"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/dan.hurley/dev/projects/AcornDB-binding/rust/target/debug/.fingerprint/acorn-trunk-git-9f24417060e2ddc9/test-lib-acorn_trunk_git`
+
+Caused by:
+    No such file or directory (os error 2)
+
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: std::backtrace::Backtrace::capture
+   2: cargo_util::paths::read_bytes
+   3: cargo_util::paths::read
+   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   5: cargo::core::compiler::fingerprint::prepare_target
+   6: cargo::core::compiler::compile
+   7: <cargo::core::compiler::build_runner::BuildRunner>::compile
+   8: cargo::ops::cargo_compile::compile_ws
+   9: cargo::ops::cargo_compile::compile_with_exec
+  10: cargo::ops::cargo_compile::compile
+  11: cargo::commands::check::exec
+  12: <cargo::cli::Exec>::exec
+  13: cargo::main
+  14: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  15: std::rt::lang_start::<()>::{closure#0}
+  16: std::rt::lang_start_internal
+  17: _main
+   0.100034333s  INFO prepare_target{force=false package_id=acorn-trunk-mem v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-mem) target="acorn_trunk_mem"}: cargo::core::compiler::fingerprint: fingerprint error for acorn-trunk-mem v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-mem)/Check { test: true }/TargetInner { name_inferred: true, ..: lib_target("acorn_trunk_mem", ["lib"], "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-mem/src/lib.rs", Edition2021) }
+   0.100038791s  INFO prepare_target{force=false package_id=acorn-trunk-mem v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-mem) target="acorn_trunk_mem"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/dan.hurley/dev/projects/AcornDB-binding/rust/target/debug/.fingerprint/acorn-trunk-mem-0e60a55c18d9da1d/test-lib-acorn_trunk_mem`
+
+Caused by:
+    No such file or directory (os error 2)
+
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: std::backtrace::Backtrace::capture
+   2: cargo_util::paths::read_bytes
+   3: cargo_util::paths::read
+   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   5: cargo::core::compiler::fingerprint::prepare_target
+   6: cargo::core::compiler::compile
+   7: <cargo::core::compiler::build_runner::BuildRunner>::compile
+   8: cargo::ops::cargo_compile::compile_ws
+   9: cargo::ops::cargo_compile::compile_with_exec
+  10: cargo::ops::cargo_compile::compile
+  11: cargo::commands::check::exec
+  12: <cargo::cli::Exec>::exec
+  13: cargo::main
+  14: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  15: std::rt::lang_start::<()>::{closure#0}
+  16: std::rt::lang_start_internal
+  17: _main
+   0.100283041s  INFO prepare_target{force=false package_id=acorn-trunk-rdbms v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-rdbms) target="acorn_trunk_rdbms"}: cargo::core::compiler::fingerprint: fingerprint error for acorn-trunk-rdbms v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-rdbms)/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("acorn_trunk_rdbms", ["lib"], "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-rdbms/src/lib.rs", Edition2021) }
+   0.100287666s  INFO prepare_target{force=false package_id=acorn-trunk-rdbms v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-rdbms) target="acorn_trunk_rdbms"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/dan.hurley/dev/projects/AcornDB-binding/rust/target/debug/.fingerprint/acorn-trunk-rdbms-11ef5543382728ce/lib-acorn_trunk_rdbms`
+
+Caused by:
+    No such file or directory (os error 2)
+
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: std::backtrace::Backtrace::capture
+   2: cargo_util::paths::read_bytes
+   3: cargo_util::paths::read
+   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   5: cargo::core::compiler::fingerprint::prepare_target
+   6: cargo::core::compiler::compile
+   7: <cargo::core::compiler::build_runner::BuildRunner>::compile
+   8: cargo::ops::cargo_compile::compile_ws
+   9: cargo::ops::cargo_compile::compile_with_exec
+  10: cargo::ops::cargo_compile::compile
+  11: cargo::commands::check::exec
+  12: <cargo::cli::Exec>::exec
+  13: cargo::main
+  14: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  15: std::rt::lang_start::<()>::{closure#0}
+  16: std::rt::lang_start_internal
+  17: _main
+   0.100516666s  INFO prepare_target{force=false package_id=acorn-trunk-rdbms v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-rdbms) target="acorn_trunk_rdbms"}: cargo::core::compiler::fingerprint: fingerprint error for acorn-trunk-rdbms v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-rdbms)/Check { test: true }/TargetInner { name_inferred: true, ..: lib_target("acorn_trunk_rdbms", ["lib"], "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-rdbms/src/lib.rs", Edition2021) }
+   0.100520833s  INFO prepare_target{force=false package_id=acorn-trunk-rdbms v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-rdbms) target="acorn_trunk_rdbms"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/dan.hurley/dev/projects/AcornDB-binding/rust/target/debug/.fingerprint/acorn-trunk-rdbms-ff604104986769e0/test-lib-acorn_trunk_rdbms`
+
+Caused by:
+    No such file or directory (os error 2)
+
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: std::backtrace::Backtrace::capture
+   2: cargo_util::paths::read_bytes
+   3: cargo_util::paths::read
+   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   5: cargo::core::compiler::fingerprint::prepare_target
+   6: cargo::core::compiler::compile
+   7: <cargo::core::compiler::build_runner::BuildRunner>::compile
+   8: cargo::ops::cargo_compile::compile_ws
+   9: cargo::ops::cargo_compile::compile_with_exec
+  10: cargo::ops::cargo_compile::compile
+  11: cargo::commands::check::exec
+  12: <cargo::cli::Exec>::exec
+  13: cargo::main
+  14: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  15: std::rt::lang_start::<()>::{closure#0}
+  16: std::rt::lang_start_internal
+  17: _main
+    Checking acorn-core v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-core)
+error: could not compile `acorn-core` (lib) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `acorn-core` (lib test) due to 4 previous errors
