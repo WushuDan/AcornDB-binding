@@ -21,3 +21,6 @@ thiserror = { workspace = true }
 tokio = { workspace = true, optional = true }
 tokio-tungstenite = { workspace = true, optional = true }
 tracing = { workspace = true }
+
+[dev-dependencies]
+acorn-trunk-mem = { path = "../acorn-trunk-mem" }

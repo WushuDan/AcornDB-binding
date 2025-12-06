@@ -27,6 +27,65 @@ pub trait SyncTransport {
     fn pull(&self, branch: &BranchId) -> Result<SyncPullResponse, SyncError>;
 }
 
+#[cfg(feature = "http-client")]
+#[derive(Clone)]
+pub struct HttpTransport {
+    client: reqwest::Client,
+    base_url: String,
+}
+
+#[cfg(feature = "http-client")]
+impl HttpTransport {
+    pub fn new<T: Into<String>>(base_url: T) -> Self {
+        HttpTransport {
+            client: reqwest::Client::new(),
+            base_url: base_url.into(),
+        }
+    }
+
+    fn block_on<F, T>(&self, fut: F) -> Result<T, SyncError>
+    where
+        F: std::future::Future<Output = Result<T, reqwest::Error>>,
+    {
+        if let Ok(handle) = tokio::runtime::Handle::try_current() {
+            handle
+                .block_on(fut)
+                .map_err(|e| SyncError::Network(e.to_string()))
+        } else {
+            tokio::runtime::Runtime::new()
+                .map_err(|e| SyncError::Network(e.to_string()))?
+                .block_on(fut)
+                .map_err(|e| SyncError::Network(e.to_string()))
+        }
+    }
+}
+
+#[cfg(feature = "http-client")]
+impl SyncTransport for HttpTransport {
+    fn apply(&self, request: &SyncApplyRequest) -> Result<SyncApplyResponse, SyncError> {
+        let url = format!("{}/sync/apply", self.base_url);
+        self.block_on(self.client.post(url).json(request).send())?
+            .error_for_status()
+            .map_err(|e| SyncError::Protocol(e.to_string()))?
+            .json::<SyncApplyResponse>()
+            .map_err(|e| SyncError::Protocol(e.to_string()))
+    }
+
+    fn pull(&self, branch: &BranchId) -> Result<SyncPullResponse, SyncError> {
+        let url = format!("{}/sync/pull", self.base_url);
+        self.block_on(
+            self.client
+                .get(url)
+                .query(&[("branch", branch.as_str())])
+                .send(),
+        )?
+        .error_for_status()
+        .map_err(|e| SyncError::Protocol(e.to_string()))?
+        .json::<SyncPullResponse>()
+        .map_err(|e| SyncError::Protocol(e.to_string()))
+    }
+}
+
 /// Stub sync client facade; will orchestrate pull/push/sync with retries.
 #[derive(Debug, Default)]
 pub struct SyncClient;
@@ -191,6 +250,8 @@ pub struct SyncResult {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use acorn_core::{Nut, Tree};
+    use acorn_trunk_mem::MemoryTrunk;
 
     #[derive(Debug, Default)]
     struct MockTransport {
@@ -260,5 +321,122 @@ mod tests {
 
         let result = client.apply_with_transport(&transport, &req);
         assert!(matches!(result, Err(AcornError::Trunk(_))));
+    }
+
+    #[test]
+    fn loopback_transport_enforces_versions() {
+        #[derive(Clone)]
+        struct LoopbackTransport {
+            trunk: MemoryTrunk,
+        }
+
+        impl SyncTransport for LoopbackTransport {
+            fn apply(&self, request: &SyncApplyRequest) -> Result<SyncApplyResponse, SyncError> {
+                let mut applied = 0usize;
+                let mut conflicts = Vec::new();
+                for op in &request.batch.operations {
+                    match op {
+                        SyncMutation::Put { key, value, version } => {
+                            let current = self.trunk.version(&request.batch.branch, key);
+                            if let Some(expected) = version {
+                                if current != Some(*expected) {
+                                    conflicts.push(SyncConflict {
+                                        key: key.clone(),
+                                        remote_value: self.trunk.get(&request.batch.branch, key).unwrap().map(|n| n.value),
+                                        local_value: Some(value.clone()),
+                                        remote_version: current,
+                                        local_version: Some(*expected),
+                                        kind: SyncConflictKind::VersionMismatch,
+                                    });
+                                    continue;
+                                }
+                            }
+                            let _ = self.trunk.put(&request.batch.branch, key, Nut { value: value.clone() });
+                            applied += 1;
+                        }
+                        SyncMutation::Delete { key, version } => {
+                            let current = self.trunk.version(&request.batch.branch, key);
+                            if let Some(expected) = version {
+                                if current != Some(*expected) {
+                                    conflicts.push(SyncConflict {
+                                        key: key.clone(),
+                                        remote_value: self.trunk.get(&request.batch.branch, key).unwrap().map(|n| n.value),
+                                        local_value: None,
+                                        remote_version: current,
+                                        local_version: Some(*expected),
+                                        kind: SyncConflictKind::VersionMismatch,
+                                    });
+                                    continue;
+                                }
+                            }
+                            if self.trunk.get(&request.batch.branch, key).unwrap().is_none() {
+                                conflicts.push(SyncConflict {
+                                    key: key.clone(),
+                                    remote_value: None,
+                                    local_value: None,
+                                    remote_version: current,
+                                    local_version: *version,
+                                    kind: SyncConflictKind::MissingKey,
+                                });
+                                continue;
+                            }
+                            let _ = self.trunk.delete(&request.batch.branch, key);
+                            applied += 1;
+                        }
+                    }
+                }
+                Ok(SyncApplyResponse { applied, conflicts })
+            }
+
+            fn pull(&self, branch: &BranchId) -> Result<SyncPullResponse, SyncError> {
+                let mut ops = Vec::new();
+                for key in self.trunk.keys(branch) {
+                    if let Some(nut) = self.trunk.get(branch, &key).unwrap() {
+                        ops.push(SyncMutation::Put {
+                            key: key.clone(),
+                            value: nut.value,
+                            version: self.trunk.version(branch, &key),
+                        });
+                    }
+                }
+                Ok(SyncPullResponse {
+                    batch: SyncBatch {
+                        branch: branch.clone(),
+                        operations: ops,
+                    },
+                    versions: vec![],
+                })
+            }
+        }
+
+        let transport = LoopbackTransport {
+            trunk: MemoryTrunk::new(),
+        };
+        let client = SyncClient;
+        let branch = BranchId::new("loop");
+        let tree = Tree::new(branch.clone(), transport.trunk.clone());
+
+        // seed v1
+        tree.put("key", Nut { value: b"v1".to_vec() }).unwrap();
+
+        // attempt apply with stale version triggers conflict
+        let apply = SyncApplyRequest {
+            batch: SyncBatch {
+                branch: branch.clone(),
+                operations: vec![SyncMutation::Put {
+                    key: "key".into(),
+                    value: b"v2".to_vec(),
+                    version: Some(0),
+                }],
+            },
+        };
+        let result = client.apply_with_transport(&transport, &apply).unwrap();
+        assert_eq!(result.applied, 0);
+        assert_eq!(result.conflicts.len(), 1);
+        assert!(matches!(result.conflicts[0].kind, SyncConflictKind::VersionMismatch));
+
+        // pull returns latest
+        let pull = client.pull_with_transport(&transport, &branch).unwrap();
+        assert_eq!(pull.batch.operations.len(), 1);
     }
 }

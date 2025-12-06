@@ -76,6 +76,7 @@ name = "acorn-sync"
 version = "0.0.1-alpha.0"
 dependencies = [
  "acorn-core",
+ "acorn-trunk-mem",
  "futures",
  "reqwest",
  "serde",
