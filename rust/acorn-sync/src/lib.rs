@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
-use acorn_core::{AcornError, AcornResult, BranchId, Tree, Trunk};
+use acorn_core::{AcornError, AcornResult, BranchId, KeyedTrunk, Tree, Trunk};
+use serde::{de::DeserializeOwned, Serialize};
 use tracing::instrument;
 
 /// HTTP/WebSocket sync endpoint target.
@@ -91,31 +92,99 @@ impl SyncTransport for HttpTransport {
 pub struct SyncClient;
 
 impl SyncClient {
-    #[instrument(skip(self, _tree))]
-    pub async fn synchronize<T, S>(&self, _tree: &Tree<T, S>, _endpoint: &SyncEndpoint) -> AcornResult<()>
+    #[instrument(skip(self, tree))]
+    pub async fn synchronize<T, S>(&self, tree: &Tree<T, S>, endpoint: &SyncEndpoint) -> AcornResult<()>
     where
-        T: Clone + Send + Sync + 'static + std::fmt::Debug,
-        S: Trunk<T> + Send + Sync,
+        T: Clone + Send + Sync + 'static + std::fmt::Debug + Serialize,
+        S: Trunk<T> + KeyedTrunk<T> + Send + Sync,
     {
-        Err(AcornError::NotImplemented)
+        #[cfg(feature = "http-client")]
+        {
+            let transport = HttpTransport::new(endpoint.url.clone());
+            self.pull(tree, endpoint, &transport).await?;
+            self.push(tree, endpoint, &transport).await
+        }
+        #[cfg(not(feature = "http-client"))]
+        {
+            let _ = (tree, endpoint);
+            Err(AcornError::NotImplemented)
+        }
     }
 
-    #[instrument(skip(self))]
-    pub async fn pull<T, S>(&self, _tree: &Tree<T, S>, _endpoint: &SyncEndpoint) -> AcornResult<()>
+    #[instrument(skip(self, tree))]
+    pub async fn pull<T, S>(&self, tree: &Tree<T, S>, endpoint: &SyncEndpoint) -> AcornResult<()>
     where
-        T: Clone + Send + Sync + 'static + std::fmt::Debug,
+        T: Clone + Send + Sync + 'static + std::fmt::Debug + Serialize + DeserializeOwned,
         S: Trunk<T> + Send + Sync,
     {
-        Err(AcornError::NotImplemented)
+        #[cfg(feature = "http-client")]
+        {
+            let transport = HttpTransport::new(endpoint.url.clone());
+            self.pull_with_transport(&transport, &endpoint.branch).and_then(|resp| {
+                for op in resp.batch.operations {
+                    match op {
+                        SyncMutation::Put { key, value, .. } => {
+                            let decoded: T = serde_json::from_slice(&value)
+                                .map_err(|e| AcornError::Serialization(e.to_string()))?;
+                            tree.put(&key, Nut { value: decoded })?;
+                        }
+                        SyncMutation::Delete { key, .. } => {
+                            let _ = tree.delete(&key)?;
+                        }
+                    }
+                }
+                Ok(())
+            })
+        }
+        #[cfg(not(feature = "http-client"))]
+        {
+            let _ = (tree, endpoint);
+            Err(AcornError::NotImplemented)
+        }
     }
 
-    #[instrument(skip(self))]
-    pub async fn push<T, S>(&self, _tree: &Tree<T, S>, _endpoint: &SyncEndpoint) -> AcornResult<()>
+    #[instrument(skip(self, tree))]
+    pub async fn push<T, S>(&self, tree: &Tree<T, S>, endpoint: &SyncEndpoint) -> AcornResult<()>
     where
-        T: Clone + Send + Sync + 'static + std::fmt::Debug,
-        S: Trunk<T> + Send + Sync,
+        T: Clone + Send + Sync + 'static + std::fmt::Debug + Serialize,
+        S: Trunk<T> + KeyedTrunk<T> + Send + Sync,
     {
-        Err(AcornError::NotImplemented)
+        #[cfg(feature = "http-client")]
+        {
+            let transport = HttpTransport::new(endpoint.url.clone());
+            // naive: send all keys as puts for now
+            let mut ops = Vec::new();
+            for key in tree.trunk().keys(&endpoint.branch) {
+                if let Some(nut) = tree.get(&key)? {
+                    let bytes = serde_json::to_vec(&nut.value)
+                        .map_err(|e| AcornError::Serialization(e.to_string()))?;
+                    ops.push(SyncMutation::Put {
+                        key: key.clone(),
+                        value: bytes,
+                        version: tree.trunk().version(&endpoint.branch, &key),
+                    });
+                }
+            }
+            let request = SyncApplyRequest {
+                batch: SyncBatch {
+                    branch: endpoint.branch.clone(),
+                    operations: ops,
+                },
+            };
+            let result = self.apply_with_transport(&transport, &request)?;
+            if !result.conflicts.is_empty() {
+                return Err(AcornError::Trunk(format!(
+                    "sync push encountered {} conflicts",
+                    result.conflicts.len()
+                )));
+            }
+            Ok(())
+        }
+        #[cfg(not(feature = "http-client"))]
+        {
+            let _ = (tree, endpoint);
+            Err(AcornError::NotImplemented)
+        }
     }
 
     /// Apply a batch using the provided transport, surfacing conflicts with kinds.

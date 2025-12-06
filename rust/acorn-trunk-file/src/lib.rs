@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use std::time::SystemTime;
 
 use acorn_core::{
-    AcornError, AcornResult, BranchId, CapabilityAdvertiser, HistoryEvent, HistoryProvider, Nut, Trunk,
+    AcornError, AcornResult, BranchId, CapabilityAdvertiser, HistoryEvent, HistoryProvider, KeyedTrunk, Nut, Trunk,
     TrunkCapability, Ttl, TtlProvider,
 };
 
@@ -198,6 +198,12 @@ impl Trunk<Vec<u8>> for FileTrunk {
             }
         }
         self.delete(branch, key)
+    }
+}
+
+impl KeyedTrunk<Vec<u8>> for FileTrunk {
+    fn keys(&self, branch: &BranchId) -> Vec<String> {
+        FileTrunk::keys(self, branch)
     }
 }
 

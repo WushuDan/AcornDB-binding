@@ -5,7 +5,7 @@ use std::sync::Arc;
 use std::time::SystemTime;
 
 use acorn_core::{
-    AcornError, AcornResult, BranchId, CapabilityAdvertiser, HistoryEvent, HistoryProvider, Nut, Trunk,
+    AcornError, AcornResult, BranchId, CapabilityAdvertiser, HistoryEvent, HistoryProvider, KeyedTrunk, Nut, Trunk,
     TrunkCapability, Ttl, TtlProvider,
 };
 use parking_lot::RwLock;
@@ -169,6 +169,18 @@ impl Trunk<Vec<u8>> for S3Trunk {
             })
             .ok_or_else(|| AcornError::MissingKey(key.to_string()))?;
         Ok(())
+    }
+}
+
+impl KeyedTrunk<Vec<u8>> for S3Trunk {
+    fn keys(&self, branch: &BranchId) -> Vec<String> {
+        let guard = self.inner.read();
+        guard
+            .data
+            .keys()
+            .filter(|(b, _)| b == branch)
+            .map(|(_, k)| k.clone())
+            .collect()
     }
 }
 

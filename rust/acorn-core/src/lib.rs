@@ -85,6 +85,11 @@ pub trait Trunk<T>: Send + Sync + Debug {
     }
 }
 
+/// Optional extension for trunks that can enumerate keys.
+pub trait KeyedTrunk<T>: Trunk<T> {
+    fn keys(&self, branch: &BranchId) -> Vec<String>;
+}
+
 /// Capability flags for trunks; extend as behaviors are implemented.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TrunkCapability {
