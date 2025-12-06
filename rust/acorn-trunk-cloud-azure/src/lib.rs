@@ -20,6 +20,7 @@ struct Inner {
     data: HashMap<(BranchId, String), Vec<u8>>,
     history: HashMap<BranchId, Vec<HistoryEvent<Vec<u8>>>>,
     ttl: HashMap<(BranchId, String), SystemTime>,
+    versions: HashMap<(BranchId, String), u64>,
 }
 
 impl AzureTrunk {
@@ -32,6 +33,11 @@ impl AzureTrunk {
     pub fn connect(&self) -> AcornResult<()> {
         Ok(())
     }
+
+    pub fn version(&self, branch: &BranchId, key: &str) -> Option<u64> {
+        let guard = self.inner.read();
+        guard.versions.get(&(branch.clone(), key.to_string())).copied()
+    }
 }
 
 impl Trunk<Vec<u8>> for AzureTrunk {
@@ -41,6 +47,7 @@ impl Trunk<Vec<u8>> for AzureTrunk {
             if SystemTime::now() >= *expires_at {
                 guard.ttl.remove(&(branch.clone(), key.to_string()));
                 guard.data.remove(&(branch.clone(), key.to_string()));
+                guard.versions.remove(&(branch.clone(), key.to_string()));
                 guard
                     .history
                     .entry(branch.clone())
@@ -59,6 +66,15 @@ impl Trunk<Vec<u8>> for AzureTrunk {
 
     fn put(&self, branch: &BranchId, key: &str, nut: Nut<Vec<u8>>) -> AcornResult<()> {
         let mut guard = self.inner.write();
+        let next_version = guard
+            .versions
+            .get(&(branch.clone(), key.to_string()))
+            .copied()
+            .unwrap_or(0)
+            .saturating_add(1);
+        guard
+            .versions
+            .insert((branch.clone(), key.to_string()), next_version);
         guard
             .history
             .entry(branch.clone())
@@ -79,6 +95,7 @@ impl Trunk<Vec<u8>> for AzureTrunk {
             .data
             .remove(&(branch.clone(), key.to_string()))
             .map(|_| {
+                guard.versions.remove(&(branch.clone(), key.to_string()));
                 guard
                     .history
                     .entry(branch.clone())
@@ -92,13 +109,22 @@ impl Trunk<Vec<u8>> for AzureTrunk {
 
 impl CapabilityAdvertiser for AzureTrunk {
     fn capabilities(&self) -> &'static [TrunkCapability] {
-        &[TrunkCapability::History, TrunkCapability::Ttl]
+        &[TrunkCapability::History, TrunkCapability::Ttl, TrunkCapability::Versions]
     }
 }
 
 impl TtlProvider<Vec<u8>> for AzureTrunk {
     fn put_with_ttl(&self, branch: &BranchId, key: &str, nut: Nut<Vec<u8>>, ttl: Ttl) -> AcornResult<()> {
         let mut guard = self.inner.write();
+        let next_version = guard
+            .versions
+            .get(&(branch.clone(), key.to_string()))
+            .copied()
+            .unwrap_or(0)
+            .saturating_add(1);
+        guard
+            .versions
+            .insert((branch.clone(), key.to_string()), next_version);
         guard
             .ttl
             .insert((branch.clone(), key.to_string()), ttl.expires_at);
@@ -127,7 +153,7 @@ impl HistoryProvider<Vec<u8>> for AzureTrunk {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use acorn_core::{EncodedTree, JsonCodec};
+    use acorn_core::{CapabilityAdvertiser, EncodedTree, JsonCodec};
     use serde::{Deserialize, Serialize};
 
     #[cfg(feature = "contract-tests")]
@@ -138,7 +164,10 @@ mod tests {
     fn contract_round_trip_history_ttl() {
         let trunk = AzureTrunk::new();
         TrunkContract::round_trip_bytes(&trunk).unwrap();
-        TrunkContract::assert_capabilities(&trunk, &[TrunkCapability::History, TrunkCapability::Ttl]);
+        TrunkContract::assert_capabilities(
+            &trunk,
+            &[TrunkCapability::History, TrunkCapability::Ttl, TrunkCapability::Versions],
+        );
         TrunkContract::ttl_expiry(&trunk).unwrap();
         TrunkContract::history_put_delete(&trunk).unwrap();
     }
@@ -156,5 +185,43 @@ mod tests {
         tree.put("k", Nut { value: val.clone() }).unwrap();
         let fetched = tree.get("k").unwrap().unwrap();
         assert_eq!(fetched.value, val);
+    }
+
+    #[test]
+    fn tracks_versions() {
+        let trunk = AzureTrunk::new();
+        let branch = BranchId::new("versions");
+
+        trunk
+            .put(
+                &branch,
+                "key",
+                Nut {
+                    value: b"v1".to_vec(),
+                },
+            )
+            .unwrap();
+        assert_eq!(trunk.version(&branch, "key"), Some(1));
+
+        trunk
+            .put(
+                &branch,
+                "key",
+                Nut {
+                    value: b"v2".to_vec(),
+                },
+            )
+            .unwrap();
+        assert_eq!(trunk.version(&branch, "key"), Some(2));
+
+        trunk.delete(&branch, "key").unwrap();
+        assert_eq!(trunk.version(&branch, "key"), None);
+    }
+
+    #[test]
+    fn advertises_versions_capability() {
+        let trunk = AzureTrunk::new();
+        let caps = CapabilityAdvertiser::capabilities(&trunk);
+        assert!(caps.contains(&TrunkCapability::Versions));
     }
 }

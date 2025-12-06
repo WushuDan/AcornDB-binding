@@ -128,6 +128,15 @@ impl CapabilityAdvertiser for MemoryTrunk {
 impl TtlProvider<Vec<u8>> for MemoryTrunk {
     fn put_with_ttl(&self, branch: &BranchId, key: &str, nut: Nut<Vec<u8>>, ttl: Ttl) -> AcornResult<()> {
         let mut guard = self.inner.write();
+        let next_version = guard
+            .versions
+            .get(&(branch.clone(), key.to_string()))
+            .copied()
+            .unwrap_or(0)
+            .saturating_add(1);
+        guard
+            .versions
+            .insert((branch.clone(), key.to_string()), next_version);
         guard
             .ttl
             .insert((branch.clone(), key.to_string()), ttl.expires_at);
