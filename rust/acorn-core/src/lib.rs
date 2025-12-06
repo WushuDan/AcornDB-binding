@@ -47,12 +47,14 @@ impl GroveId {
 }
 
 /// Represents a stored value plus metadata.
+/// Represents a stored value plus metadata.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(bound(serialize = "T: Serialize", deserialize = "T: DeserializeOwned"))]
 pub struct Nut<T> {
     pub value: T,
 }
 
+/// TTL helper for trunks that support expiration.
 #[derive(Debug, Clone, Copy)]
 pub struct Ttl {
     pub expires_at: SystemTime,

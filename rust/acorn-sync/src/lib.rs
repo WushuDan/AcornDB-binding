@@ -3,6 +3,7 @@
 use acorn_core::{AcornError, AcornResult, BranchId, Tree, Trunk};
 use tracing::instrument;
 
+/// HTTP/WebSocket sync endpoint target.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct SyncEndpoint {
     pub url: String,
@@ -19,6 +20,7 @@ pub enum SyncError {
     Unknown(String),
 }
 
+/// Stub sync client facade; will orchestrate pull/push/sync with retries.
 #[derive(Debug, Default)]
 pub struct SyncClient;
 
@@ -51,6 +53,7 @@ impl SyncClient {
     }
 }
 
+/// Subscription placeholder; will be backed by streaming updates.
 #[derive(Debug, Default)]
 pub struct Subscription;
 
@@ -68,6 +71,7 @@ impl Subscription {
     }
 }
 
+/// Streaming events emitted during sync.
 #[derive(Debug, Clone)]
 pub enum SyncEvent {
     Applied { key: String },
@@ -75,6 +79,7 @@ pub enum SyncEvent {
     Heartbeat,
 }
 
+/// Mutations applied during sync; optional version enables optimistic concurrency.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum SyncMutation {
     Put {
@@ -88,29 +93,34 @@ pub enum SyncMutation {
     },
 }
 
+/// Batch of operations scoped to a branch.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct SyncBatch {
     pub branch: BranchId,
     pub operations: Vec<SyncMutation>,
 }
 
+/// Payload for apply requests.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct SyncApplyRequest {
     pub batch: SyncBatch,
 }
 
+/// Result of applying a batch on the server.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct SyncApplyResponse {
     pub applied: usize,
     pub conflicts: Vec<SyncConflict>,
 }
 
+/// Response payload for pull requests (ops plus version snapshot).
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct SyncPullResponse {
     pub batch: SyncBatch,
     pub versions: Vec<(String, u64)>,
 }
 
+/// Conflict surface returned by sync operations.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct SyncConflict {
     pub key: String,

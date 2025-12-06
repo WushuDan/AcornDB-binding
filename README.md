@@ -198,6 +198,9 @@ grove.Oversee<User>(branch); // Auto-syncs on every change
 
 AcornDB uses **Trunks** to abstract storage. Swap backends without changing your code.
 
+### Rust Workspace
+- See `rust/README.md` for the Rust crate quickstart, feature flags, and trunk capability snapshot.
+
 ### Built-in Trunks
 
 | Trunk | Package | Durable | History | Async | Use Case |
