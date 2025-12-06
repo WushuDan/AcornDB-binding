@@ -1,5 +1,7 @@
 use acorn_core::BranchId;
-use acorn_sync::{SyncApplyRequest, SyncApplyResponse, SyncErrorResponse, SyncMutation, SyncPullResponse};
+use acorn_sync::{
+    SyncApplyRequest, SyncApplyResponse, SyncConflict, SyncErrorResponse, SyncMutation, SyncPullResponse,
+};
 use acorn_trunk_file::FileTrunk;
 use acorn_trunk_mem::MemoryTrunk;
 use axum::{
@@ -18,10 +20,15 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 #[derive(Debug, Clone, serde::Serialize)]
 struct StreamEvent {
     branch: String,
-    applied: usize,
-    conflicts: usize,
-    conflict_keys: Vec<String>,
-    versions: Vec<(String, u64)>,
+    applied: Vec<StreamOp>,
+    conflicts: Vec<SyncConflict>,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+struct StreamOp {
+    key: String,
+    op: String,
+    version: Option<u64>,
 }
 
 #[tokio::main]
@@ -120,8 +127,8 @@ async fn apply_batch(
 ) -> Result<Json<SyncApplyResponse>, (StatusCode, Json<SyncErrorResponse>)> {
     let trunk = state.trunk.lock();
     let mut versions = state.versions.lock();
-    let mut applied = 0usize;
-    let mut conflict_keys = Vec::new();
+    let mut applied_ops = Vec::new();
+    let mut conflicts = Vec::new();
 
     for op in &payload.batch.operations {
         match op {
@@ -132,8 +139,13 @@ async fn apply_batch(
                 if let Some(expected) = version {
                     if let Some(existing) = current_version {
                         if existing != *expected {
-                            conflicts += 1;
-                            conflict_keys.push(key.clone());
+                            conflicts.push(SyncConflict {
+                                key: key.clone(),
+                                remote_value: trunk.get(&payload.batch.branch, key),
+                                local_value: Some(value.clone()),
+                                remote_version: current_version,
+                                local_version: *version,
+                            });
                             continue;
                         }
                     }
@@ -146,7 +158,11 @@ async fn apply_batch(
                 }
                 let next_version = current_version.unwrap_or(0).saturating_add(1);
                 versions.insert((payload.batch.branch.clone(), key.clone()), next_version);
-                applied += 1;
+                applied_ops.push(StreamOp {
+                    key: key.clone(),
+                    op: "put".into(),
+                    version: Some(next_version),
+                });
             }
             SyncMutation::Delete { key, version } => {
                 let current_version = versions
@@ -155,13 +171,25 @@ async fn apply_batch(
                 if let Some(expected) = version {
                     if let Some(existing) = current_version {
                         if existing != *expected {
-                            conflict_keys.push(key.clone());
+                            conflicts.push(SyncConflict {
+                                key: key.clone(),
+                                remote_value: trunk.get(&payload.batch.branch, key),
+                                local_value: None,
+                                remote_version: current_version,
+                                local_version: *version,
+                            });
                             continue;
                         }
                     }
                 }
                 if trunk.get(&payload.batch.branch, key).is_none() {
-                    conflict_keys.push(key.clone());
+                    conflicts.push(SyncConflict {
+                        key: key.clone(),
+                        remote_value: None,
+                        local_value: None,
+                        remote_version: current_version,
+                        local_version: *version,
+                    });
                     continue;
                 }
                 if let Err(e) = trunk.delete(&payload.batch.branch, key) {
@@ -171,41 +199,24 @@ async fn apply_batch(
                     ));
                 }
                 versions.remove(&(payload.batch.branch.clone(), key.clone()));
-                applied += 1;
+                applied_ops.push(StreamOp {
+                    key: key.clone(),
+                    op: "delete".into(),
+                    version: None,
+                });
             }
         }
     }
 
     let _ = state.notifier.send(StreamEvent {
         branch: payload.batch.branch.as_str().to_string(),
-        applied,
-        conflicts: conflict_keys.len(),
-        conflict_keys: conflict_keys.clone(),
-        versions: conflict_keys
-            .into_iter()
-            .filter_map(|key| {
-                state
-                    .versions
-                    .lock()
-                    .get(&(payload.batch.branch.clone(), key.clone()))
-                    .copied()
-                    .map(|v| (key, v))
-            })
-            .collect(),
+        applied: applied_ops.clone(),
+        conflicts: conflicts.clone(),
     });
 
     Ok(Json(SyncApplyResponse {
-        applied,
-        conflicts: conflict_keys
-            .into_iter()
-            .map(|key| acorn_sync::SyncConflict {
-                key,
-                remote_value: None,
-                local_value: None,
-                remote_version: None,
-                local_version: None,
-            })
-            .collect(),
+        applied: applied_ops.len(),
+        conflicts,
     }))
 }
 
