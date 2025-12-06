@@ -8,7 +8,11 @@ pub struct SyncClient;
 
 impl SyncClient {
     #[instrument(skip(self, _tree))]
-    pub async fn synchronize<T>(&self, _tree: &Tree<T>) -> AcornResult<()> {
+    pub async fn synchronize<T, S>(&self, _tree: &Tree<T, S>) -> AcornResult<()>
+    where
+        T: Clone + Send + Sync + 'static,
+        S: Send + Sync,
+    {
         Err(AcornError::NotImplemented)
     }
 }

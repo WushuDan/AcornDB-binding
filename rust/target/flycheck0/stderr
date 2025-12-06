@@ -1,0 +1,6 @@
+    Updating crates.io index
+error: no matching package found
+searched package name: `azure-identity`
+perhaps you meant:      azure_identity
+location searched: crates.io index
+required by package `acorn-trunk-cloud-azure v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-cloud-azure)`
