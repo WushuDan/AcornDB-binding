@@ -289,4 +289,35 @@ mod tests {
         trunk.delete(&branch, "key").unwrap();
         assert_eq!(trunk.current_version(&branch, "key"), None);
     }
+
+    #[test]
+    fn cas_delete_conflict() {
+        let trunk = GitTrunk::new();
+        let branch = BranchId::new("cas-del");
+
+        trunk
+            .put(
+                &branch,
+                "key",
+                Nut {
+                    value: b"v1".to_vec(),
+                },
+            )
+            .unwrap();
+        assert_eq!(trunk.current_version(&branch, "key"), Some(1));
+
+        // wrong expectation yields conflict
+        let conflict = trunk.delete_if_version(&branch, "key", Some(2));
+        assert!(matches!(
+            conflict,
+            Err(AcornError::VersionConflict {
+                expected: Some(2),
+                actual: Some(1)
+            })
+        ));
+
+        // correct expectation succeeds
+        assert!(trunk.delete_if_version(&branch, "key", Some(1)).is_ok());
+        assert_eq!(trunk.current_version(&branch, "key"), None);
+    }
 }
