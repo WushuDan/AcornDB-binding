@@ -34,7 +34,7 @@ impl S3Trunk {
         Ok(())
     }
 
-    pub fn version(&self, branch: &BranchId, key: &str) -> Option<u64> {
+    pub fn current_version(&self, branch: &BranchId, key: &str) -> Option<u64> {
         let guard = self.inner.read();
         guard.versions.get(&(branch.clone(), key.to_string())).copied()
     }
@@ -102,8 +102,12 @@ impl Trunk<Vec<u8>> for S3Trunk {
                     .or_default()
                     .push(HistoryEvent::Delete { key: key.to_string() });
             })
-            .ok_or_else(|| AcornError::Trunk("missing key".into()))?;
+            .ok_or_else(|| AcornError::MissingKey(key.to_string()))?;
         Ok(())
+    }
+
+    fn version(&self, branch: &BranchId, key: &str) -> Option<u64> {
+        self.current_version(branch, key)
     }
 }
 
@@ -201,7 +205,7 @@ mod tests {
                 },
             )
             .unwrap();
-        assert_eq!(trunk.version(&branch, "key"), Some(1));
+        assert_eq!(trunk.current_version(&branch, "key"), Some(1));
 
         trunk
             .put(
@@ -212,10 +216,10 @@ mod tests {
                 },
             )
             .unwrap();
-        assert_eq!(trunk.version(&branch, "key"), Some(2));
+        assert_eq!(trunk.current_version(&branch, "key"), Some(2));
 
         trunk.delete(&branch, "key").unwrap();
-        assert_eq!(trunk.version(&branch, "key"), None);
+        assert_eq!(trunk.current_version(&branch, "key"), None);
     }
 
     #[test]

@@ -12,6 +12,10 @@ pub type AcornResult<T> = Result<T, AcornError>;
 pub enum AcornError {
     #[error("not implemented yet")]
     NotImplemented,
+    #[error("missing key: {0}")]
+    MissingKey(String),
+    #[error("version conflict (expected: {expected:?}, actual: {actual:?})")]
+    VersionConflict { expected: Option<u64>, actual: Option<u64> },
     #[error("trunk operation failed: {0}")]
     Trunk(String),
     #[error("serialization failed: {0}")]
@@ -65,6 +69,9 @@ pub trait Trunk<T>: Send + Sync + Debug {
     fn get(&self, branch: &BranchId, key: &str) -> AcornResult<Option<Nut<T>>>;
     fn put(&self, branch: &BranchId, key: &str, nut: Nut<T>) -> AcornResult<()>;
     fn delete(&self, branch: &BranchId, key: &str) -> AcornResult<()>;
+    fn version(&self, _branch: &BranchId, _key: &str) -> Option<u64> {
+        None
+    }
     fn capabilities(&self) -> &'static [TrunkCapability] {
         &[]
     }
@@ -159,7 +166,33 @@ where
         self.trunk.put(&self.branch, key, nut)
     }
 
+    pub fn put_if_version(&self, key: &str, expected: Option<u64>, nut: Nut<T>) -> AcornResult<()> {
+        let current = self.trunk.version(&self.branch, key);
+        if let Some(expected) = expected {
+            if current != Some(expected) {
+                return Err(AcornError::VersionConflict {
+                    expected: Some(expected),
+                    actual: current,
+                });
+            }
+        }
+        self.trunk.put(&self.branch, key, nut)
+    }
+
     pub fn delete(&self, key: &str) -> AcornResult<()> {
+        self.trunk.delete(&self.branch, key)
+    }
+
+    pub fn delete_if_version(&self, key: &str, expected: Option<u64>) -> AcornResult<()> {
+        let current = self.trunk.version(&self.branch, key);
+        if let Some(expected) = expected {
+            if current != Some(expected) {
+                return Err(AcornError::VersionConflict {
+                    expected: Some(expected),
+                    actual: current,
+                });
+            }
+        }
         self.trunk.delete(&self.branch, key)
     }
 }

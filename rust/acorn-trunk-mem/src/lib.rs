@@ -42,7 +42,7 @@ impl MemoryTrunk {
             .collect()
     }
 
-    pub fn version(&self, branch: &BranchId, key: &str) -> Option<u64> {
+    pub fn current_version(&self, branch: &BranchId, key: &str) -> Option<u64> {
         let guard = self.inner.read();
         guard.versions.get(&(branch.clone(), key.to_string())).copied()
     }
@@ -110,8 +110,12 @@ impl Trunk<Vec<u8>> for MemoryTrunk {
                     .or_default()
                     .push(HistoryEvent::Delete { key: key.to_string() });
             })
-            .ok_or_else(|| AcornError::Trunk("missing key".into()))?;
+            .ok_or_else(|| AcornError::MissingKey(key.to_string()))?;
         Ok(())
+    }
+
+    fn version(&self, branch: &BranchId, key: &str) -> Option<u64> {
+        self.current_version(branch, key)
     }
 }
 
@@ -165,7 +169,7 @@ impl HistoryProvider<Vec<u8>> for MemoryTrunk {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use acorn_core::{CapabilityAdvertiser, EncodedTree, JsonCodec};
+    use acorn_core::{CapabilityAdvertiser, EncodedTree, JsonCodec, Tree};
     #[cfg(feature = "contract-tests")]
     use acorn_test_harness::TrunkContract;
     #[cfg(feature = "contract-tests")]
@@ -280,13 +284,52 @@ mod tests {
     fn versions_increment_on_put() {
         let trunk = MemoryTrunk::new();
         let branch = BranchId::new("v");
-        assert_eq!(trunk.version(&branch, "k"), None);
+        assert_eq!(trunk.current_version(&branch, "k"), None);
 
         trunk.put(&branch, "k", Nut { value: b"1".to_vec() }).unwrap();
-        assert_eq!(trunk.version(&branch, "k"), Some(1));
+        assert_eq!(trunk.current_version(&branch, "k"), Some(1));
 
         trunk.put(&branch, "k", Nut { value: b"2".to_vec() }).unwrap();
-        assert_eq!(trunk.version(&branch, "k"), Some(2));
+        assert_eq!(trunk.current_version(&branch, "k"), Some(2));
+    }
+
+    #[test]
+    fn tree_put_if_version_detects_conflict() {
+        let trunk = MemoryTrunk::new();
+        let tree = Tree::new(BranchId::new("branch"), trunk.clone());
+
+        tree.put("key", Nut { value: b"one".to_vec() }).unwrap();
+        assert_eq!(trunk.current_version(&BranchId::new("branch"), "key"), Some(1));
+
+        let ok = tree
+            .put_if_version("key", Some(1), Nut { value: b"two".to_vec() });
+        assert!(ok.is_ok());
+
+        let conflict = tree.put_if_version("key", Some(1), Nut { value: b"three".to_vec() });
+        assert!(matches!(
+            conflict,
+            Err(AcornError::VersionConflict {
+                expected: Some(1),
+                actual: Some(2)
+            })
+        ));
+    }
+
+    #[test]
+    fn tree_delete_if_version_confirms_missing_or_conflict() {
+        let trunk = MemoryTrunk::new();
+        let tree = Tree::new(BranchId::new("branch-del"), trunk.clone());
+
+        // deleting missing key yields missing error when expectation is None
+        let res = tree.delete_if_version("nope", None);
+        assert!(matches!(res, Err(AcornError::MissingKey(_))));
+
+        tree.put("key", Nut { value: b"one".to_vec() }).unwrap();
+        assert!(tree.delete_if_version("key", Some(1)).is_ok());
+
+        // Once deleted, another delete with expected version conflicts
+        let res = tree.delete_if_version("key", Some(1));
+        assert!(matches!(res, Err(AcornError::VersionConflict { .. })));
     }
 
     #[cfg(feature = "contract-tests")]

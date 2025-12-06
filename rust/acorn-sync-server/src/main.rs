@@ -118,8 +118,8 @@ impl BackendTrunk {
 
     fn version(&self, branch: &BranchId, key: &str) -> Option<u64> {
         match self {
-            BackendTrunk::Memory(t) => t.version(branch, key),
-            BackendTrunk::File(t) => t.version(branch, key),
+            BackendTrunk::Memory(t) => t.current_version(branch, key),
+            BackendTrunk::File(t) => t.current_version(branch, key),
         }
     }
 }

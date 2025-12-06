@@ -92,7 +92,7 @@ impl FileTrunk {
         }
     }
 
-    pub fn version(&self, branch: &BranchId, key: &str) -> Option<u64> {
+    pub fn current_version(&self, branch: &BranchId, key: &str) -> Option<u64> {
         if !self.versions_enabled {
             return None;
         }
@@ -150,12 +150,22 @@ impl Trunk<Vec<u8>> for FileTrunk {
         let path = self.branch_dir(branch).join(key);
         let ttl_path = self.branch_dir(branch).join(format!("{}.ttl", key));
         let _ = fs::remove_file(&ttl_path);
-        fs::remove_file(&path).map_err(|e| AcornError::Trunk(e.to_string()))?;
+        fs::remove_file(&path).map_err(|e| {
+            if e.kind() == std::io::ErrorKind::NotFound {
+                AcornError::MissingKey(key.to_string())
+            } else {
+                AcornError::Trunk(e.to_string())
+            }
+        })?;
         self.clear_version(branch, key);
         if self.history_enabled {
             self.append_history(branch, HistoryEvent::Delete { key: key.to_string() })?;
         }
         Ok(())
+    }
+
+    fn version(&self, branch: &BranchId, key: &str) -> Option<u64> {
+        self.current_version(branch, key)
     }
 }
 
@@ -380,7 +390,7 @@ mod tests {
                 },
             )
             .unwrap();
-        assert_eq!(trunk.version(&branch, "key"), Some(1));
+        assert_eq!(trunk.current_version(&branch, "key"), Some(1));
 
         trunk
             .put(
@@ -391,10 +401,10 @@ mod tests {
                 },
             )
             .unwrap();
-        assert_eq!(trunk.version(&branch, "key"), Some(2));
+        assert_eq!(trunk.current_version(&branch, "key"), Some(2));
 
         trunk.delete(&branch, "key").unwrap();
-        assert_eq!(trunk.version(&branch, "key"), None);
+        assert_eq!(trunk.current_version(&branch, "key"), None);
     }
 
     #[cfg(feature = "contract-tests")]
