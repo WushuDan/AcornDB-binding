@@ -115,6 +115,11 @@ pub struct SyncApplyResult {
     pub conflicts: Vec<SyncConflict>,
 }
 
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct SyncErrorResponse {
+    pub error: String,
+}
+
 #[derive(Debug, Clone)]
 pub struct SyncResult {
     pub applied: usize,

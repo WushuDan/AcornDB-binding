@@ -5,7 +5,7 @@ use axum::{
 use std::net::SocketAddr;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-use acorn_sync::{SyncApplyRequest, SyncApplyResponse};
+use acorn_sync::{SyncApplyRequest, SyncApplyResponse, SyncErrorResponse, SyncPullResponse};
 use std::net::SocketAddr;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -18,7 +18,8 @@ async fn main() {
 
     let app = Router::new()
         .route("/health", get(health))
-        .route("/sync/apply", post(apply_batch));
+        .route("/sync/apply", post(apply_batch))
+        .route("/sync/pull", get(pull_batch));
 
     let addr: SocketAddr = "0.0.0.0:8080".parse().unwrap();
     tracing::info!("acorn-sync-server listening on {}", addr);
@@ -37,5 +38,14 @@ async fn apply_batch(Json(payload): Json<SyncApplyRequest>) -> Json<SyncApplyRes
     Json(SyncApplyResponse {
         applied,
         conflicts: 0,
+    })
+}
+
+async fn pull_batch() -> Json<SyncPullResponse> {
+    Json(SyncPullResponse {
+        batch: acorn_sync::SyncBatch {
+            branch: acorn_core::BranchId::new("default"),
+            operations: Vec::new(),
+        },
     })
 }
