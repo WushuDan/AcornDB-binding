@@ -78,16 +78,11 @@ impl SyncTransport for HttpTransport {
 
     fn pull(&self, branch: &BranchId) -> Result<SyncPullResponse, SyncError> {
         let url = format!("{}/sync/pull", self.base_url);
-        self.block_on(
-            self.client
-                .get(url)
-                .query(&[("branch", branch.as_str())])
-                .send(),
-        )?
-        .error_for_status()
-        .map_err(|e| SyncError::Protocol(e.to_string()))?
-        .json::<SyncPullResponse>()
-        .map_err(|e| SyncError::Protocol(e.to_string()))
+        self.block_on(self.client.get(url).query(&[("branch", branch.as_str())]).send())?
+            .error_for_status()
+            .map_err(|e| SyncError::Protocol(e.to_string()))?
+            .json::<SyncPullResponse>()
+            .map_err(|e| SyncError::Protocol(e.to_string()))
     }
 }
 
@@ -97,7 +92,11 @@ pub struct SyncClient;
 
 impl SyncClient {
     #[instrument(skip(self, tree))]
-    pub async fn synchronize<T, S>(&self, tree: &Tree<T, S>, endpoint: &SyncEndpoint) -> AcornResult<SyncResult>
+    pub async fn synchronize<T, S>(
+        &self,
+        tree: &Tree<T, S>,
+        endpoint: &SyncEndpoint,
+    ) -> AcornResult<SyncResult>
     where
         T: Clone + Send + Sync + 'static + std::fmt::Debug + Serialize,
         S: Trunk<T> + KeyedTrunk<T> + Clone + Send + Sync,
@@ -133,32 +132,33 @@ impl SyncClient {
         #[cfg(feature = "http-client")]
         {
             let transport = HttpTransport::new(endpoint.url.clone());
-            self.pull_with_transport(&transport, &endpoint.branch).and_then(|resp| {
-                for key in resp.deleted {
-                    let _ = tree.delete(&key)?;
-                }
+            self.pull_with_transport(&transport, &endpoint.branch)
+                .and_then(|resp| {
+                    for key in resp.deleted {
+                        let _ = tree.delete(&key)?;
+                    }
 
-                let mut applied = 0usize;
-                for op in resp.batch.operations {
-                    match op {
-                        SyncMutation::Put { key, value, .. } => {
-                            let decoded: T = serde_json::from_slice(&value)
-                                .map_err(|e| AcornError::Serialization(e.to_string()))?;
-                            tree.put(&key, Nut { value: decoded })?;
-                            applied += 1;
-                        }
-                        SyncMutation::Delete { key, .. } => {
-                            let _ = tree.delete(&key)?;
+                    let mut applied = 0usize;
+                    for op in resp.batch.operations {
+                        match op {
+                            SyncMutation::Put { key, value, .. } => {
+                                let decoded: T = serde_json::from_slice(&value)
+                                    .map_err(|e| AcornError::Serialization(e.to_string()))?;
+                                tree.put(&key, Nut { value: decoded })?;
+                                applied += 1;
+                            }
+                            SyncMutation::Delete { key, .. } => {
+                                let _ = tree.delete(&key)?;
+                            }
                         }
                     }
-                }
 
-                Ok(SyncResult {
-                    applied,
-                    conflicts: 0,
-                    conflict_keys: Vec::new(),
+                    Ok(SyncResult {
+                        applied,
+                        conflicts: 0,
+                        conflict_keys: Vec::new(),
+                    })
                 })
-            })
         }
         #[cfg(not(feature = "http-client"))]
         {
@@ -179,10 +179,15 @@ impl SyncClient {
             // Fetch remote snapshot for delta computation
             let remote = self.pull_with_transport(&transport, &endpoint.branch)?;
             let remote_versions: HashMap<_, _> = remote.versions.into_iter().collect();
-            let remote_keys: HashSet<_> = remote.batch.operations.iter().map(|op| match op {
-                SyncMutation::Put { key, .. } => key.clone(),
-                SyncMutation::Delete { key, .. } => key.clone(),
-            }).collect();
+            let remote_keys: HashSet<_> = remote
+                .batch
+                .operations
+                .iter()
+                .map(|op| match op {
+                    SyncMutation::Put { key, .. } => key.clone(),
+                    SyncMutation::Delete { key, .. } => key.clone(),
+                })
+                .collect();
             let remote_deleted: HashSet<_> = remote.deleted.into_iter().collect();
             let remote_deleted_versions: HashMap<_, _> = remote.deleted_versions.into_iter().collect();
 
@@ -474,7 +479,10 @@ mod tests {
         let result = client.apply_with_transport(&transport, &req).unwrap();
         assert_eq!(result.applied, 0);
         assert_eq!(result.conflicts.len(), 1);
-        assert!(matches!(result.conflicts[0].kind, SyncConflictKind::VersionMismatch));
+        assert!(matches!(
+            result.conflicts[0].kind,
+            SyncConflictKind::VersionMismatch
+        ));
     }
 
     #[test]
@@ -502,7 +510,7 @@ mod tests {
             trunk: MemoryTrunk,
         }
 
-impl SyncTransport for LoopbackTransport {
+        impl SyncTransport for LoopbackTransport {
             fn apply(&self, request: &SyncApplyRequest) -> Result<SyncApplyResponse, SyncError> {
                 let mut applied = 0usize;
                 let mut conflicts = Vec::new();
@@ -514,7 +522,11 @@ impl SyncTransport for LoopbackTransport {
                                 if current != Some(*expected) {
                                     conflicts.push(SyncConflict {
                                         key: key.clone(),
-                                        remote_value: self.trunk.get(&request.batch.branch, key).unwrap().map(|n| n.value),
+                                        remote_value: self
+                                            .trunk
+                                            .get(&request.batch.branch, key)
+                                            .unwrap()
+                                            .map(|n| n.value),
                                         local_value: Some(value.clone()),
                                         remote_version: current,
                                         local_version: Some(*expected),
@@ -523,7 +535,9 @@ impl SyncTransport for LoopbackTransport {
                                     continue;
                                 }
                             }
-                            let _ = self.trunk.put(&request.batch.branch, key, Nut { value: value.clone() });
+                            let _ = self
+                                .trunk
+                                .put(&request.batch.branch, key, Nut { value: value.clone() });
                             applied += 1;
                         }
                         SyncMutation::Delete { key, version } => {
@@ -532,7 +546,11 @@ impl SyncTransport for LoopbackTransport {
                                 if current != Some(*expected) {
                                     conflicts.push(SyncConflict {
                                         key: key.clone(),
-                                        remote_value: self.trunk.get(&request.batch.branch, key).unwrap().map(|n| n.value),
+                                        remote_value: self
+                                            .trunk
+                                            .get(&request.batch.branch, key)
+                                            .unwrap()
+                                            .map(|n| n.value),
                                         local_value: None,
                                         remote_version: current,
                                         local_version: Some(*expected),
@@ -598,7 +616,13 @@ impl SyncTransport for LoopbackTransport {
         let tree = Tree::new(branch.clone(), transport.trunk.clone());
 
         // seed v1
-        tree.put("key", Nut { value: b"v1".to_vec() }).unwrap();
+        tree.put(
+            "key",
+            Nut {
+                value: b"v1".to_vec(),
+            },
+        )
+        .unwrap();
 
         // attempt apply with stale version triggers conflict
         let apply = SyncApplyRequest {
@@ -614,7 +638,10 @@ impl SyncTransport for LoopbackTransport {
         let result = client.apply_with_transport(&transport, &apply).unwrap();
         assert_eq!(result.applied, 0);
         assert_eq!(result.conflicts.len(), 1);
-        assert!(matches!(result.conflicts[0].kind, SyncConflictKind::VersionMismatch));
+        assert!(matches!(
+            result.conflicts[0].kind,
+            SyncConflictKind::VersionMismatch
+        ));
 
         // pull returns latest
         let pull = client.pull_with_transport(&transport, &branch).unwrap();
@@ -640,7 +667,11 @@ impl SyncTransport for LoopbackTransport {
                                 if current != Some(*expected) {
                                     conflicts.push(SyncConflict {
                                         key: key.clone(),
-                                        remote_value: self.remote.get(&request.batch.branch, key).unwrap().map(|n| n.value),
+                                        remote_value: self
+                                            .remote
+                                            .get(&request.batch.branch, key)
+                                            .unwrap()
+                                            .map(|n| n.value),
                                         local_value: Some(value.clone()),
                                         remote_version: current,
                                         local_version: Some(*expected),
@@ -649,7 +680,9 @@ impl SyncTransport for LoopbackTransport {
                                     continue;
                                 }
                             }
-                            let _ = self.remote.put(&request.batch.branch, key, Nut { value: value.clone() });
+                            let _ = self
+                                .remote
+                                .put(&request.batch.branch, key, Nut { value: value.clone() });
                             applied += 1;
                         }
                         SyncMutation::Delete { key, version } => {
@@ -658,7 +691,11 @@ impl SyncTransport for LoopbackTransport {
                                 if current != Some(*expected) {
                                     conflicts.push(SyncConflict {
                                         key: key.clone(),
-                                        remote_value: self.remote.get(&request.batch.branch, key).unwrap().map(|n| n.value),
+                                        remote_value: self
+                                            .remote
+                                            .get(&request.batch.branch, key)
+                                            .unwrap()
+                                            .map(|n| n.value),
                                         local_value: None,
                                         remote_version: current,
                                         local_version: Some(*expected),
@@ -715,17 +752,37 @@ impl SyncTransport for LoopbackTransport {
         // local trunk at version 1
         let local_trunk = MemoryTrunk::new();
         let tree = Tree::new(branch.clone(), local_trunk.clone());
-        tree.put("key", Nut { value: b"local".to_vec() }).unwrap(); // v1
+        tree.put(
+            "key",
+            Nut {
+                value: b"local".to_vec(),
+            },
+        )
+        .unwrap(); // v1
 
         // remote trunk at version 2
         let remote_trunk = MemoryTrunk::new();
-        remote_trunk.put(&branch, "key", Nut { value: b"remote1".to_vec() }).unwrap();
-        remote_trunk.put(&branch, "key", Nut { value: b"remote2".to_vec() }).unwrap();
+        remote_trunk
+            .put(
+                &branch,
+                "key",
+                Nut {
+                    value: b"remote1".to_vec(),
+                },
+            )
+            .unwrap();
+        remote_trunk
+            .put(
+                &branch,
+                "key",
+                Nut {
+                    value: b"remote2".to_vec(),
+                },
+            )
+            .unwrap();
 
         let transport = RemoteTransport { remote: remote_trunk };
-        let result = client
-            .push_with_transport(&transport, &tree, &branch)
-            .unwrap();
+        let result = client.push_with_transport(&transport, &tree, &branch).unwrap();
         assert_eq!(result.applied, 0);
         assert_eq!(result.conflicts, 1);
         assert_eq!(result.conflict_keys, vec!["key".to_string()]);
@@ -762,7 +819,11 @@ impl SyncTransport for LoopbackTransport {
                             if current != Some(*expected) {
                                 conflicts.push(SyncConflict {
                                     key: key.clone(),
-                                    remote_value: state.trunk.get(&payload.batch.branch, key).unwrap().map(|n| n.value),
+                                    remote_value: state
+                                        .trunk
+                                        .get(&payload.batch.branch, key)
+                                        .unwrap()
+                                        .map(|n| n.value),
                                     local_value: Some(value.clone()),
                                     remote_version: current,
                                     local_version: Some(*expected),
@@ -771,7 +832,9 @@ impl SyncTransport for LoopbackTransport {
                                 continue;
                             }
                         }
-                        let _ = state.trunk.put(&payload.batch.branch, key, Nut { value: value.clone() });
+                        let _ = state
+                            .trunk
+                            .put(&payload.batch.branch, key, Nut { value: value.clone() });
                         applied += 1;
                     }
                     SyncMutation::Delete { key, version } => {
@@ -780,7 +843,11 @@ impl SyncTransport for LoopbackTransport {
                             if current != Some(*expected) {
                                 conflicts.push(SyncConflict {
                                     key: key.clone(),
-                                    remote_value: state.trunk.get(&payload.batch.branch, key).unwrap().map(|n| n.value),
+                                    remote_value: state
+                                        .trunk
+                                        .get(&payload.batch.branch, key)
+                                        .unwrap()
+                                        .map(|n| n.value),
                                     local_value: None,
                                     remote_version: current,
                                     local_version: Some(*expected),
@@ -831,7 +898,10 @@ impl SyncTransport for LoopbackTransport {
                 }
             }
             Json(SyncPullResponse {
-                batch: SyncBatch { branch, operations: ops },
+                batch: SyncBatch {
+                    branch,
+                    operations: ops,
+                },
                 versions,
                 deleted,
                 deleted_versions,
@@ -886,7 +956,10 @@ impl SyncTransport for LoopbackTransport {
         let result = client.apply_with_transport(&transport, &apply).unwrap();
         assert_eq!(result.applied, 0);
         assert_eq!(result.conflicts.len(), 1);
-        assert!(matches!(result.conflicts[0].kind, SyncConflictKind::VersionMismatch));
+        assert!(matches!(
+            result.conflicts[0].kind,
+            SyncConflictKind::VersionMismatch
+        ));
 
         // delete a missing key to trigger missing-key conflict
         let delete_missing = SyncApplyRequest {
@@ -901,7 +974,10 @@ impl SyncTransport for LoopbackTransport {
         let delete_result = client.apply_with_transport(&transport, &delete_missing).unwrap();
         assert_eq!(delete_result.applied, 0);
         assert_eq!(delete_result.conflicts.len(), 1);
-        assert!(matches!(delete_result.conflicts[0].kind, SyncConflictKind::MissingKey));
+        assert!(matches!(
+            delete_result.conflicts[0].kind,
+            SyncConflictKind::MissingKey
+        ));
 
         // pull should return current value and version
         let pull = client.pull_with_transport(&transport, &branch).unwrap();

@@ -5,8 +5,8 @@ use std::sync::Arc;
 use std::time::SystemTime;
 
 use acorn_core::{
-    AcornError, AcornResult, BranchId, CapabilityAdvertiser, HistoryEvent, HistoryProvider, KeyedTrunk, Nut, Trunk,
-    TrunkCapability, Ttl, TtlProvider,
+    AcornError, AcornResult, BranchId, CapabilityAdvertiser, HistoryEvent, HistoryProvider, KeyedTrunk, Nut,
+    Trunk, TrunkCapability, Ttl, TtlProvider,
 };
 use parking_lot::RwLock;
 
@@ -186,7 +186,11 @@ impl KeyedTrunk<Vec<u8>> for RdbmsTrunk {
 
 impl CapabilityAdvertiser for RdbmsTrunk {
     fn capabilities(&self) -> &'static [TrunkCapability] {
-        &[TrunkCapability::History, TrunkCapability::Ttl, TrunkCapability::Versions]
+        &[
+            TrunkCapability::History,
+            TrunkCapability::Ttl,
+            TrunkCapability::Versions,
+        ]
     }
 }
 
@@ -230,8 +234,8 @@ impl HistoryProvider<Vec<u8>> for RdbmsTrunk {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use acorn_core::{EncodedTree, JsonCodec};
     use acorn_core::CapabilityAdvertiser;
+    use acorn_core::{EncodedTree, JsonCodec};
     use serde::{Deserialize, Serialize};
 
     #[cfg(feature = "contract-tests")]
@@ -244,7 +248,11 @@ mod tests {
         TrunkContract::round_trip_bytes(&trunk).unwrap();
         TrunkContract::assert_capabilities(
             &trunk,
-            &[TrunkCapability::History, TrunkCapability::Ttl, TrunkCapability::Versions],
+            &[
+                TrunkCapability::History,
+                TrunkCapability::Ttl,
+                TrunkCapability::Versions,
+            ],
         );
         TrunkContract::ttl_expiry(&trunk).unwrap();
         TrunkContract::history_put_delete(&trunk).unwrap();

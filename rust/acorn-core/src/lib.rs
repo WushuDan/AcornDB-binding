@@ -15,7 +15,10 @@ pub enum AcornError {
     #[error("missing key: {0}")]
     MissingKey(String),
     #[error("version conflict (expected: {expected:?}, actual: {actual:?})")]
-    VersionConflict { expected: Option<u64>, actual: Option<u64> },
+    VersionConflict {
+        expected: Option<u64>,
+        actual: Option<u64>,
+    },
     #[error("trunk operation failed: {0}")]
     Trunk(String),
     #[error("serialization failed: {0}")]
@@ -73,7 +76,13 @@ pub trait Trunk<T>: Send + Sync + Debug {
         None
     }
     /// Compare-and-set style put that only writes when the expected version matches the current.
-    fn put_if_version(&self, _branch: &BranchId, _key: &str, _expected: Option<u64>, _nut: Nut<T>) -> AcornResult<()> {
+    fn put_if_version(
+        &self,
+        _branch: &BranchId,
+        _key: &str,
+        _expected: Option<u64>,
+        _nut: Nut<T>,
+    ) -> AcornResult<()> {
         Err(AcornError::NotImplemented)
     }
     /// Compare-and-set delete that enforces expected version when provided.

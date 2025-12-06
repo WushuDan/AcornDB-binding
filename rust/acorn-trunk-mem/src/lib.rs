@@ -391,14 +391,31 @@ mod tests {
         let trunk = MemoryTrunk::new();
         let tree = Tree::new(BranchId::new("branch"), trunk.clone());
 
-        tree.put("key", Nut { value: b"one".to_vec() }).unwrap();
+        tree.put(
+            "key",
+            Nut {
+                value: b"one".to_vec(),
+            },
+        )
+        .unwrap();
         assert_eq!(trunk.current_version(&BranchId::new("branch"), "key"), Some(1));
 
-        let ok = tree
-            .put_if_version("key", Some(1), Nut { value: b"two".to_vec() });
+        let ok = tree.put_if_version(
+            "key",
+            Some(1),
+            Nut {
+                value: b"two".to_vec(),
+            },
+        );
         assert!(ok.is_ok());
 
-        let conflict = tree.put_if_version("key", Some(1), Nut { value: b"three".to_vec() });
+        let conflict = tree.put_if_version(
+            "key",
+            Some(1),
+            Nut {
+                value: b"three".to_vec(),
+            },
+        );
         assert!(matches!(
             conflict,
             Err(AcornError::VersionConflict {
@@ -417,7 +434,13 @@ mod tests {
         let res = tree.delete_if_version("nope", None);
         assert!(matches!(res, Err(AcornError::MissingKey(_))));
 
-        tree.put("key", Nut { value: b"one".to_vec() }).unwrap();
+        tree.put(
+            "key",
+            Nut {
+                value: b"one".to_vec(),
+            },
+        )
+        .unwrap();
         assert!(tree.delete_if_version("key", Some(1)).is_ok());
 
         // Once deleted, another delete with expected version conflicts

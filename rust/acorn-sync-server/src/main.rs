@@ -147,17 +147,17 @@ async fn apply_batch(
                 if let Some(expected) = *version {
                     if let Some(existing) = current_version {
                         if existing != expected {
-                        conflicts.push(SyncConflict {
-                            key: key.clone(),
-                            remote_value: trunk.get(&payload.batch.branch, key.as_str()),
-                            local_value: Some(value.clone()),
-                            remote_version: current_version,
-                            local_version: Some(expected),
-                            kind: SyncConflictKind::VersionMismatch,
-                        });
-                        continue;
+                            conflicts.push(SyncConflict {
+                                key: key.clone(),
+                                remote_value: trunk.get(&payload.batch.branch, key.as_str()),
+                                local_value: Some(value.clone()),
+                                remote_version: current_version,
+                                local_version: Some(expected),
+                                kind: SyncConflictKind::VersionMismatch,
+                            });
+                            continue;
+                        }
                     }
-                }
                 }
                 if let Err(e) = trunk.put(&payload.batch.branch, key.as_str(), value.clone()) {
                     return Err((

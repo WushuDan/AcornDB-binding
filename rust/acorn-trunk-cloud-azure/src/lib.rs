@@ -5,8 +5,8 @@ use std::sync::Arc;
 use std::time::SystemTime;
 
 use acorn_core::{
-    AcornError, AcornResult, BranchId, CapabilityAdvertiser, HistoryEvent, HistoryProvider, KeyedTrunk, Nut, Trunk,
-    TrunkCapability, Ttl, TtlProvider,
+    AcornError, AcornResult, BranchId, CapabilityAdvertiser, HistoryEvent, HistoryProvider, KeyedTrunk, Nut,
+    Trunk, TrunkCapability, Ttl, TtlProvider,
 };
 use parking_lot::RwLock;
 
@@ -186,7 +186,11 @@ impl KeyedTrunk<Vec<u8>> for AzureTrunk {
 
 impl CapabilityAdvertiser for AzureTrunk {
     fn capabilities(&self) -> &'static [TrunkCapability] {
-        &[TrunkCapability::History, TrunkCapability::Ttl, TrunkCapability::Versions]
+        &[
+            TrunkCapability::History,
+            TrunkCapability::Ttl,
+            TrunkCapability::Versions,
+        ]
     }
 }
 
@@ -243,7 +247,11 @@ mod tests {
         TrunkContract::round_trip_bytes(&trunk).unwrap();
         TrunkContract::assert_capabilities(
             &trunk,
-            &[TrunkCapability::History, TrunkCapability::Ttl, TrunkCapability::Versions],
+            &[
+                TrunkCapability::History,
+                TrunkCapability::Ttl,
+                TrunkCapability::Versions,
+            ],
         );
         TrunkContract::ttl_expiry(&trunk).unwrap();
         TrunkContract::history_put_delete(&trunk).unwrap();

@@ -245,9 +245,11 @@ impl TombstoneProvider<Vec<u8>> for FileTrunk {
 impl CapabilityAdvertiser for FileTrunk {
     fn capabilities(&self) -> &'static [TrunkCapability] {
         match (self.ttl_enabled, self.history_enabled) {
-            (true, true) if self.versions_enabled => {
-                &[TrunkCapability::Ttl, TrunkCapability::History, TrunkCapability::Versions]
-            }
+            (true, true) if self.versions_enabled => &[
+                TrunkCapability::Ttl,
+                TrunkCapability::History,
+                TrunkCapability::Versions,
+            ],
             (true, true) => &[TrunkCapability::Ttl, TrunkCapability::History],
             (true, false) if self.versions_enabled => &[TrunkCapability::Ttl, TrunkCapability::Versions],
             (true, false) => &[TrunkCapability::Ttl],
@@ -365,9 +367,9 @@ impl HistoryProvider<Vec<u8>> for FileTrunk {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use acorn_core::CapabilityAdvertiser;
     #[cfg(feature = "contract-tests")]
     use acorn_test_harness::TrunkContract;
-    use acorn_core::CapabilityAdvertiser;
     use std::fs;
     #[cfg(feature = "contract-tests")]
     use std::io::Read;
