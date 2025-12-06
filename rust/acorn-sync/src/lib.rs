@@ -163,6 +163,7 @@ impl SyncClient {
                 SyncMutation::Put { key, .. } => key.clone(),
                 SyncMutation::Delete { key, .. } => key.clone(),
             }).collect();
+            let remote_deleted: HashSet<_> = remote.deleted.into_iter().collect();
 
             let mut ops = Vec::new();
 
@@ -170,7 +171,7 @@ impl SyncClient {
             for key in tree.trunk().keys(&endpoint.branch) {
                 let local_version = tree.trunk().version(&endpoint.branch, &key);
                 let remote_version = remote_versions.get(&key).copied();
-                if remote_version == local_version {
+                if remote_version == local_version && !remote_deleted.contains(&key) {
                     continue;
                 }
                 if let Some(nut) = tree.get(&key)? {
@@ -341,6 +342,7 @@ pub struct SyncApplyResponse {
 pub struct SyncPullResponse {
     pub batch: SyncBatch,
     pub versions: Vec<(String, u64)>,
+    pub deleted: Vec<String>,
 }
 
 /// Conflict surface returned by sync operations.
@@ -463,7 +465,7 @@ mod tests {
             trunk: MemoryTrunk,
         }
 
-        impl SyncTransport for LoopbackTransport {
+impl SyncTransport for LoopbackTransport {
             fn apply(&self, request: &SyncApplyRequest) -> Result<SyncApplyResponse, SyncError> {
                 let mut applied = 0usize;
                 let mut conflicts = Vec::new();
@@ -523,6 +525,7 @@ mod tests {
 
             fn pull(&self, branch: &BranchId) -> Result<SyncPullResponse, SyncError> {
                 let mut ops = Vec::new();
+                let mut versions = Vec::new();
                 for key in self.trunk.keys(branch) {
                     if let Some(nut) = self.trunk.get(branch, &key).unwrap() {
                         ops.push(SyncMutation::Put {
@@ -530,6 +533,9 @@ mod tests {
                             value: nut.value,
                             version: self.trunk.version(branch, &key),
                         });
+                        if let Some(v) = self.trunk.version(branch, &key) {
+                            versions.push((key.clone(), v));
+                        }
                     }
                 }
                 Ok(SyncPullResponse {
@@ -537,7 +543,8 @@ mod tests {
                         branch: branch.clone(),
                         operations: ops,
                     },
-                    versions: vec![],
+                    versions,
+                    deleted: Vec::new(),
                 })
             }
         }
@@ -655,6 +662,7 @@ mod tests {
                         operations: ops,
                     },
                     versions: vec![],
+                    deleted: Vec::new(),
                 })
             }
         }
@@ -762,6 +770,7 @@ mod tests {
         async fn pull_handler(State(state): State<HttpState>) -> Json<SyncPullResponse> {
             let branch = BranchId::new("main");
             let mut ops = Vec::new();
+            let mut versions = Vec::new();
             for key in state.trunk.keys(&branch) {
                 if let Some(nut) = state.trunk.get(&branch, &key).unwrap() {
                     ops.push(SyncMutation::Put {
@@ -769,11 +778,15 @@ mod tests {
                         value: nut.value,
                         version: state.trunk.version(&branch, &key),
                     });
+                    if let Some(v) = state.trunk.version(&branch, &key) {
+                        versions.push((key.clone(), v));
+                    }
                 }
             }
             Json(SyncPullResponse {
                 batch: SyncBatch { branch, operations: ops },
-                versions: vec![],
+                versions,
+                deleted: Vec::new(),
             })
         }
 
