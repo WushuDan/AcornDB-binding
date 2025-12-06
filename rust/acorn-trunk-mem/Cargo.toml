@@ -9,6 +9,7 @@ publish = false
 acorn-core = { path = "../acorn-core" }
 parking_lot = { workspace = true }
 tracing = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
 
 [features]
 default = []

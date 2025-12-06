@@ -170,6 +170,7 @@ version = "0.0.1-alpha.0"
 dependencies = [
  "acorn-core",
  "parking_lot 0.12.5",
+ "serde",
  "tracing",
 ]
 

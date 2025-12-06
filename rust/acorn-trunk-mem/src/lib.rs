@@ -118,6 +118,8 @@ impl TtlProvider<Vec<u8>> for MemoryTrunk {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use acorn_core::{EncodedTree, JsonCodec};
+    use serde::{Deserialize, Serialize};
 
     #[test]
     fn put_get_delete_round_trip() {
@@ -195,5 +197,30 @@ mod tests {
 
         std::thread::sleep(std::time::Duration::from_millis(20));
         assert!(trunk.get(&branch, "key").unwrap().is_none());
+    }
+
+    #[test]
+    fn reports_capabilities() {
+        let trunk = MemoryTrunk::new();
+        let caps = CapabilityAdvertiser::capabilities(&trunk);
+        assert!(caps.contains(&TrunkCapability::History));
+        assert!(caps.contains(&TrunkCapability::Ttl));
+    }
+
+    #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+    struct Demo {
+        msg: String,
+    }
+
+    #[test]
+    fn encoded_tree_round_trip() {
+        let trunk = MemoryTrunk::new();
+        let tree = EncodedTree::new(BranchId::new("enc"), trunk, JsonCodec);
+
+        let value = Demo { msg: "hi".into() };
+        tree.put("key", Nut { value: value.clone() }).unwrap();
+
+        let fetched = tree.get("key").unwrap().unwrap();
+        assert_eq!(fetched.value, value);
     }
 }
