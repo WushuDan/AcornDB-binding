@@ -128,9 +128,12 @@ impl HistoryProvider<Vec<u8>> for S3Trunk {
 mod tests {
     use super::*;
     use acorn_core::{EncodedTree, JsonCodec};
-    use acorn_test_harness::TrunkContract;
     use serde::{Deserialize, Serialize};
 
+    #[cfg(feature = "contract-tests")]
+    use acorn_test_harness::TrunkContract;
+
+    #[cfg(feature = "contract-tests")]
     #[test]
     fn contract_round_trip_history_ttl() {
         let trunk = S3Trunk::new();
