@@ -97,7 +97,7 @@ pub struct SyncClient;
 
 impl SyncClient {
     #[instrument(skip(self, tree))]
-    pub async fn synchronize<T, S>(&self, tree: &Tree<T, S>, endpoint: &SyncEndpoint) -> AcornResult<()>
+    pub async fn synchronize<T, S>(&self, tree: &Tree<T, S>, endpoint: &SyncEndpoint) -> AcornResult<SyncResult>
     where
         T: Clone + Send + Sync + 'static + std::fmt::Debug + Serialize,
         S: Trunk<T> + KeyedTrunk<T> + Clone + Send + Sync,
@@ -105,10 +105,17 @@ impl SyncClient {
         #[cfg(feature = "http-client")]
         {
             let transport = HttpTransport::new(endpoint.url.clone());
-            self.pull(tree, endpoint, &transport).await?;
-            self.push(tree, endpoint, &transport)
-                .await
-                .map(|_| ())
+            let pull = self.pull(tree, endpoint, &transport).await?;
+            let push = self.push(tree, endpoint, &transport).await?;
+            Ok(SyncResult {
+                applied: pull.applied + push.applied,
+                conflicts: pull.conflicts + push.conflicts,
+                conflict_keys: {
+                    let mut keys = pull.conflict_keys;
+                    keys.extend(push.conflict_keys);
+                    keys
+                },
+            })
         }
         #[cfg(not(feature = "http-client"))]
         {
@@ -177,6 +184,7 @@ impl SyncClient {
                 SyncMutation::Delete { key, .. } => key.clone(),
             }).collect();
             let remote_deleted: HashSet<_> = remote.deleted.into_iter().collect();
+            let remote_deleted_versions: HashMap<_, _> = remote.deleted_versions.into_iter().collect();
 
             let mut ops = Vec::new();
 
@@ -185,6 +193,14 @@ impl SyncClient {
                 let local_version = tree.trunk().version(&endpoint.branch, &key);
                 let remote_version = remote_versions.get(&key).copied();
                 if remote_version == local_version && !remote_deleted.contains(&key) {
+                    continue;
+                }
+                if let Some(remote_tomb) = remote_deleted_versions.get(&key) {
+                    if *remote_tomb == local_version {
+                        continue;
+                    }
+                }
+                if remote_deleted.contains(&key) && remote_version.is_none() && local_version.is_none() {
                     continue;
                 }
                 if let Some(nut) = tree.get(&key)? {
@@ -202,7 +218,10 @@ impl SyncClient {
             let local_keys: HashSet<_> = tree.trunk().keys(&endpoint.branch).into_iter().collect();
             for key in remote_keys {
                 if !local_keys.contains(&key) {
-                    let version = remote_versions.get(&key).copied();
+                    let version = remote_versions
+                        .get(&key)
+                        .copied()
+                        .or_else(|| remote_deleted_versions.get(&key).copied().flatten());
                     ops.push(SyncMutation::Delete { key, version });
                 }
             }
@@ -795,6 +814,7 @@ impl SyncTransport for LoopbackTransport {
             let mut ops = Vec::new();
             let mut versions = Vec::new();
             let mut deleted = Vec::new();
+            let mut deleted_versions = Vec::new();
             for key in state.trunk.keys(&branch) {
                 if let Some(nut) = state.trunk.get(&branch, &key).unwrap() {
                     ops.push(SyncMutation::Put {
@@ -806,6 +826,7 @@ impl SyncTransport for LoopbackTransport {
                         versions.push((key.clone(), v));
                     }
                 } else {
+                    deleted_versions.push((key.clone(), state.trunk.version(&branch, &key)));
                     deleted.push(key);
                 }
             }
@@ -813,7 +834,7 @@ impl SyncTransport for LoopbackTransport {
                 batch: SyncBatch { branch, operations: ops },
                 versions,
                 deleted,
-                deleted_versions: Vec::new(),
+                deleted_versions,
             })
         }
 

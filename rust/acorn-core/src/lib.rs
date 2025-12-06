@@ -90,6 +90,12 @@ pub trait KeyedTrunk<T>: Trunk<T> {
     fn keys(&self, branch: &BranchId) -> Vec<String>;
 }
 
+/// Optional tombstone metadata for sync to reason about deletions.
+pub trait TombstoneProvider<T>: Trunk<T> {
+    /// Return deleted keys with their last known versions (if tracked).
+    fn tombstones(&self, branch: &BranchId) -> Vec<(String, Option<u64>)>;
+}
+
 /// Capability flags for trunks; extend as behaviors are implemented.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TrunkCapability {

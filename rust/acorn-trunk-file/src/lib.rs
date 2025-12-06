@@ -1,13 +1,16 @@
 #![allow(dead_code)]
 
+use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::time::SystemTime;
 
 use acorn_core::{
-    AcornError, AcornResult, BranchId, CapabilityAdvertiser, HistoryEvent, HistoryProvider, KeyedTrunk, Nut, Trunk,
-    TrunkCapability, Ttl, TtlProvider,
+    AcornError, AcornResult, BranchId, CapabilityAdvertiser, HistoryEvent, HistoryProvider, KeyedTrunk, Nut,
+    TombstoneProvider, Trunk, TrunkCapability, Ttl, TtlProvider,
 };
+use parking_lot::RwLock;
 
 #[derive(Debug, Clone)]
 pub struct FileTrunk {
@@ -15,6 +18,7 @@ pub struct FileTrunk {
     ttl_enabled: bool,
     history_enabled: bool,
     versions_enabled: bool,
+    tombstones: Arc<RwLock<HashMap<(BranchId, String), Option<u64>>>>,
 }
 
 impl FileTrunk {
@@ -24,6 +28,7 @@ impl FileTrunk {
             ttl_enabled: false,
             history_enabled: false,
             versions_enabled: false,
+            tombstones: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
@@ -33,6 +38,7 @@ impl FileTrunk {
             ttl_enabled: true,
             history_enabled: false,
             versions_enabled: false,
+            tombstones: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
@@ -42,6 +48,7 @@ impl FileTrunk {
             ttl_enabled: false,
             history_enabled: true,
             versions_enabled: true,
+            tombstones: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
@@ -51,6 +58,7 @@ impl FileTrunk {
             ttl_enabled: true,
             history_enabled: true,
             versions_enabled: true,
+            tombstones: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
@@ -90,6 +98,17 @@ impl FileTrunk {
         if self.versions_enabled {
             let _ = fs::remove_file(self.version_path(branch, key));
         }
+    }
+
+    fn record_tombstone(&self, branch: &BranchId, key: &str) {
+        let version = if self.versions_enabled {
+            self.current_version(branch, key)
+        } else {
+            None
+        };
+        self.tombstones
+            .write()
+            .insert((branch.clone(), key.to_string()), version);
     }
 
     pub fn current_version(&self, branch: &BranchId, key: &str) -> Option<u64> {
@@ -134,6 +153,7 @@ impl Trunk<Vec<u8>> for FileTrunk {
         let path = dir.join(key);
         fs::write(&path, nut.value.clone()).map_err(|e| AcornError::Trunk(e.to_string()))?;
         let _ = self.bump_version(branch, key)?;
+        self.tombstones.write().remove(&(branch.clone(), key.to_string()));
         if self.history_enabled {
             self.append_history(
                 branch,
@@ -157,7 +177,11 @@ impl Trunk<Vec<u8>> for FileTrunk {
                 AcornError::Trunk(e.to_string())
             }
         })?;
+        let version = self.current_version(branch, key);
         self.clear_version(branch, key);
+        self.tombstones
+            .write()
+            .insert((branch.clone(), key.to_string()), version);
         if self.history_enabled {
             self.append_history(branch, HistoryEvent::Delete { key: key.to_string() })?;
         }
@@ -207,6 +231,17 @@ impl KeyedTrunk<Vec<u8>> for FileTrunk {
     }
 }
 
+impl TombstoneProvider<Vec<u8>> for FileTrunk {
+    fn tombstones(&self, branch: &BranchId) -> Vec<(String, Option<u64>)> {
+        self.tombstones
+            .read()
+            .iter()
+            .filter(|((b, _), _)| b == branch)
+            .map(|((_, k), v)| (k.clone(), *v))
+            .collect()
+    }
+}
+
 impl CapabilityAdvertiser for FileTrunk {
     fn capabilities(&self) -> &'static [TrunkCapability] {
         match (self.ttl_enabled, self.history_enabled) {
@@ -246,6 +281,7 @@ impl TtlProvider<Vec<u8>> for FileTrunk {
         .map_err(|e| AcornError::Trunk(e.to_string()))?;
 
         let _ = self.bump_version(branch, key)?;
+        self.tombstones.write().remove(&(branch.clone(), key.to_string()));
         if self.history_enabled {
             self.append_history(
                 branch,

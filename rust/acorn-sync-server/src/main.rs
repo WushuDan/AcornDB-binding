@@ -1,4 +1,4 @@
-use acorn_core::{BranchId, Trunk};
+use acorn_core::{BranchId, TombstoneProvider, Trunk};
 use acorn_sync::{
     SyncApplyRequest, SyncApplyResponse, SyncConflict, SyncConflictKind, SyncErrorResponse, SyncMutation,
     SyncPullResponse,
@@ -123,6 +123,13 @@ impl BackendTrunk {
             BackendTrunk::File(t) => t.current_version(branch, key),
         }
     }
+
+    fn tombstones(&self, branch: &BranchId) -> Vec<(String, Option<u64>)> {
+        match self {
+            BackendTrunk::Memory(t) => t.tombstones(branch),
+            BackendTrunk::File(t) => t.tombstones(branch),
+        }
+    }
 }
 
 async fn apply_batch(
@@ -234,6 +241,8 @@ async fn pull_batch(
     let mut ops = Vec::new();
     let mut versions = Vec::new();
     let mut deleted = Vec::new();
+    let mut deleted_versions = Vec::new();
+    let tombstones = trunk.tombstones(&branch);
 
     for key in trunk.keys(&branch) {
         if let Some(value) = trunk.get(&branch, &key) {
@@ -247,10 +256,18 @@ async fn pull_batch(
                 versions.push((key, v));
             }
         } else {
+            let tomb_version = trunk.version(&branch, &key);
+            deleted_versions.push((key.clone(), tomb_version));
+            let tomb_version = trunk.version(&branch, &key);
+            deleted_versions.push((key.clone(), tomb_version));
             deleted.push(key);
         }
     }
 
+    for (k, v) in tombstones {
+        deleted_versions.push((k.clone(), v));
+        deleted.push(k);
+    }
     Ok(Json(SyncPullResponse {
         batch: acorn_sync::SyncBatch {
             branch,
