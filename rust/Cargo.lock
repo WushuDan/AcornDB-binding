@@ -94,6 +94,7 @@ dependencies = [
  "axum",
  "clap",
  "hyper 1.8.1",
+ "parking_lot 0.12.5",
  "serde",
  "tokio",
  "tokio-tungstenite",

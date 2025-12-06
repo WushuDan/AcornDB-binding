@@ -17,6 +17,7 @@ tower = { workspace = true, optional = true }
 tower-http = { workspace = true, optional = true }
 tracing = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
+parking_lot = { workspace = true }
 
 [features]
 default = ["http-server"]
