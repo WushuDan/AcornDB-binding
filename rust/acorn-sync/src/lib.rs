@@ -2,6 +2,10 @@
 
 use acorn_core::{AcornError, AcornResult, BranchId, KeyedTrunk, Tree, Trunk};
 use serde::{de::DeserializeOwned, Serialize};
+#[cfg(feature = "http-client")]
+use serde_json;
+#[cfg(feature = "http-client")]
+use std::collections::{HashMap, HashSet};
 use tracing::instrument;
 
 /// HTTP/WebSocket sync endpoint target.
@@ -152,7 +156,51 @@ impl SyncClient {
         #[cfg(feature = "http-client")]
         {
             let transport = HttpTransport::new(endpoint.url.clone());
-            let result = self.push_with_transport(&transport, tree, &endpoint.branch)?;
+            // Fetch remote snapshot for delta computation
+            let remote = self.pull_with_transport(&transport, &endpoint.branch)?;
+            let remote_versions: HashMap<_, _> = remote.versions.into_iter().collect();
+            let remote_keys: HashSet<_> = remote.batch.operations.iter().map(|op| match op {
+                SyncMutation::Put { key, .. } => key.clone(),
+                SyncMutation::Delete { key, .. } => key.clone(),
+            }).collect();
+
+            let mut ops = Vec::new();
+
+            // push local puts where version differs or missing remotely
+            for key in tree.trunk().keys(&endpoint.branch) {
+                let local_version = tree.trunk().version(&endpoint.branch, &key);
+                let remote_version = remote_versions.get(&key).copied();
+                if remote_version == local_version {
+                    continue;
+                }
+                if let Some(nut) = tree.get(&key)? {
+                    let bytes = serde_json::to_vec(&nut.value)
+                        .map_err(|e| AcornError::Serialization(e.to_string()))?;
+                    ops.push(SyncMutation::Put {
+                        key: key.clone(),
+                        value: bytes,
+                        version: local_version,
+                    });
+                }
+            }
+
+            // send deletes for remote keys missing locally
+            let local_keys: HashSet<_> = tree.trunk().keys(&endpoint.branch).into_iter().collect();
+            for key in remote_keys {
+                if !local_keys.contains(&key) {
+                    let version = remote_versions.get(&key).copied();
+                    ops.push(SyncMutation::Delete { key, version });
+                }
+            }
+
+            let request = SyncApplyRequest {
+                batch: SyncBatch {
+                    branch: endpoint.branch.clone(),
+                    operations: ops,
+                },
+            };
+
+            let result = self.apply_with_transport(&transport, &request)?;
             if !result.conflicts.is_empty() {
                 return Err(AcornError::Trunk(format!(
                     "sync push encountered {} conflicts",
