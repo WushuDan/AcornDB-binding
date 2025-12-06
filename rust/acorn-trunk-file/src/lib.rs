@@ -175,6 +175,29 @@ impl FileTrunk {
         use std::io::Write;
         writeln!(file, "{}", line).map_err(|e| AcornError::Trunk(e.to_string()))
     }
+
+    pub fn keys(&self, branch: &BranchId) -> Vec<String> {
+        let dir = self.branch_dir(branch);
+        match fs::read_dir(dir) {
+            Ok(entries) => entries
+                .flatten()
+                .filter_map(|entry| {
+                    let path = entry.path();
+                    if path.is_file() {
+                        let name = path.file_name()?.to_string_lossy().to_string();
+                        if name.ends_with(".ttl") {
+                            None
+                        } else {
+                            Some(name)
+                        }
+                    } else {
+                        None
+                    }
+                })
+                .collect(),
+            Err(_) => Vec::new(),
+        }
+    }
 }
 
 impl HistoryProvider<Vec<u8>> for FileTrunk {

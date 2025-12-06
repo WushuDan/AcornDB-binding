@@ -1,5 +1,6 @@
 use acorn_core::BranchId;
 use acorn_sync::{SyncApplyRequest, SyncApplyResponse, SyncErrorResponse, SyncMutation, SyncPullResponse};
+use acorn_trunk_file::FileTrunk;
 use acorn_trunk_mem::MemoryTrunk;
 use axum::{
     extract::{ws::WebSocketUpgrade, Query, State},
@@ -44,7 +45,7 @@ async fn health() -> &'static str {
 
 #[derive(Clone)]
 struct AppState {
-    trunk: Arc<Mutex<MemoryTrunk>>,
+    trunk: Arc<Mutex<BackendTrunk>>,
     notifier: broadcast::Sender<String>,
 }
 
@@ -52,8 +53,60 @@ impl AppState {
     fn new() -> Self {
         let (tx, _rx) = broadcast::channel(64);
         Self {
-            trunk: Arc::new(MemoryTrunk::new()),
+            trunk: Arc::new(BackendTrunk::from_env()),
             notifier: tx,
+        }
+    }
+}
+
+#[derive(Debug)]
+enum BackendTrunk {
+    Memory(MemoryTrunk),
+    File(FileTrunk),
+}
+
+impl BackendTrunk {
+    fn from_env() -> Self {
+        if let Ok(path) = std::env::var("ACORN_TRUNK_FILE") {
+            BackendTrunk::File(FileTrunk::with_history_and_ttl(path))
+        } else {
+            BackendTrunk::Memory(MemoryTrunk::new())
+        }
+    }
+
+    fn put(&self, branch: &BranchId, key: &str, value: Vec<u8>) {
+        match self {
+            BackendTrunk::Memory(t) => {
+                let _ = t.put(branch, key, acorn_core::Nut { value });
+            }
+            BackendTrunk::File(t) => {
+                let _ = t.put(branch, key, acorn_core::Nut { value });
+            }
+        }
+    }
+
+    fn delete(&self, branch: &BranchId, key: &str) {
+        match self {
+            BackendTrunk::Memory(t) => {
+                let _ = t.delete(branch, key);
+            }
+            BackendTrunk::File(t) => {
+                let _ = t.delete(branch, key);
+            }
+        }
+    }
+
+    fn get(&self, branch: &BranchId, key: &str) -> Option<Vec<u8>> {
+        match self {
+            BackendTrunk::Memory(t) => t.get(branch, key).ok().flatten().map(|n| n.value),
+            BackendTrunk::File(t) => t.get(branch, key).ok().flatten().map(|n| n.value),
+        }
+    }
+
+    fn keys(&self, branch: &BranchId) -> Vec<String> {
+        match self {
+            BackendTrunk::Memory(t) => t.keys(branch),
+            BackendTrunk::File(t) => t.keys(branch),
         }
     }
 }
@@ -68,15 +121,11 @@ async fn apply_batch(
     for op in &payload.batch.operations {
         match op {
             SyncMutation::Put { key, value } => {
-                let _ = trunk.put(
-                    &payload.batch.branch,
-                    key,
-                    acorn_core::Nut { value: value.clone() },
-                );
+                trunk.put(&payload.batch.branch, key, value.clone());
                 applied += 1;
             }
             SyncMutation::Delete { key } => {
-                let _ = trunk.delete(&payload.batch.branch, key);
+                trunk.delete(&payload.batch.branch, key);
                 applied += 1;
             }
         }
@@ -108,10 +157,10 @@ async fn pull_batch(
     let mut ops = Vec::new();
 
     for key in trunk.keys(&branch) {
-        if let Ok(Some(nut)) = trunk.get(&branch, &key) {
+        if let Some(value) = trunk.get(&branch, &key) {
             ops.push(SyncMutation::Put {
                 key: key.clone(),
-                value: nut.value,
+                value,
             });
         }
     }
