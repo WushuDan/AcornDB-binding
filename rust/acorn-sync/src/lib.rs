@@ -125,6 +125,11 @@ impl SyncClient {
         {
             let transport = HttpTransport::new(endpoint.url.clone());
             self.pull_with_transport(&transport, &endpoint.branch).and_then(|resp| {
+                // remove tombstoned keys
+                for key in resp.deleted {
+                    let _ = tree.delete(&key)?;
+                }
+
                 for op in resp.batch.operations {
                     match op {
                         SyncMutation::Put { key, value, .. } => {

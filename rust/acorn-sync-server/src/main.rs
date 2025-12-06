@@ -233,6 +233,7 @@ async fn pull_batch(
     let trunk = state.trunk.lock();
     let mut ops = Vec::new();
     let mut versions = Vec::new();
+    let mut deleted = Vec::new();
 
     for key in trunk.keys(&branch) {
         if let Some(value) = trunk.get(&branch, &key) {
@@ -245,6 +246,8 @@ async fn pull_batch(
             if let Some(v) = version {
                 versions.push((key, v));
             }
+        } else {
+            deleted.push(key);
         }
     }
 
@@ -254,7 +257,7 @@ async fn pull_batch(
             operations: ops,
         },
         versions,
-        deleted: Vec::new(),
+        deleted,
     }))
 }
 
