@@ -1,0 +1,35 @@
+name: Rust Workspace Smoke
+
+on:
+  push:
+    paths:
+      - "rust/**"
+      - ".github/workflows/rust-smoke.yml"
+  pull_request:
+    paths:
+      - "rust/**"
+      - ".github/workflows/rust-smoke.yml"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('rust/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Workspace tests (default features)
+        working-directory: rust
+        run: cargo test --workspace --all-targets
