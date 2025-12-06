@@ -102,7 +102,7 @@ pub struct SyncApplyRequest {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct SyncApplyResponse {
     pub applied: usize,
-    pub conflicts: usize,
+    pub conflicts: Vec<SyncConflict>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

@@ -20,6 +20,7 @@ struct StreamEvent {
     branch: String,
     applied: usize,
     conflicts: usize,
+    conflict_keys: Vec<String>,
 }
 
 #[tokio::main]
@@ -119,7 +120,7 @@ async fn apply_batch(
     let trunk = state.trunk.lock();
     let mut versions = state.versions.lock();
     let mut applied = 0usize;
-    let mut conflicts = 0usize;
+    let mut conflict_keys = Vec::new();
 
     for op in &payload.batch.operations {
         match op {
@@ -131,6 +132,7 @@ async fn apply_batch(
                     if let Some(existing) = current_version {
                         if existing != *expected {
                             conflicts += 1;
+                            conflict_keys.push(key.clone());
                             continue;
                         }
                     }
@@ -152,13 +154,13 @@ async fn apply_batch(
                 if let Some(expected) = version {
                     if let Some(existing) = current_version {
                         if existing != *expected {
-                            conflicts += 1;
+                            conflict_keys.push(key.clone());
                             continue;
                         }
                     }
                 }
                 if trunk.get(&payload.batch.branch, key).is_none() {
-                    conflicts += 1;
+                    conflict_keys.push(key.clone());
                     continue;
                 }
                 if let Err(e) = trunk.delete(&payload.batch.branch, key) {
@@ -176,10 +178,23 @@ async fn apply_batch(
     let _ = state.notifier.send(StreamEvent {
         branch: payload.batch.branch.as_str().to_string(),
         applied,
-        conflicts,
+        conflicts: conflict_keys.len(),
+        conflict_keys: conflict_keys.clone(),
     });
 
-    Ok(Json(SyncApplyResponse { applied, conflicts }))
+    Ok(Json(SyncApplyResponse {
+        applied,
+        conflicts: conflict_keys
+            .into_iter()
+            .map(|key| acorn_sync::SyncConflict {
+                key,
+                remote_value: None,
+                local_value: None,
+                remote_version: None,
+                local_version: None,
+            })
+            .collect(),
+    }))
 }
 
 #[derive(Debug, serde::Deserialize)]
