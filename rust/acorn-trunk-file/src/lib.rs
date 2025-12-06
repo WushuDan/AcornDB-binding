@@ -167,6 +167,38 @@ impl Trunk<Vec<u8>> for FileTrunk {
     fn version(&self, branch: &BranchId, key: &str) -> Option<u64> {
         self.current_version(branch, key)
     }
+
+    fn put_if_version(
+        &self,
+        branch: &BranchId,
+        key: &str,
+        expected: Option<u64>,
+        nut: Nut<Vec<u8>>,
+    ) -> AcornResult<()> {
+        if let Some(expected) = expected {
+            let current = self.current_version(branch, key);
+            if current != Some(expected) {
+                return Err(AcornError::VersionConflict {
+                    expected: Some(expected),
+                    actual: current,
+                });
+            }
+        }
+        self.put(branch, key, nut)
+    }
+
+    fn delete_if_version(&self, branch: &BranchId, key: &str, expected: Option<u64>) -> AcornResult<()> {
+        let current = self.current_version(branch, key);
+        if let Some(expected) = expected {
+            if current != Some(expected) {
+                return Err(AcornError::VersionConflict {
+                    expected: Some(expected),
+                    actual: current,
+                });
+            }
+        }
+        self.delete(branch, key)
+    }
 }
 
 impl CapabilityAdvertiser for FileTrunk {

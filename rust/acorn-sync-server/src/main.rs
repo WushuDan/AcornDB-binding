@@ -1,6 +1,7 @@
 use acorn_core::{BranchId, Trunk};
 use acorn_sync::{
-    SyncApplyRequest, SyncApplyResponse, SyncConflict, SyncErrorResponse, SyncMutation, SyncPullResponse,
+    SyncApplyRequest, SyncApplyResponse, SyncConflict, SyncConflictKind, SyncErrorResponse, SyncMutation,
+    SyncPullResponse,
 };
 use acorn_trunk_file::FileTrunk;
 use acorn_trunk_mem::MemoryTrunk;
@@ -139,16 +140,17 @@ async fn apply_batch(
                 if let Some(expected) = *version {
                     if let Some(existing) = current_version {
                         if existing != expected {
-                            conflicts.push(SyncConflict {
-                                key: key.clone(),
-                                remote_value: trunk.get(&payload.batch.branch, key.as_str()),
-                                local_value: Some(value.clone()),
-                                remote_version: current_version,
-                                local_version: Some(expected),
-                            });
-                            continue;
-                        }
+                        conflicts.push(SyncConflict {
+                            key: key.clone(),
+                            remote_value: trunk.get(&payload.batch.branch, key.as_str()),
+                            local_value: Some(value.clone()),
+                            remote_version: current_version,
+                            local_version: Some(expected),
+                            kind: SyncConflictKind::VersionMismatch,
+                        });
+                        continue;
                     }
+                }
                 }
                 if let Err(e) = trunk.put(&payload.batch.branch, key.as_str(), value.clone()) {
                     return Err((
@@ -174,6 +176,7 @@ async fn apply_batch(
                                 local_value: None,
                                 remote_version: current_version,
                                 local_version: Some(expected),
+                                kind: SyncConflictKind::VersionMismatch,
                             });
                             continue;
                         }
@@ -186,6 +189,7 @@ async fn apply_batch(
                         local_value: None,
                         remote_version: current_version,
                         local_version: *version,
+                        kind: SyncConflictKind::MissingKey,
                     });
                     continue;
                 }

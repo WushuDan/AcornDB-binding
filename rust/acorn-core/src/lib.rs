@@ -72,6 +72,14 @@ pub trait Trunk<T>: Send + Sync + Debug {
     fn version(&self, _branch: &BranchId, _key: &str) -> Option<u64> {
         None
     }
+    /// Compare-and-set style put that only writes when the expected version matches the current.
+    fn put_if_version(&self, _branch: &BranchId, _key: &str, _expected: Option<u64>, _nut: Nut<T>) -> AcornResult<()> {
+        Err(AcornError::NotImplemented)
+    }
+    /// Compare-and-set delete that enforces expected version when provided.
+    fn delete_if_version(&self, _branch: &BranchId, _key: &str, _expected: Option<u64>) -> AcornResult<()> {
+        Err(AcornError::NotImplemented)
+    }
     fn capabilities(&self) -> &'static [TrunkCapability] {
         &[]
     }
@@ -167,16 +175,7 @@ where
     }
 
     pub fn put_if_version(&self, key: &str, expected: Option<u64>, nut: Nut<T>) -> AcornResult<()> {
-        let current = self.trunk.version(&self.branch, key);
-        if let Some(expected) = expected {
-            if current != Some(expected) {
-                return Err(AcornError::VersionConflict {
-                    expected: Some(expected),
-                    actual: current,
-                });
-            }
-        }
-        self.trunk.put(&self.branch, key, nut)
+        self.trunk.put_if_version(&self.branch, key, expected, nut)
     }
 
     pub fn delete(&self, key: &str) -> AcornResult<()> {
@@ -184,16 +183,7 @@ where
     }
 
     pub fn delete_if_version(&self, key: &str, expected: Option<u64>) -> AcornResult<()> {
-        let current = self.trunk.version(&self.branch, key);
-        if let Some(expected) = expected {
-            if current != Some(expected) {
-                return Err(AcornError::VersionConflict {
-                    expected: Some(expected),
-                    actual: current,
-                });
-            }
-        }
-        self.trunk.delete(&self.branch, key)
+        self.trunk.delete_if_version(&self.branch, key, expected)
     }
 }
 

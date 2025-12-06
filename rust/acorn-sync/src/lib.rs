@@ -17,6 +17,7 @@ pub enum SyncError {
     Conflict(String),
     Storage(String),
     VersionConflict(String),
+    MissingKey(String),
     Unknown(String),
 }
 
@@ -128,6 +129,14 @@ pub struct SyncConflict {
     pub local_value: Option<Vec<u8>>,
     pub remote_version: Option<u64>,
     pub local_version: Option<u64>,
+    pub kind: SyncConflictKind,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub enum SyncConflictKind {
+    VersionMismatch,
+    MissingKey,
+    Unknown,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

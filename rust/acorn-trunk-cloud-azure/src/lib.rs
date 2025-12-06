@@ -109,6 +109,67 @@ impl Trunk<Vec<u8>> for AzureTrunk {
     fn version(&self, branch: &BranchId, key: &str) -> Option<u64> {
         self.current_version(branch, key)
     }
+
+    fn put_if_version(
+        &self,
+        branch: &BranchId,
+        key: &str,
+        expected: Option<u64>,
+        nut: Nut<Vec<u8>>,
+    ) -> AcornResult<()> {
+        let mut guard = self.inner.write();
+        let current = guard.versions.get(&(branch.clone(), key.to_string())).copied();
+        if let Some(expected) = expected {
+            if current != Some(expected) {
+                return Err(AcornError::VersionConflict {
+                    expected: Some(expected),
+                    actual: current,
+                });
+            }
+        }
+        let next_version = current.unwrap_or(0).saturating_add(1);
+        guard
+            .versions
+            .insert((branch.clone(), key.to_string()), next_version);
+        guard
+            .history
+            .entry(branch.clone())
+            .or_default()
+            .push(HistoryEvent::Put {
+                key: key.to_string(),
+                nut: Nut {
+                    value: nut.value.clone(),
+                },
+            });
+        guard.data.insert((branch.clone(), key.to_string()), nut.value);
+        Ok(())
+    }
+
+    fn delete_if_version(&self, branch: &BranchId, key: &str, expected: Option<u64>) -> AcornResult<()> {
+        let mut guard = self.inner.write();
+        let current = guard.versions.get(&(branch.clone(), key.to_string())).copied();
+        if let Some(expected) = expected {
+            if current != Some(expected) {
+                return Err(AcornError::VersionConflict {
+                    expected: Some(expected),
+                    actual: current,
+                });
+            }
+        }
+        guard
+            .data
+            .remove(&(branch.clone(), key.to_string()))
+            .map(|_| {
+                guard.versions.remove(&(branch.clone(), key.to_string()));
+                guard
+                    .history
+                    .entry(branch.clone())
+                    .or_default()
+                    .push(HistoryEvent::Delete { key: key.to_string() });
+            })
+            .ok_or_else(|| AcornError::MissingKey(key.to_string()))?;
+        Ok(())
+    }
 }
 
 impl CapabilityAdvertiser for AzureTrunk {
