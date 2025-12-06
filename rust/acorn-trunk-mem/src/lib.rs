@@ -5,8 +5,8 @@ use std::sync::Arc;
 use std::time::SystemTime;
 
 use acorn_core::{
-    AcornError, AcornResult, BranchId, CapabilityAdvertiser, HistoryEvent, Nut, Trunk,
-    TrunkCapability, Ttl, TtlProvider,
+    AcornError, AcornResult, BranchId, CapabilityAdvertiser, HistoryEvent, Nut, Trunk, TrunkCapability, Ttl,
+    TtlProvider,
 };
 use parking_lot::RwLock;
 
@@ -43,9 +43,7 @@ impl Trunk<Vec<u8>> for MemoryTrunk {
                     .history
                     .entry(branch.clone())
                     .or_default()
-                    .push(HistoryEvent::Delete {
-                        key: key.to_string(),
-                    });
+                    .push(HistoryEvent::Delete { key: key.to_string() });
                 return Ok(None);
             }
         }
@@ -83,9 +81,7 @@ impl Trunk<Vec<u8>> for MemoryTrunk {
                     .history
                     .entry(branch.clone())
                     .or_default()
-                    .push(HistoryEvent::Delete {
-                        key: key.to_string(),
-                    });
+                    .push(HistoryEvent::Delete { key: key.to_string() });
             })
             .ok_or_else(|| AcornError::Trunk("missing key".into()))?;
         Ok(())
@@ -101,7 +97,9 @@ impl CapabilityAdvertiser for MemoryTrunk {
 impl TtlProvider<Vec<u8>> for MemoryTrunk {
     fn put_with_ttl(&self, branch: &BranchId, key: &str, nut: Nut<Vec<u8>>, ttl: Ttl) -> AcornResult<()> {
         let mut guard = self.inner.write();
-        guard.ttl.insert((branch.clone(), key.to_string()), ttl.expires_at);
+        guard
+            .ttl
+            .insert((branch.clone(), key.to_string()), ttl.expires_at);
         guard
             .history
             .entry(branch.clone())
@@ -127,7 +125,13 @@ mod tests {
         let branch = BranchId::new("main");
 
         trunk
-            .put(&branch, "key", Nut { value: b"hello".to_vec() })
+            .put(
+                &branch,
+                "key",
+                Nut {
+                    value: b"hello".to_vec(),
+                },
+            )
             .unwrap();
 
         let fetched = trunk.get(&branch, "key").unwrap().unwrap();
@@ -143,7 +147,13 @@ mod tests {
         let branch = BranchId::new("history");
 
         trunk
-            .put(&branch, "key", Nut { value: b"bytes".to_vec() })
+            .put(
+                &branch,
+                "key",
+                Nut {
+                    value: b"bytes".to_vec(),
+                },
+            )
             .unwrap();
         trunk.delete(&branch, "key").unwrap();
 
@@ -172,7 +182,14 @@ mod tests {
         };
 
         trunk
-            .put_with_ttl(&branch, "key", Nut { value: b"live".to_vec() }, ttl)
+            .put_with_ttl(
+                &branch,
+                "key",
+                Nut {
+                    value: b"live".to_vec(),
+                },
+                ttl,
+            )
             .unwrap();
         assert!(trunk.get(&branch, "key").unwrap().is_some());
 
