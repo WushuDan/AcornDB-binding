@@ -76,6 +76,7 @@ pub enum TrunkCapability {
     Ttl,
     Streaming,
     Backpressure,
+    Versions,
 }
 
 pub trait CapabilityAdvertiser {

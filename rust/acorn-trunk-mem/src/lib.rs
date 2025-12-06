@@ -20,6 +20,7 @@ struct Inner {
     data: HashMap<(BranchId, String), Vec<u8>>,
     history: HashMap<BranchId, Vec<HistoryEvent<Vec<u8>>>>,
     ttl: HashMap<(BranchId, String), SystemTime>,
+    versions: HashMap<(BranchId, String), u64>,
 }
 
 impl MemoryTrunk {
@@ -40,6 +41,11 @@ impl MemoryTrunk {
             .map(|(_, k)| k.clone())
             .collect()
     }
+
+    pub fn version(&self, branch: &BranchId, key: &str) -> Option<u64> {
+        let guard = self.inner.read();
+        guard.versions.get(&(branch.clone(), key.to_string())).copied()
+    }
 }
 
 impl Trunk<Vec<u8>> for MemoryTrunk {
@@ -49,6 +55,7 @@ impl Trunk<Vec<u8>> for MemoryTrunk {
             if SystemTime::now() >= *expires_at {
                 guard.ttl.remove(&(branch.clone(), key.to_string()));
                 guard.data.remove(&(branch.clone(), key.to_string()));
+                guard.versions.remove(&(branch.clone(), key.to_string()));
                 guard
                     .history
                     .entry(branch.clone())
@@ -67,6 +74,15 @@ impl Trunk<Vec<u8>> for MemoryTrunk {
 
     fn put(&self, branch: &BranchId, key: &str, nut: Nut<Vec<u8>>) -> AcornResult<()> {
         let mut guard = self.inner.write();
+        let next_version = guard
+            .versions
+            .get(&(branch.clone(), key.to_string()))
+            .copied()
+            .unwrap_or(0)
+            .saturating_add(1);
+        guard
+            .versions
+            .insert((branch.clone(), key.to_string()), next_version);
         guard
             .history
             .entry(branch.clone())
@@ -87,6 +103,7 @@ impl Trunk<Vec<u8>> for MemoryTrunk {
             .data
             .remove(&(branch.clone(), key.to_string()))
             .map(|_| {
+                guard.versions.remove(&(branch.clone(), key.to_string()));
                 guard
                     .history
                     .entry(branch.clone())
@@ -100,7 +117,11 @@ impl Trunk<Vec<u8>> for MemoryTrunk {
 
 impl CapabilityAdvertiser for MemoryTrunk {
     fn capabilities(&self) -> &'static [TrunkCapability] {
-        &[TrunkCapability::History, TrunkCapability::Ttl]
+        &[
+            TrunkCapability::History,
+            TrunkCapability::Ttl,
+            TrunkCapability::Versions,
+        ]
     }
 }
 
@@ -226,6 +247,7 @@ mod tests {
         let caps = CapabilityAdvertiser::capabilities(&trunk);
         assert!(caps.contains(&TrunkCapability::History));
         assert!(caps.contains(&TrunkCapability::Ttl));
+        assert!(caps.contains(&TrunkCapability::Versions));
     }
 
     #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -243,6 +265,19 @@ mod tests {
 
         let fetched = tree.get("key").unwrap().unwrap();
         assert_eq!(fetched.value, value);
+    }
+
+    #[test]
+    fn versions_increment_on_put() {
+        let trunk = MemoryTrunk::new();
+        let branch = BranchId::new("v");
+        assert_eq!(trunk.version(&branch, "k"), None);
+
+        trunk.put(&branch, "k", Nut { value: b"1".to_vec() }).unwrap();
+        assert_eq!(trunk.version(&branch, "k"), Some(1));
+
+        trunk.put(&branch, "k", Nut { value: b"2".to_vec() }).unwrap();
+        assert_eq!(trunk.version(&branch, "k"), Some(2));
     }
 
     #[cfg(feature = "contract-tests")]
