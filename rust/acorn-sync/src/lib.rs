@@ -106,7 +106,9 @@ impl SyncClient {
         {
             let transport = HttpTransport::new(endpoint.url.clone());
             self.pull(tree, endpoint, &transport).await?;
-            self.push(tree, endpoint, &transport).await
+            self.push(tree, endpoint, &transport)
+                .await
+                .map(|_| ())
         }
         #[cfg(not(feature = "http-client"))]
         {
@@ -116,7 +118,7 @@ impl SyncClient {
     }
 
     #[instrument(skip(self, tree))]
-    pub async fn pull<T, S>(&self, tree: &Tree<T, S>, endpoint: &SyncEndpoint) -> AcornResult<()>
+    pub async fn pull<T, S>(&self, tree: &Tree<T, S>, endpoint: &SyncEndpoint) -> AcornResult<SyncResult>
     where
         T: Clone + Send + Sync + 'static + std::fmt::Debug + Serialize + DeserializeOwned,
         S: Trunk<T> + Send + Sync,
@@ -125,24 +127,30 @@ impl SyncClient {
         {
             let transport = HttpTransport::new(endpoint.url.clone());
             self.pull_with_transport(&transport, &endpoint.branch).and_then(|resp| {
-                // remove tombstoned keys
                 for key in resp.deleted {
                     let _ = tree.delete(&key)?;
                 }
 
+                let mut applied = 0usize;
                 for op in resp.batch.operations {
                     match op {
                         SyncMutation::Put { key, value, .. } => {
                             let decoded: T = serde_json::from_slice(&value)
                                 .map_err(|e| AcornError::Serialization(e.to_string()))?;
                             tree.put(&key, Nut { value: decoded })?;
+                            applied += 1;
                         }
                         SyncMutation::Delete { key, .. } => {
                             let _ = tree.delete(&key)?;
                         }
                     }
                 }
-                Ok(())
+
+                Ok(SyncResult {
+                    applied,
+                    conflicts: 0,
+                    conflict_keys: Vec::new(),
+                })
             })
         }
         #[cfg(not(feature = "http-client"))]
@@ -153,7 +161,7 @@ impl SyncClient {
     }
 
     #[instrument(skip(self, tree))]
-    pub async fn push<T, S>(&self, tree: &Tree<T, S>, endpoint: &SyncEndpoint) -> AcornResult<()>
+    pub async fn push<T, S>(&self, tree: &Tree<T, S>, endpoint: &SyncEndpoint) -> AcornResult<SyncResult>
     where
         T: Clone + Send + Sync + 'static + std::fmt::Debug + Serialize,
         S: Trunk<T> + KeyedTrunk<T> + Clone + Send + Sync,
@@ -207,13 +215,11 @@ impl SyncClient {
             };
 
             let result = self.apply_with_transport(&transport, &request)?;
-            if !result.conflicts.is_empty() {
-                return Err(AcornError::Trunk(format!(
-                    "sync push encountered {} conflicts",
-                    result.conflicts.len()
-                )));
-            }
-            Ok(())
+            Ok(SyncResult {
+                applied: result.applied,
+                conflicts: result.conflicts.len(),
+                conflict_keys: result.conflicts.iter().map(|c| c.key.clone()).collect(),
+            })
         }
         #[cfg(not(feature = "http-client"))]
         {
@@ -243,7 +249,7 @@ impl SyncClient {
         transport: &X,
         tree: &Tree<T, S>,
         branch: &BranchId,
-    ) -> AcornResult<SyncApplyResult>
+    ) -> AcornResult<SyncResult>
     where
         T: Clone + Send + Sync + 'static + std::fmt::Debug + Serialize,
         S: Trunk<T> + KeyedTrunk<T> + Clone,
@@ -267,7 +273,12 @@ impl SyncClient {
                 operations: ops,
             },
         };
-        self.apply_with_transport(transport, &request)
+        let result = self.apply_with_transport(transport, &request)?;
+        Ok(SyncResult {
+            applied: result.applied,
+            conflicts: result.conflicts.len(),
+            conflict_keys: result.conflicts.iter().map(|c| c.key.clone()).collect(),
+        })
     }
 
     /// Pull mutations using the provided transport.
@@ -348,6 +359,7 @@ pub struct SyncPullResponse {
     pub batch: SyncBatch,
     pub versions: Vec<(String, u64)>,
     pub deleted: Vec<String>,
+    pub deleted_versions: Vec<(String, Option<u64>)>,
 }
 
 /// Conflict surface returned by sync operations.
@@ -383,6 +395,7 @@ pub struct SyncErrorResponse {
 pub struct SyncResult {
     pub applied: usize,
     pub conflicts: usize,
+    pub conflict_keys: Vec<String>,
 }
 
 #[cfg(test)]
@@ -531,6 +544,7 @@ impl SyncTransport for LoopbackTransport {
             fn pull(&self, branch: &BranchId) -> Result<SyncPullResponse, SyncError> {
                 let mut ops = Vec::new();
                 let mut versions = Vec::new();
+                let mut deleted = Vec::new();
                 for key in self.trunk.keys(branch) {
                     if let Some(nut) = self.trunk.get(branch, &key).unwrap() {
                         ops.push(SyncMutation::Put {
@@ -541,6 +555,8 @@ impl SyncTransport for LoopbackTransport {
                         if let Some(v) = self.trunk.version(branch, &key) {
                             versions.push((key.clone(), v));
                         }
+                    } else {
+                        deleted.push(key);
                     }
                 }
                 Ok(SyncPullResponse {
@@ -549,7 +565,8 @@ impl SyncTransport for LoopbackTransport {
                         operations: ops,
                     },
                     versions,
-                    deleted: Vec::new(),
+                    deleted,
+                    deleted_versions: Vec::new(),
                 })
             }
         }
@@ -668,6 +685,7 @@ impl SyncTransport for LoopbackTransport {
                     },
                     versions: vec![],
                     deleted: Vec::new(),
+                    deleted_versions: Vec::new(),
                 })
             }
         }
@@ -690,8 +708,8 @@ impl SyncTransport for LoopbackTransport {
             .push_with_transport(&transport, &tree, &branch)
             .unwrap();
         assert_eq!(result.applied, 0);
-        assert_eq!(result.conflicts.len(), 1);
-        assert!(matches!(result.conflicts[0].kind, SyncConflictKind::VersionMismatch));
+        assert_eq!(result.conflicts, 1);
+        assert_eq!(result.conflict_keys, vec!["key".to_string()]);
     }
 
     #[cfg(feature = "http-client")]
@@ -776,6 +794,7 @@ impl SyncTransport for LoopbackTransport {
             let branch = BranchId::new("main");
             let mut ops = Vec::new();
             let mut versions = Vec::new();
+            let mut deleted = Vec::new();
             for key in state.trunk.keys(&branch) {
                 if let Some(nut) = state.trunk.get(&branch, &key).unwrap() {
                     ops.push(SyncMutation::Put {
@@ -786,12 +805,15 @@ impl SyncTransport for LoopbackTransport {
                     if let Some(v) = state.trunk.version(&branch, &key) {
                         versions.push((key.clone(), v));
                     }
+                } else {
+                    deleted.push(key);
                 }
             }
             Json(SyncPullResponse {
                 batch: SyncBatch { branch, operations: ops },
                 versions,
-                deleted: Vec::new(),
+                deleted,
+                deleted_versions: Vec::new(),
             })
         }
 

@@ -258,6 +258,7 @@ async fn pull_batch(
         },
         versions,
         deleted,
+        deleted_versions: Vec::new(),
     }))
 }
 
