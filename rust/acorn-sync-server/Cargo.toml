@@ -8,6 +8,7 @@ publish = false
 [dependencies]
 acorn-core = { path = "../acorn-core" }
 acorn-sync = { path = "../acorn-sync" }
+acorn-trunk-mem = { path = "../acorn-trunk-mem" }
 axum = { workspace = true, optional = true }
 clap = { workspace = true, features = ["derive"] }
 hyper = { workspace = true, optional = true }

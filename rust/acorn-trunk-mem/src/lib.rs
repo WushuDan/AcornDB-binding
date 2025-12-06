@@ -30,6 +30,16 @@ impl MemoryTrunk {
     pub fn health_check(&self) -> AcornResult<()> {
         Ok(())
     }
+
+    pub fn keys(&self, branch: &BranchId) -> Vec<String> {
+        let guard = self.inner.read();
+        guard
+            .data
+            .keys()
+            .filter(|(b, _)| b == branch)
+            .map(|(_, k)| k.clone())
+            .collect()
+    }
 }
 
 impl Trunk<Vec<u8>> for MemoryTrunk {

@@ -33,7 +33,7 @@ authors = ["AcornDB Team"]
 
 [workspace.dependencies]
 arrow = "57.1.0"
-axum = { version = "0.8.7", default-features = false, features = ["http1", "http2", "macros", "tokio"] }
+axum = { version = "0.8.7", default-features = false, features = ["http1", "http2", "macros", "tokio", "ws"] }
 anyhow = "1"
 aws-config = "1"
 aws-sdk-s3 = "1"

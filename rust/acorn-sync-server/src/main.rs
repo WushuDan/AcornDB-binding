@@ -1,6 +1,7 @@
 use axum::{
-    extract::{Query, State},
+    extract::{ws::WebSocketUpgrade, Query, State},
     http::StatusCode,
+    response::IntoResponse,
     routing::{get, post},
     Json, Router,
 };
@@ -12,6 +13,7 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use acorn_core::BranchId;
 use acorn_sync::{SyncApplyRequest, SyncApplyResponse, SyncErrorResponse, SyncMutation, SyncPullResponse};
+use acorn_trunk_mem::MemoryTrunk;
 
 #[tokio::main]
 async fn main() {
@@ -26,6 +28,7 @@ async fn main() {
         .route("/health", get(health))
         .route("/sync/apply", post(apply_batch))
         .route("/sync/pull", get(pull_batch))
+        .route("/sync/stream", get(stream_updates))
         .with_state(state);
 
     let addr: SocketAddr = "0.0.0.0:8080".parse().unwrap();
@@ -42,24 +45,28 @@ async fn health() -> &'static str {
 
 #[derive(Clone, Default)]
 struct AppState {
-    inner: Arc<Mutex<HashMap<(BranchId, String), Vec<u8>>>>,
+    trunk: Arc<Mutex<MemoryTrunk>>,
 }
 
 async fn apply_batch(
     State(state): State<AppState>,
     Json(payload): Json<SyncApplyRequest>,
 ) -> Result<Json<SyncApplyResponse>, (StatusCode, Json<SyncErrorResponse>)> {
-    let mut store = state.inner.lock();
+    let trunk = state.trunk.lock();
     let mut applied = 0usize;
 
     for op in &payload.batch.operations {
         match op {
             SyncMutation::Put { key, value } => {
-                store.insert((payload.batch.branch.clone(), key.clone()), value.clone());
+                let _ = trunk.put(
+                    &payload.batch.branch,
+                    key,
+                    acorn_core::Nut { value: value.clone() },
+                );
                 applied += 1;
             }
             SyncMutation::Delete { key } => {
-                store.remove(&(payload.batch.branch.clone(), key.clone()));
+                let _ = trunk.delete(&payload.batch.branch, key);
                 applied += 1;
             }
         }
@@ -81,14 +88,14 @@ async fn pull_batch(
     Query(query): Query<PullQuery>,
 ) -> Result<Json<SyncPullResponse>, (StatusCode, Json<SyncErrorResponse>)> {
     let branch = BranchId::new(query.branch.unwrap_or_else(|| "default".into()));
-    let store = state.inner.lock();
+    let trunk = state.trunk.lock();
     let mut ops = Vec::new();
 
-    for ((b, key), value) in store.iter() {
-        if b == &branch {
+    for key in trunk.keys(&branch) {
+        if let Ok(Some(nut)) = trunk.get(&branch, &key) {
             ops.push(SyncMutation::Put {
                 key: key.clone(),
-                value: value.clone(),
+                value: nut.value,
             });
         }
     }
@@ -99,4 +106,22 @@ async fn pull_batch(
             operations: ops,
         },
     }))
+}
+
+async fn stream_updates(ws: WebSocketUpgrade) -> impl IntoResponse {
+    ws.on_upgrade(handle_ws)
+}
+
+async fn handle_ws(mut socket: axum::extract::ws::WebSocket) {
+    use axum::extract::ws::Message;
+    if let Err(e) = socket.send(Message::Text("heartbeat".into())).await {
+        tracing::warn!("failed to send heartbeat: {}", e);
+        return;
+    }
+    while let Some(msg) = socket.recv().await {
+        match msg {
+            Ok(Message::Close(_)) => break,
+            _ => {}
+        }
+    }
 }
