@@ -74,25 +74,17 @@ impl BackendTrunk {
         }
     }
 
-    fn put(&self, branch: &BranchId, key: &str, value: Vec<u8>) {
+    fn put(&self, branch: &BranchId, key: &str, value: Vec<u8>) -> Result<(), acorn_core::AcornError> {
         match self {
-            BackendTrunk::Memory(t) => {
-                let _ = t.put(branch, key, acorn_core::Nut { value });
-            }
-            BackendTrunk::File(t) => {
-                let _ = t.put(branch, key, acorn_core::Nut { value });
-            }
+            BackendTrunk::Memory(t) => t.put(branch, key, acorn_core::Nut { value }),
+            BackendTrunk::File(t) => t.put(branch, key, acorn_core::Nut { value }),
         }
     }
 
-    fn delete(&self, branch: &BranchId, key: &str) {
+    fn delete(&self, branch: &BranchId, key: &str) -> Result<(), acorn_core::AcornError> {
         match self {
-            BackendTrunk::Memory(t) => {
-                let _ = t.delete(branch, key);
-            }
-            BackendTrunk::File(t) => {
-                let _ = t.delete(branch, key);
-            }
+            BackendTrunk::Memory(t) => t.delete(branch, key),
+            BackendTrunk::File(t) => t.delete(branch, key),
         }
     }
 
@@ -121,11 +113,21 @@ async fn apply_batch(
     for op in &payload.batch.operations {
         match op {
             SyncMutation::Put { key, value } => {
-                trunk.put(&payload.batch.branch, key, value.clone());
+                if let Err(e) = trunk.put(&payload.batch.branch, key, value.clone()) {
+                    return Err((
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        Json(SyncErrorResponse { error: e.to_string() }),
+                    ));
+                }
                 applied += 1;
             }
             SyncMutation::Delete { key } => {
-                trunk.delete(&payload.batch.branch, key);
+                if let Err(e) = trunk.delete(&payload.batch.branch, key) {
+                    return Err((
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        Json(SyncErrorResponse { error: e.to_string() }),
+                    ));
+                }
                 applied += 1;
             }
         }
