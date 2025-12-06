@@ -126,11 +126,11 @@ impl HistoryProvider<Vec<u8>> for MemoryTrunk {
 mod tests {
     use super::*;
     use acorn_core::{CapabilityAdvertiser, EncodedTree, JsonCodec};
+    #[cfg(feature = "contract-tests")]
+    use acorn_test_harness::TrunkContract;
+    #[cfg(feature = "contract-tests")]
+    use acorn_test_harness::TrunkContract;
     use serde::{Deserialize, Serialize};
-    #[cfg(feature = "contract-tests")]
-    use acorn_test_harness::TrunkContract;
-    #[cfg(feature = "contract-tests")]
-    use acorn_test_harness::TrunkContract;
 
     #[test]
     fn put_get_delete_round_trip() {

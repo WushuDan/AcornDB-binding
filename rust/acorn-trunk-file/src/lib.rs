@@ -204,11 +204,11 @@ impl HistoryProvider<Vec<u8>> for FileTrunk {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(feature = "contract-tests")]
+    use acorn_test_harness::TrunkContract;
     use std::fs;
     #[cfg(feature = "contract-tests")]
     use std::io::Read;
-    #[cfg(feature = "contract-tests")]
-    use acorn_test_harness::TrunkContract;
 
     #[test]
     fn put_get_delete_round_trip() {

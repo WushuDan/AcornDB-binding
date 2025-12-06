@@ -5,8 +5,8 @@ use std::sync::Arc;
 use std::time::SystemTime;
 
 use acorn_core::{
-    AcornError, AcornResult, BranchId, CapabilityAdvertiser, HistoryEvent, HistoryProvider, Nut,
-    Trunk, TrunkCapability, Ttl, TtlProvider,
+    AcornError, AcornResult, BranchId, CapabilityAdvertiser, HistoryEvent, HistoryProvider, Nut, Trunk,
+    TrunkCapability, Ttl, TtlProvider,
 };
 use parking_lot::RwLock;
 
@@ -45,9 +45,7 @@ impl Trunk<Vec<u8>> for RdbmsTrunk {
                     .history
                     .entry(branch.clone())
                     .or_default()
-                    .push(HistoryEvent::Delete {
-                        key: key.to_string(),
-                    });
+                    .push(HistoryEvent::Delete { key: key.to_string() });
                 return Ok(None);
             }
         }
@@ -85,9 +83,7 @@ impl Trunk<Vec<u8>> for RdbmsTrunk {
                     .history
                     .entry(branch.clone())
                     .or_default()
-                    .push(HistoryEvent::Delete {
-                        key: key.to_string(),
-                    });
+                    .push(HistoryEvent::Delete { key: key.to_string() });
             })
             .ok_or_else(|| AcornError::Trunk("missing key".into()))?;
         Ok(())
@@ -124,11 +120,7 @@ impl TtlProvider<Vec<u8>> for RdbmsTrunk {
 impl HistoryProvider<Vec<u8>> for RdbmsTrunk {
     fn history(&self, branch: &BranchId) -> AcornResult<Vec<HistoryEvent<Vec<u8>>>> {
         let guard = self.inner.read();
-        Ok(guard
-            .history
-            .get(branch)
-            .cloned()
-            .unwrap_or_else(Vec::new))
+        Ok(guard.history.get(branch).cloned().unwrap_or_else(Vec::new))
     }
 }
 

@@ -9,6 +9,15 @@ pub struct SyncEndpoint {
     pub branch: BranchId,
 }
 
+#[derive(Debug, Clone)]
+pub enum SyncError {
+    Network(String),
+    Protocol(String),
+    Conflict(String),
+    Storage(String),
+    Unknown(String),
+}
+
 #[derive(Debug, Default)]
 pub struct SyncClient;
 
@@ -16,7 +25,25 @@ impl SyncClient {
     #[instrument(skip(self, _tree))]
     pub async fn synchronize<T, S>(&self, _tree: &Tree<T, S>, _endpoint: &SyncEndpoint) -> AcornResult<()>
     where
-        T: Clone + Send + Sync + 'static,
+        T: Clone + Send + Sync + 'static + std::fmt::Debug,
+        S: Trunk<T> + Send + Sync,
+    {
+        Err(AcornError::NotImplemented)
+    }
+
+    #[instrument(skip(self))]
+    pub async fn pull<T, S>(&self, _tree: &Tree<T, S>, _endpoint: &SyncEndpoint) -> AcornResult<()>
+    where
+        T: Clone + Send + Sync + 'static + std::fmt::Debug,
+        S: Trunk<T> + Send + Sync,
+    {
+        Err(AcornError::NotImplemented)
+    }
+
+    #[instrument(skip(self))]
+    pub async fn push<T, S>(&self, _tree: &Tree<T, S>, _endpoint: &SyncEndpoint) -> AcornResult<()>
+    where
+        T: Clone + Send + Sync + 'static + std::fmt::Debug,
         S: Trunk<T> + Send + Sync,
     {
         Err(AcornError::NotImplemented)
@@ -34,4 +61,15 @@ impl Subscription {
     {
         Ok(Subscription)
     }
+
+    pub async fn next_event(&self) -> AcornResult<Option<SyncEvent>> {
+        Err(AcornError::NotImplemented)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum SyncEvent {
+    Applied { key: String },
+    Conflict { key: String },
+    Heartbeat,
 }
