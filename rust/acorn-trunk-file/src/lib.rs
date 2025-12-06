@@ -439,6 +439,56 @@ mod tests {
         assert_eq!(trunk.current_version(&branch, "key"), None);
     }
 
+    #[test]
+    fn cas_put_and_conflict() {
+        let tmp_dir = tempfile::tempdir().unwrap();
+        let trunk = FileTrunk::with_history(tmp_dir.path());
+        let branch = BranchId::new("cas");
+
+        // First write without expectation
+        trunk
+            .put_if_version(
+                &branch,
+                "key",
+                None,
+                Nut {
+                    value: b"v1".to_vec(),
+                },
+            )
+            .unwrap();
+        assert_eq!(trunk.current_version(&branch, "key"), Some(1));
+
+        // Next write with matching expectation succeeds
+        trunk
+            .put_if_version(
+                &branch,
+                "key",
+                Some(1),
+                Nut {
+                    value: b"v2".to_vec(),
+                },
+            )
+            .unwrap();
+        assert_eq!(trunk.current_version(&branch, "key"), Some(2));
+
+        // Conflicting expectation rejected
+        let conflict = trunk.put_if_version(
+            &branch,
+            "key",
+            Some(1),
+            Nut {
+                value: b"v3".to_vec(),
+            },
+        );
+        assert!(matches!(
+            conflict,
+            Err(AcornError::VersionConflict {
+                expected: Some(1),
+                actual: Some(2)
+            })
+        ));
+    }
+
     #[cfg(feature = "contract-tests")]
     #[test]
     fn history_put_delete_logged() {

@@ -21,6 +21,12 @@ pub enum SyncError {
     Unknown(String),
 }
 
+/// Transport abstraction for issuing sync requests.
+pub trait SyncTransport {
+    fn apply(&self, request: &SyncApplyRequest) -> Result<SyncApplyResponse, SyncError>;
+    fn pull(&self, branch: &BranchId) -> Result<SyncPullResponse, SyncError>;
+}
+
 /// Stub sync client facade; will orchestrate pull/push/sync with retries.
 #[derive(Debug, Default)]
 pub struct SyncClient;
@@ -51,6 +57,32 @@ impl SyncClient {
         S: Trunk<T> + Send + Sync,
     {
         Err(AcornError::NotImplemented)
+    }
+
+    /// Apply a batch using the provided transport, surfacing conflicts with kinds.
+    pub fn apply_with_transport<T: SyncTransport>(
+        &self,
+        transport: &T,
+        request: &SyncApplyRequest,
+    ) -> AcornResult<SyncApplyResult> {
+        let response = transport
+            .apply(request)
+            .map_err(|e| AcornError::Trunk(format!("sync apply failed: {:?}", e)))?;
+        Ok(SyncApplyResult {
+            applied: response.applied,
+            conflicts: response.conflicts,
+        })
+    }
+
+    /// Pull mutations using the provided transport.
+    pub fn pull_with_transport<T: SyncTransport>(
+        &self,
+        transport: &T,
+        branch: &BranchId,
+    ) -> AcornResult<SyncPullResponse> {
+        transport
+            .pull(branch)
+            .map_err(|e| AcornError::Trunk(format!("sync pull failed: {:?}", e)))
     }
 }
 
@@ -154,4 +186,79 @@ pub struct SyncErrorResponse {
 pub struct SyncResult {
     pub applied: usize,
     pub conflicts: usize,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[derive(Debug, Default)]
+    struct MockTransport {
+        apply_response: Option<SyncApplyResponse>,
+        apply_error: Option<SyncError>,
+    }
+
+    impl SyncTransport for MockTransport {
+        fn apply(&self, _request: &SyncApplyRequest) -> Result<SyncApplyResponse, SyncError> {
+            if let Some(err) = &self.apply_error {
+                return Err(err.clone());
+            }
+            self.apply_response
+                .clone()
+                .ok_or_else(|| SyncError::Unknown("missing mock apply response".into()))
+        }
+
+        fn pull(&self, _branch: &BranchId) -> Result<SyncPullResponse, SyncError> {
+            Err(SyncError::Unknown("pull not mocked".into()))
+        }
+    }
+
+    #[test]
+    fn surfaces_conflict_kinds_from_transport() {
+        let conflicts = vec![SyncConflict {
+            key: "k1".into(),
+            remote_value: Some(vec![1]),
+            local_value: Some(vec![2]),
+            remote_version: Some(2),
+            local_version: Some(1),
+            kind: SyncConflictKind::VersionMismatch,
+        }];
+        let transport = MockTransport {
+            apply_response: Some(SyncApplyResponse {
+                applied: 0,
+                conflicts: conflicts.clone(),
+            }),
+            apply_error: None,
+        };
+        let client = SyncClient;
+        let req = SyncApplyRequest {
+            batch: SyncBatch {
+                branch: BranchId::new("b"),
+                operations: vec![],
+            },
+        };
+
+        let result = client.apply_with_transport(&transport, &req).unwrap();
+        assert_eq!(result.applied, 0);
+        assert_eq!(result.conflicts.len(), 1);
+        assert!(matches!(result.conflicts[0].kind, SyncConflictKind::VersionMismatch));
+    }
+
+    #[test]
+    fn maps_transport_error_to_acorn_error() {
+        let transport = MockTransport {
+            apply_response: None,
+            apply_error: Some(SyncError::Network("down".into())),
+        };
+        let client = SyncClient;
+        let req = SyncApplyRequest {
+            batch: SyncBatch {
+                branch: BranchId::new("b"),
+                operations: vec![],
+            },
+        };
+
+        let result = client.apply_with_transport(&transport, &req);
+        assert!(matches!(result, Err(AcornError::Trunk(_))));
+    }
 }
