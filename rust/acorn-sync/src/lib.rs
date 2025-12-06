@@ -15,6 +15,7 @@ pub enum SyncError {
     Protocol(String),
     Conflict(String),
     Storage(String),
+    VersionConflict(String),
     Unknown(String),
 }
 

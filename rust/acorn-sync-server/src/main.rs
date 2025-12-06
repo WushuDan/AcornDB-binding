@@ -17,7 +17,9 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[derive(Debug, Clone, serde::Serialize)]
 struct StreamEvent {
-    message: String,
+    branch: String,
+    applied: usize,
+    conflicts: usize,
 }
 
 #[tokio::main]
@@ -118,7 +120,12 @@ async fn apply_batch(
 
     for op in &payload.batch.operations {
         match op {
-            SyncMutation::Put { key, value } => {
+            SyncMutation::Put { key, value, version } => {
+                // naive version check: if version provided and key exists, treat as conflict
+                if version.is_some() && trunk.get(&payload.batch.branch, key).is_some() {
+                    conflicts += 1;
+                    continue;
+                }
                 if let Err(e) = trunk.put(&payload.batch.branch, key, value.clone()) {
                     return Err((
                         StatusCode::INTERNAL_SERVER_ERROR,
@@ -127,7 +134,11 @@ async fn apply_batch(
                 }
                 applied += 1;
             }
-            SyncMutation::Delete { key } => {
+            SyncMutation::Delete { key, version } => {
+                if version.is_some() && trunk.get(&payload.batch.branch, key).is_none() {
+                    conflicts += 1;
+                    continue;
+                }
                 if let Err(e) = trunk.delete(&payload.batch.branch, key) {
                     return Err((
                         StatusCode::INTERNAL_SERVER_ERROR,
@@ -140,12 +151,9 @@ async fn apply_batch(
     }
 
     let _ = state.notifier.send(StreamEvent {
-        message: format!(
-            "branch:{} applied:{} conflicts:{}",
-            payload.batch.branch.as_str(),
-            applied,
-            conflicts
-        ),
+        branch: payload.batch.branch.as_str().to_string(),
+        applied,
+        conflicts,
     });
 
     Ok(Json(SyncApplyResponse { applied, conflicts }))
@@ -186,14 +194,15 @@ async fn stream_updates(State(state): State<AppState>, ws: WebSocketUpgrade) -> 
     ws.on_upgrade(move |socket| handle_ws(socket, receiver))
 }
 
-async fn handle_ws(mut socket: axum::extract::ws::WebSocket, mut receiver: broadcast::Receiver<String>) {
+async fn handle_ws(mut socket: axum::extract::ws::WebSocket, mut receiver: broadcast::Receiver<StreamEvent>) {
     use axum::extract::ws::Message;
     loop {
         select! {
             maybe_msg = receiver.recv() => {
                 match maybe_msg {
-                    Ok(text) => {
-                        if socket.send(Message::Text(text)).await.is_err() {
+                    Ok(evt) => {
+                        let payload = serde_json::to_string(&evt).unwrap_or_else(|_| "{}".into());
+                        if socket.send(Message::Text(payload)).await.is_err() {
                             break;
                         }
                     }
