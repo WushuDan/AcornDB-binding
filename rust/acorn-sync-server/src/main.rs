@@ -239,7 +239,7 @@ async fn pull_batch(
             ops.push(SyncMutation::Put {
                 key: key.clone(),
                 value,
-                version: None,
+                version: state.versions.lock().get(&(branch.clone(), key.clone())).copied(),
             });
             if let Some(v) = state.versions.lock().get(&(branch.clone(), key.clone())).copied() {
                 versions.push((key, v));
