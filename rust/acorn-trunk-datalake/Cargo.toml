@@ -7,10 +7,12 @@ publish = false
 
 [dependencies]
 acorn-core = { path = "../acorn-core" }
+arrow = { workspace = true, optional = true }
+parquet = { workspace = true, optional = true }
 tracing = { workspace = true }
 
 [features]
-default = ["parquet"]
-parquet = []
-arrow = []
+default = []
+parquet = ["dep:parquet"]
+arrow = ["dep:arrow"]
 delta-lake = []

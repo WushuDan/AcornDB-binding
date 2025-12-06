@@ -7,9 +7,12 @@ publish = false
 
 [dependencies]
 acorn-core = { path = "../acorn-core" }
+aws-config = { workspace = true, optional = true }
+aws-sdk-s3 = { workspace = true, optional = true }
+tokio = { workspace = true, optional = true }
 tracing = { workspace = true }
 
 [features]
 default = []
-aws-sdk-rust = []
+aws-sdk-rust = ["dep:aws-config", "dep:aws-sdk-s3", "dep:tokio"]
 mock = []

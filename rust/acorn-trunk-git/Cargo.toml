@@ -7,8 +7,9 @@ publish = false
 
 [dependencies]
 acorn-core = { path = "../acorn-core" }
+git2 = { workspace = true, optional = true }
 tracing = { workspace = true }
 
 [features]
 default = []
-git2-backend = []
+git2-backend = ["dep:git2"]

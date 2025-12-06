@@ -7,9 +7,12 @@ publish = false
 
 [dependencies]
 acorn-core = { path = "../acorn-core" }
+azure-identity = { workspace = true, optional = true }
+azure-storage-blobs = { workspace = true, optional = true }
+tokio = { workspace = true, optional = true }
 tracing = { workspace = true }
 
 [features]
 default = []
-azure-sdk = []
+azure-sdk = ["dep:azure-identity", "dep:azure-storage-blobs", "dep:tokio"]
 mock = []

@@ -7,11 +7,16 @@ publish = false
 
 [features]
 default = ["std"]
-std = []
+std = ["tokio"]
 backpressure-tests = []
+http-client = ["reqwest"]
+websocket = ["tokio-tungstenite"]
 
 [dependencies]
 acorn-core = { path = "../acorn-core" }
 futures = { workspace = true }
+reqwest = { workspace = true, optional = true }
 thiserror = { workspace = true }
+tokio = { workspace = true, optional = true }
+tokio-tungstenite = { workspace = true, optional = true }
 tracing = { workspace = true }

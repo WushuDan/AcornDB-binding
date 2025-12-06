@@ -7,10 +7,13 @@ publish = false
 
 [dependencies]
 acorn-core = { path = "../acorn-core" }
+sqlx = { workspace = true, optional = true }
+sled = { workspace = true, optional = true }
+tokio = { workspace = true, optional = true }
 tracing = { workspace = true }
 
 [features]
 default = ["filesystem"]
 filesystem = []
-sled = []
-sqlite = []
+sled = ["dep:sled"]
+sqlite = ["sqlx/sqlite", "dep:sqlx"]
