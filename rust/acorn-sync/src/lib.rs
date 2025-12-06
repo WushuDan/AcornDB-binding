@@ -252,6 +252,8 @@ mod tests {
     use super::*;
     use acorn_core::{Nut, Tree};
     use acorn_trunk_mem::MemoryTrunk;
+    #[cfg(feature = "http-client")]
+    use std::sync::Arc;
 
     #[derive(Debug, Default)]
     struct MockTransport {
@@ -438,5 +440,159 @@ mod tests {
         // pull returns latest
         let pull = client.pull_with_transport(&transport, &branch).unwrap();
         assert_eq!(pull.batch.operations.len(), 1);
+    }
+
+    #[cfg(feature = "http-client")]
+    #[tokio::test]
+    async fn http_transport_detects_version_conflict() {
+        use axum::{
+            extract::State,
+            routing::{get, post},
+            Json, Router,
+        };
+        use tokio::net::TcpListener;
+        use tokio::task::JoinHandle;
+
+        #[derive(Clone)]
+        struct HttpState {
+            trunk: Arc<MemoryTrunk>,
+        }
+
+        async fn apply_handler(
+            State(state): State<HttpState>,
+            Json(payload): Json<SyncApplyRequest>,
+        ) -> Json<SyncApplyResponse> {
+            let mut applied = 0usize;
+            let mut conflicts = Vec::new();
+
+            for op in &payload.batch.operations {
+                match op {
+                    SyncMutation::Put { key, value, version } => {
+                        let current = state.trunk.version(&payload.batch.branch, key);
+                        if let Some(expected) = version {
+                            if current != Some(*expected) {
+                                conflicts.push(SyncConflict {
+                                    key: key.clone(),
+                                    remote_value: state.trunk.get(&payload.batch.branch, key).unwrap().map(|n| n.value),
+                                    local_value: Some(value.clone()),
+                                    remote_version: current,
+                                    local_version: Some(*expected),
+                                    kind: SyncConflictKind::VersionMismatch,
+                                });
+                                continue;
+                            }
+                        }
+                        let _ = state.trunk.put(&payload.batch.branch, key, Nut { value: value.clone() });
+                        applied += 1;
+                    }
+                    SyncMutation::Delete { key, version } => {
+                        let current = state.trunk.version(&payload.batch.branch, key);
+                        if let Some(expected) = version {
+                            if current != Some(*expected) {
+                                conflicts.push(SyncConflict {
+                                    key: key.clone(),
+                                    remote_value: state.trunk.get(&payload.batch.branch, key).unwrap().map(|n| n.value),
+                                    local_value: None,
+                                    remote_version: current,
+                                    local_version: Some(*expected),
+                                    kind: SyncConflictKind::VersionMismatch,
+                                });
+                                continue;
+                            }
+                        }
+                        if state.trunk.get(&payload.batch.branch, key).unwrap().is_none() {
+                            conflicts.push(SyncConflict {
+                                key: key.clone(),
+                                remote_value: None,
+                                local_value: None,
+                                remote_version: current,
+                                local_version: *version,
+                                kind: SyncConflictKind::MissingKey,
+                            });
+                            continue;
+                        }
+                        let _ = state.trunk.delete(&payload.batch.branch, key);
+                        applied += 1;
+                    }
+                }
+            }
+
+            Json(SyncApplyResponse { applied, conflicts })
+        }
+
+        async fn pull_handler(State(state): State<HttpState>) -> Json<SyncPullResponse> {
+            let branch = BranchId::new("main");
+            let mut ops = Vec::new();
+            for key in state.trunk.keys(&branch) {
+                if let Some(nut) = state.trunk.get(&branch, &key).unwrap() {
+                    ops.push(SyncMutation::Put {
+                        key: key.clone(),
+                        value: nut.value,
+                        version: state.trunk.version(&branch, &key),
+                    });
+                }
+            }
+            Json(SyncPullResponse {
+                batch: SyncBatch { branch, operations: ops },
+                versions: vec![],
+            })
+        }
+
+        async fn serve(state: HttpState) -> (SocketAddr, JoinHandle<()>) {
+            use std::net::SocketAddr;
+            let app = Router::new()
+                .route("/sync/apply", post(apply_handler))
+                .route("/sync/pull", get(pull_handler))
+                .with_state(state);
+
+            let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let addr = listener.local_addr().unwrap();
+            let handle = tokio::spawn(async move {
+                axum::serve(listener, app.into_make_service()).await.unwrap();
+            });
+            (addr, handle)
+        }
+
+        let trunk = Arc::new(MemoryTrunk::new());
+        let state = HttpState { trunk: trunk.clone() };
+
+        // seed initial version (v1)
+        trunk
+            .put(
+                &BranchId::new("main"),
+                "key",
+                Nut {
+                    value: b"v1".to_vec(),
+                },
+            )
+            .unwrap();
+
+        let (addr, handle) = serve(state).await;
+        let transport = HttpTransport::new(format!("http://{}", addr));
+        let client = SyncClient;
+        let branch = BranchId::new("main");
+
+        // apply with stale expectation (0 instead of 1) should conflict
+        let apply = SyncApplyRequest {
+            batch: SyncBatch {
+                branch: branch.clone(),
+                operations: vec![SyncMutation::Put {
+                    key: "key".into(),
+                    value: b"v2".to_vec(),
+                    version: Some(0),
+                }],
+            },
+        };
+        let result = client.apply_with_transport(&transport, &apply).unwrap();
+        assert_eq!(result.applied, 0);
+        assert_eq!(result.conflicts.len(), 1);
+        assert!(matches!(result.conflicts[0].kind, SyncConflictKind::VersionMismatch));
+
+        // pull should return current value and version
+        let pull = client.pull_with_transport(&transport, &branch).unwrap();
+        assert_eq!(pull.batch.operations.len(), 1);
+
+        // shutdown server
+        handle.abort();
     }
 }

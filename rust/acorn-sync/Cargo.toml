@@ -24,3 +24,4 @@ tracing = { workspace = true }
 
 [dev-dependencies]
 acorn-trunk-mem = { path = "../acorn-trunk-mem" }
+axum = { workspace = true, features = ["json"] }
