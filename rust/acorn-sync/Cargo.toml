@@ -17,6 +17,7 @@ acorn-core = { path = "../acorn-core" }
 futures = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 reqwest = { workspace = true, optional = true }
+serde_json = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, optional = true }
 tokio-tungstenite = { workspace = true, optional = true }

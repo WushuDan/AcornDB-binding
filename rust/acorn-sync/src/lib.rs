@@ -96,7 +96,7 @@ impl SyncClient {
     pub async fn synchronize<T, S>(&self, tree: &Tree<T, S>, endpoint: &SyncEndpoint) -> AcornResult<()>
     where
         T: Clone + Send + Sync + 'static + std::fmt::Debug + Serialize,
-        S: Trunk<T> + KeyedTrunk<T> + Send + Sync,
+        S: Trunk<T> + KeyedTrunk<T> + Clone + Send + Sync,
     {
         #[cfg(feature = "http-client")]
         {
@@ -147,31 +147,12 @@ impl SyncClient {
     pub async fn push<T, S>(&self, tree: &Tree<T, S>, endpoint: &SyncEndpoint) -> AcornResult<()>
     where
         T: Clone + Send + Sync + 'static + std::fmt::Debug + Serialize,
-        S: Trunk<T> + KeyedTrunk<T> + Send + Sync,
+        S: Trunk<T> + KeyedTrunk<T> + Clone + Send + Sync,
     {
         #[cfg(feature = "http-client")]
         {
             let transport = HttpTransport::new(endpoint.url.clone());
-            // naive: send all keys as puts for now
-            let mut ops = Vec::new();
-            for key in tree.trunk().keys(&endpoint.branch) {
-                if let Some(nut) = tree.get(&key)? {
-                    let bytes = serde_json::to_vec(&nut.value)
-                        .map_err(|e| AcornError::Serialization(e.to_string()))?;
-                    ops.push(SyncMutation::Put {
-                        key: key.clone(),
-                        value: bytes,
-                        version: tree.trunk().version(&endpoint.branch, &key),
-                    });
-                }
-            }
-            let request = SyncApplyRequest {
-                batch: SyncBatch {
-                    branch: endpoint.branch.clone(),
-                    operations: ops,
-                },
-            };
-            let result = self.apply_with_transport(&transport, &request)?;
+            let result = self.push_with_transport(&transport, tree, &endpoint.branch)?;
             if !result.conflicts.is_empty() {
                 return Err(AcornError::Trunk(format!(
                     "sync push encountered {} conflicts",
@@ -200,6 +181,39 @@ impl SyncClient {
             applied: response.applied,
             conflicts: response.conflicts,
         })
+    }
+
+    /// Push local keys/values using a provided transport (useful for tests or alternate transports).
+    pub fn push_with_transport<T, S, X>(
+        &self,
+        transport: &X,
+        tree: &Tree<T, S>,
+        branch: &BranchId,
+    ) -> AcornResult<SyncApplyResult>
+    where
+        T: Clone + Send + Sync + 'static + std::fmt::Debug + Serialize,
+        S: Trunk<T> + KeyedTrunk<T> + Clone,
+        X: SyncTransport,
+    {
+        let mut ops = Vec::new();
+        for key in tree.trunk().keys(branch) {
+            if let Some(nut) = tree.get(&key)? {
+                let bytes =
+                    serde_json::to_vec(&nut.value).map_err(|e| AcornError::Serialization(e.to_string()))?;
+                ops.push(SyncMutation::Put {
+                    key: key.clone(),
+                    value: bytes,
+                    version: tree.trunk().version(branch, &key),
+                });
+            }
+        }
+        let request = SyncApplyRequest {
+            batch: SyncBatch {
+                branch: branch.clone(),
+                operations: ops,
+            },
+        };
+        self.apply_with_transport(transport, &request)
     }
 
     /// Pull mutations using the provided transport.
@@ -511,6 +525,114 @@ mod tests {
         assert_eq!(pull.batch.operations.len(), 1);
     }
 
+    #[test]
+    fn push_with_transport_surfaces_conflict() {
+        #[derive(Clone)]
+        struct RemoteTransport {
+            remote: MemoryTrunk,
+        }
+
+        impl SyncTransport for RemoteTransport {
+            fn apply(&self, request: &SyncApplyRequest) -> Result<SyncApplyResponse, SyncError> {
+                let mut applied = 0usize;
+                let mut conflicts = Vec::new();
+                for op in &request.batch.operations {
+                    match op {
+                        SyncMutation::Put { key, value, version } => {
+                            let current = self.remote.version(&request.batch.branch, key);
+                            if let Some(expected) = version {
+                                if current != Some(*expected) {
+                                    conflicts.push(SyncConflict {
+                                        key: key.clone(),
+                                        remote_value: self.remote.get(&request.batch.branch, key).unwrap().map(|n| n.value),
+                                        local_value: Some(value.clone()),
+                                        remote_version: current,
+                                        local_version: Some(*expected),
+                                        kind: SyncConflictKind::VersionMismatch,
+                                    });
+                                    continue;
+                                }
+                            }
+                            let _ = self.remote.put(&request.batch.branch, key, Nut { value: value.clone() });
+                            applied += 1;
+                        }
+                        SyncMutation::Delete { key, version } => {
+                            let current = self.remote.version(&request.batch.branch, key);
+                            if let Some(expected) = version {
+                                if current != Some(*expected) {
+                                    conflicts.push(SyncConflict {
+                                        key: key.clone(),
+                                        remote_value: self.remote.get(&request.batch.branch, key).unwrap().map(|n| n.value),
+                                        local_value: None,
+                                        remote_version: current,
+                                        local_version: Some(*expected),
+                                        kind: SyncConflictKind::VersionMismatch,
+                                    });
+                                    continue;
+                                }
+                            }
+                            if self.remote.get(&request.batch.branch, key).unwrap().is_none() {
+                                conflicts.push(SyncConflict {
+                                    key: key.clone(),
+                                    remote_value: None,
+                                    local_value: None,
+                                    remote_version: current,
+                                    local_version: *version,
+                                    kind: SyncConflictKind::MissingKey,
+                                });
+                                continue;
+                            }
+                            let _ = self.remote.delete(&request.batch.branch, key);
+                            applied += 1;
+                        }
+                    }
+                }
+                Ok(SyncApplyResponse { applied, conflicts })
+            }
+
+            fn pull(&self, branch: &BranchId) -> Result<SyncPullResponse, SyncError> {
+                let mut ops = Vec::new();
+                for key in self.remote.keys(branch) {
+                    if let Some(nut) = self.remote.get(branch, &key).unwrap() {
+                        ops.push(SyncMutation::Put {
+                            key: key.clone(),
+                            value: nut.value,
+                            version: self.remote.version(branch, &key),
+                        });
+                    }
+                }
+                Ok(SyncPullResponse {
+                    batch: SyncBatch {
+                        branch: branch.clone(),
+                        operations: ops,
+                    },
+                    versions: vec![],
+                })
+            }
+        }
+
+        let client = SyncClient;
+        let branch = BranchId::new("push");
+
+        // local trunk at version 1
+        let local_trunk = MemoryTrunk::new();
+        let tree = Tree::new(branch.clone(), local_trunk.clone());
+        tree.put("key", Nut { value: b"local".to_vec() }).unwrap(); // v1
+
+        // remote trunk at version 2
+        let remote_trunk = MemoryTrunk::new();
+        remote_trunk.put(&branch, "key", Nut { value: b"remote1".to_vec() }).unwrap();
+        remote_trunk.put(&branch, "key", Nut { value: b"remote2".to_vec() }).unwrap();
+
+        let transport = RemoteTransport { remote: remote_trunk };
+        let result = client
+            .push_with_transport(&transport, &tree, &branch)
+            .unwrap();
+        assert_eq!(result.applied, 0);
+        assert_eq!(result.conflicts.len(), 1);
+        assert!(matches!(result.conflicts[0].kind, SyncConflictKind::VersionMismatch));
+    }
+
     #[cfg(feature = "http-client")]
     #[tokio::test]
     async fn http_transport_detects_version_conflict() {
@@ -656,6 +778,21 @@ mod tests {
         assert_eq!(result.applied, 0);
         assert_eq!(result.conflicts.len(), 1);
         assert!(matches!(result.conflicts[0].kind, SyncConflictKind::VersionMismatch));
+
+        // delete a missing key to trigger missing-key conflict
+        let delete_missing = SyncApplyRequest {
+            batch: SyncBatch {
+                branch: branch.clone(),
+                operations: vec![SyncMutation::Delete {
+                    key: "absent".into(),
+                    version: None,
+                }],
+            },
+        };
+        let delete_result = client.apply_with_transport(&transport, &delete_missing).unwrap();
+        assert_eq!(delete_result.applied, 0);
+        assert_eq!(delete_result.conflicts.len(), 1);
+        assert!(matches!(delete_result.conflicts[0].kind, SyncConflictKind::MissingKey));
 
         // pull should return current value and version
         let pull = client.pull_with_transport(&transport, &branch).unwrap();
