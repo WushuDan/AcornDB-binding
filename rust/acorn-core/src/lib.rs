@@ -80,6 +80,7 @@ pub trait CapabilityAdvertiser {
     fn capabilities(&self) -> &'static [TrunkCapability];
 }
 
+#[derive(Debug, Clone)]
 pub enum HistoryEvent<T> {
     Put { key: String, nut: Nut<T> },
     Delete { key: String },

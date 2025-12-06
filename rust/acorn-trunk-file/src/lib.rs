@@ -3,7 +3,9 @@
 use std::fs;
 use std::path::PathBuf;
 
-use acorn_core::{AcornError, AcornResult, BranchId, Nut, Trunk};
+use acorn_core::{
+    AcornError, AcornResult, BranchId, CapabilityAdvertiser, Nut, Trunk, TrunkCapability,
+};
 
 #[derive(Debug, Clone)]
 pub struct FileTrunk {
@@ -44,6 +46,12 @@ impl Trunk<Vec<u8>> for FileTrunk {
     fn delete(&self, branch: &BranchId, key: &str) -> AcornResult<()> {
         let path = self.branch_dir(branch).join(key);
         fs::remove_file(path).map_err(|e| AcornError::Trunk(e.to_string()))
+    }
+}
+
+impl CapabilityAdvertiser for FileTrunk {
+    fn capabilities(&self) -> &'static [TrunkCapability] {
+        &[]
     }
 }
 
