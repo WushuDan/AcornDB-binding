@@ -13,6 +13,7 @@ sled = { workspace = true, optional = true }
 tokio = { workspace = true, optional = true }
 tracing = { workspace = true }
 tempfile = "3.13.0"
+serde_json = { workspace = true }
 
 [features]
 default = ["filesystem"]

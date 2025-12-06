@@ -5,8 +5,8 @@ use std::sync::Arc;
 use std::time::SystemTime;
 
 use acorn_core::{
-    AcornError, AcornResult, BranchId, CapabilityAdvertiser, HistoryEvent, HistoryProvider, Nut,
-    Trunk, TrunkCapability, Ttl, TtlProvider,
+    AcornError, AcornResult, BranchId, CapabilityAdvertiser, HistoryEvent, HistoryProvider, Nut, Trunk,
+    TrunkCapability, Ttl, TtlProvider,
 };
 use parking_lot::RwLock;
 
@@ -118,11 +118,7 @@ impl TtlProvider<Vec<u8>> for MemoryTrunk {
 impl HistoryProvider<Vec<u8>> for MemoryTrunk {
     fn history(&self, branch: &BranchId) -> AcornResult<Vec<HistoryEvent<Vec<u8>>>> {
         let guard = self.inner.read();
-        Ok(guard
-            .history
-            .get(branch)
-            .cloned()
-            .unwrap_or_else(Vec::new))
+        Ok(guard.history.get(branch).cloned().unwrap_or_else(Vec::new))
     }
 }
 
@@ -130,8 +126,8 @@ impl HistoryProvider<Vec<u8>> for MemoryTrunk {
 mod tests {
     use super::*;
     use acorn_core::{CapabilityAdvertiser, EncodedTree, JsonCodec};
-    use serde::{Deserialize, Serialize};
     use acorn_test_harness::TrunkContract;
+    use serde::{Deserialize, Serialize};
 
     #[test]
     fn put_get_delete_round_trip() {
@@ -242,8 +238,6 @@ mod tests {
         TrunkContract::round_trip_bytes(&trunk).unwrap();
         TrunkContract::assert_capabilities(&trunk, &[TrunkCapability::History, TrunkCapability::Ttl]);
         TrunkContract::ttl_expiry(&trunk).unwrap();
-
-        let history = trunk.history(&BranchId::new("ttl-contract")).unwrap_or_default();
-        TrunkContract::assert_history(&history, "ttl-key").unwrap();
+        TrunkContract::history_put_delete(&trunk).unwrap();
     }
 }

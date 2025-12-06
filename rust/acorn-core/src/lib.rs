@@ -47,7 +47,11 @@ impl GroveId {
 }
 
 /// Represents a stored value plus metadata.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(bound(
+    serialize = "T: Serialize",
+    deserialize = "T: DeserializeOwned"
+))]
 pub struct Nut<T> {
     pub value: T,
 }
@@ -80,7 +84,11 @@ pub trait CapabilityAdvertiser {
     fn capabilities(&self) -> &'static [TrunkCapability];
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(bound(
+    serialize = "T: Serialize",
+    deserialize = "T: DeserializeOwned"
+))]
 pub enum HistoryEvent<T> {
     Put { key: String, nut: Nut<T> },
     Delete { key: String },

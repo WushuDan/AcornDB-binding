@@ -1,8 +1,8 @@
 #![allow(dead_code)]
 
 use acorn_core::{
-    AcornResult, BranchId, CapabilityAdvertiser, HistoryEvent, Nut, Trunk, TrunkCapability, Ttl,
-    TtlProvider,
+    AcornResult, BranchId, CapabilityAdvertiser, HistoryEvent, HistoryProvider, Nut, Trunk, TrunkCapability,
+    Ttl, TtlProvider,
 };
 use std::time::{Duration, SystemTime};
 
@@ -84,18 +84,6 @@ impl TrunkContract {
         Ok(())
     }
 
-    pub fn history_events(events: &[HistoryEvent<Vec<u8>>]) -> bool {
-        let mut saw_put = false;
-        let mut saw_delete = false;
-        for event in events {
-            match event {
-                HistoryEvent::Put { .. } => saw_put = true,
-                HistoryEvent::Delete { .. } => saw_delete = true,
-            }
-        }
-        saw_put && saw_delete
-    }
-
     pub fn assert_history(events: &[HistoryEvent<Vec<u8>>], key: &str) -> AcornResult<()> {
         let mut saw_put = false;
         let mut saw_delete = false;
@@ -114,6 +102,27 @@ impl TrunkContract {
             return Err(harness_err("missing delete history event"));
         }
         Ok(())
+    }
+
+    pub fn history_put_delete<S>(trunk: &S) -> AcornResult<()>
+    where
+        S: Trunk<Vec<u8>> + HistoryProvider<Vec<u8>>,
+    {
+        let branch = BranchId::new("history-contract");
+        let key = "history-key";
+        let payload = b"history".to_vec();
+
+        trunk.put(
+            &branch,
+            key,
+            Nut {
+                value: payload.clone(),
+            },
+        )?;
+        trunk.delete(&branch, key)?;
+
+        let events = trunk.history(&branch)?;
+        Self::assert_history(&events, key)
     }
 }
 
