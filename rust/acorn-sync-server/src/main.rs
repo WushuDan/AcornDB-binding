@@ -1,4 +1,11 @@
-use axum::{routing::get, Router};
+use axum::{
+    routing::{get, post},
+    Json, Router,
+};
+use std::net::SocketAddr;
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+
+use acorn_sync::{SyncApplyRequest, SyncApplyResponse};
 use std::net::SocketAddr;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -9,7 +16,9 @@ async fn main() {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    let app = Router::new().route("/health", get(health));
+    let app = Router::new()
+        .route("/health", get(health))
+        .route("/sync/apply", post(apply_batch));
 
     let addr: SocketAddr = "0.0.0.0:8080".parse().unwrap();
     tracing::info!("acorn-sync-server listening on {}", addr);
@@ -21,4 +30,12 @@ async fn main() {
 
 async fn health() -> &'static str {
     "ok"
+}
+
+async fn apply_batch(Json(payload): Json<SyncApplyRequest>) -> Json<SyncApplyResponse> {
+    let applied = payload.batch.operations.len();
+    Json(SyncApplyResponse {
+        applied,
+        conflicts: 0,
+    })
 }

@@ -3,7 +3,7 @@
 use acorn_core::{AcornError, AcornResult, BranchId, Tree, Trunk};
 use tracing::instrument;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct SyncEndpoint {
     pub url: String,
     pub branch: BranchId,
@@ -84,6 +84,35 @@ pub enum SyncMutation {
 pub struct SyncBatch {
     pub branch: BranchId,
     pub operations: Vec<SyncMutation>,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct SyncApplyRequest {
+    pub batch: SyncBatch,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct SyncApplyResponse {
+    pub applied: usize,
+    pub conflicts: usize,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct SyncPullResponse {
+    pub batch: SyncBatch,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct SyncConflict {
+    pub key: String,
+    pub remote_value: Option<Vec<u8>>,
+    pub local_value: Option<Vec<u8>>,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct SyncApplyResult {
+    pub applied: usize,
+    pub conflicts: Vec<SyncConflict>,
 }
 
 #[derive(Debug, Clone)]

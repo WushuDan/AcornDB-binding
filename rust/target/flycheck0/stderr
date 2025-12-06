@@ -1,9 +1,40 @@
 warning: acorn-canopy v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-canopy) ignoring invalid dependency `acorn-sync-server` which is missing a lib target
-   0.079147542s  INFO prepare_target{force=false package_id=acorn-bench v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-bench) target="acorn_bench"}: cargo::core::compiler::fingerprint: stale: changed "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-core/src/lib.rs"
-   0.079158708s  INFO prepare_target{force=false package_id=acorn-bench v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-bench) target="acorn_bench"}: cargo::core::compiler::fingerprint:           (vs) "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/target/debug/.fingerprint/acorn-core-65bd2729c584e681/dep-lib-acorn_core"
-   0.079161500s  INFO prepare_target{force=false package_id=acorn-bench v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-bench) target="acorn_bench"}: cargo::core::compiler::fingerprint:                FileTime { seconds: 1764988578, nanos: 651899096 } < FileTime { seconds: 1764990072, nanos: 264271999 }
-   0.080882917s  INFO prepare_target{force=false package_id=acorn-bench v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-bench) target="acorn_bench"}: cargo::core::compiler::fingerprint: fingerprint error for acorn-bench v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-bench)/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("acorn_bench", ["lib"], "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-bench/src/lib.rs", Edition2021) }
-   0.080894708s  INFO prepare_target{force=false package_id=acorn-bench v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-bench) target="acorn_bench"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/dan.hurley/dev/projects/AcornDB-binding/rust/target/debug/.fingerprint/acorn-bench-5d545e13d3665486/lib-acorn_bench`
+   0.075225125s  INFO prepare_target{force=false package_id=acorn-bench v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-bench) target="acorn_bench"}: cargo::core::compiler::fingerprint: stale: changed "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-core/src/lib.rs"
+   0.075234250s  INFO prepare_target{force=false package_id=acorn-bench v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-bench) target="acorn_bench"}: cargo::core::compiler::fingerprint:           (vs) "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/target/debug/.fingerprint/acorn-core-65bd2729c584e681/dep-lib-acorn_core"
+   0.075237083s  INFO prepare_target{force=false package_id=acorn-bench v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-bench) target="acorn_bench"}: cargo::core::compiler::fingerprint:                FileTime { seconds: 1764990174, nanos: 537732936 } < FileTime { seconds: 1764990201, nanos: 524187186 }
+   0.075790500s  INFO prepare_target{force=false package_id=acorn-bench v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-bench) target="acorn_bench"}: cargo::core::compiler::fingerprint: fingerprint dirty for acorn-bench v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-bench)/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("acorn_bench", ["lib"], "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-bench/src/lib.rs", Edition2021) }
+   0.075799083s  INFO prepare_target{force=false package_id=acorn-bench v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-bench) target="acorn_bench"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "acorn_core" })
+   0.075995792s  INFO prepare_target{force=false package_id=acorn-core v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-core) target="acorn_core"}: cargo::core::compiler::fingerprint: fingerprint dirty for acorn-core v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-core)/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("acorn_core", ["lib"], "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-core/src/lib.rs", Edition2021) }
+   0.075999958s  INFO prepare_target{force=false package_id=acorn-core v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-core) target="acorn_core"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleItem(ChangedFile { reference: "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/target/debug/.fingerprint/acorn-core-65bd2729c584e681/dep-lib-acorn_core", reference_mtime: FileTime { seconds: 1764990174, nanos: 537732936 }, stale: "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-core/src/lib.rs", stale_mtime: FileTime { seconds: 1764990201, nanos: 524187186 } }))
+   0.076981333s  INFO prepare_target{force=false package_id=acorn-sync v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-sync) target="acorn_sync"}: cargo::core::compiler::fingerprint: fingerprint dirty for acorn-sync v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-sync)/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("acorn_sync", ["lib"], "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-sync/src/lib.rs", Edition2021) }
+   0.076985667s  INFO prepare_target{force=false package_id=acorn-sync v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-sync) target="acorn_sync"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "acorn_core" })
+   0.077585208s  INFO prepare_target{force=false package_id=acorn-bench v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-bench) target="acorn_bench"}: cargo::core::compiler::fingerprint: fingerprint dirty for acorn-bench v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-bench)/Check { test: true }/TargetInner { name_inferred: true, ..: lib_target("acorn_bench", ["lib"], "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-bench/src/lib.rs", Edition2021) }
+   0.077589625s  INFO prepare_target{force=false package_id=acorn-bench v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-bench) target="acorn_bench"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "acorn_core" })
+   0.078112917s  INFO prepare_target{force=false package_id=acorn-canopy v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-canopy) target="acorn-canopy"}: cargo::core::compiler::fingerprint: fingerprint dirty for acorn-canopy v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-canopy)/Check { test: false }/TargetInner { name: "acorn-canopy", doc: true, ..: with_path("/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-canopy/src/main.rs", Edition2021) }
+   0.078116833s  INFO prepare_target{force=false package_id=acorn-canopy v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-canopy) target="acorn-canopy"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "acorn_core" })
+   0.078537125s  INFO prepare_target{force=false package_id=acorn-canopy v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-canopy) target="acorn-canopy"}: cargo::core::compiler::fingerprint: fingerprint dirty for acorn-canopy v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-canopy)/Check { test: true }/TargetInner { name: "acorn-canopy", doc: true, ..: with_path("/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-canopy/src/main.rs", Edition2021) }
+   0.078540833s  INFO prepare_target{force=false package_id=acorn-canopy v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-canopy) target="acorn-canopy"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "acorn_core" })
+   0.079272542s  INFO prepare_target{force=false package_id=acorn-cli v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-cli) target="acorn-cli"}: cargo::core::compiler::fingerprint: fingerprint dirty for acorn-cli v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-cli)/Check { test: false }/TargetInner { name: "acorn-cli", doc: true, ..: with_path("/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-cli/src/main.rs", Edition2021) }
+   0.079276500s  INFO prepare_target{force=false package_id=acorn-cli v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-cli) target="acorn-cli"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "acorn_core" })
+   0.079546708s  INFO prepare_target{force=false package_id=acorn-trunk-file v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-file) target="acorn_trunk_file"}: cargo::core::compiler::fingerprint: fingerprint dirty for acorn-trunk-file v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-file)/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("acorn_trunk_file", ["lib"], "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-file/src/lib.rs", Edition2021) }
+   0.079550583s  INFO prepare_target{force=false package_id=acorn-trunk-file v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-file) target="acorn_trunk_file"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "acorn_core" })
+   0.079989083s  INFO prepare_target{force=false package_id=acorn-trunk-mem v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-mem) target="acorn_trunk_mem"}: cargo::core::compiler::fingerprint: fingerprint dirty for acorn-trunk-mem v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-mem)/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("acorn_trunk_mem", ["lib"], "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-mem/src/lib.rs", Edition2021) }
+   0.079992875s  INFO prepare_target{force=false package_id=acorn-trunk-mem v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-mem) target="acorn_trunk_mem"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "acorn_core" })
+   0.080354292s  INFO prepare_target{force=false package_id=acorn-cli v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-cli) target="acorn-cli"}: cargo::core::compiler::fingerprint: fingerprint dirty for acorn-cli v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-cli)/Check { test: true }/TargetInner { name: "acorn-cli", doc: true, ..: with_path("/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-cli/src/main.rs", Edition2021) }
+   0.080357667s  INFO prepare_target{force=false package_id=acorn-cli v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-cli) target="acorn-cli"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "acorn_core" })
+   0.080628375s  INFO prepare_target{force=false package_id=acorn-core v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-core) target="acorn_core"}: cargo::core::compiler::fingerprint: stale: changed "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-core/src/lib.rs"
+   0.080631000s  INFO prepare_target{force=false package_id=acorn-core v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-core) target="acorn_core"}: cargo::core::compiler::fingerprint:           (vs) "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/target/debug/.fingerprint/acorn-core-54471ca43e71504b/dep-test-lib-acorn_core"
+   0.080632667s  INFO prepare_target{force=false package_id=acorn-core v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-core) target="acorn_core"}: cargo::core::compiler::fingerprint:                FileTime { seconds: 1764990174, nanos: 541458813 } < FileTime { seconds: 1764990201, nanos: 524187186 }
+   0.080666167s  INFO prepare_target{force=false package_id=acorn-core v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-core) target="acorn_core"}: cargo::core::compiler::fingerprint: fingerprint dirty for acorn-core v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-core)/Check { test: true }/TargetInner { name_inferred: true, ..: lib_target("acorn_core", ["lib"], "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-core/src/lib.rs", Edition2021) }
+   0.080669750s  INFO prepare_target{force=false package_id=acorn-core v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-core) target="acorn_core"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleItem(ChangedFile { reference: "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/target/debug/.fingerprint/acorn-core-54471ca43e71504b/dep-test-lib-acorn_core", reference_mtime: FileTime { seconds: 1764990174, nanos: 541458813 }, stale: "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-core/src/lib.rs", stale_mtime: FileTime { seconds: 1764990201, nanos: 524187186 } }))
+   0.080835583s  INFO prepare_target{force=false package_id=acorn-sample-apps v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-sample-apps) target="acorn_sample_apps"}: cargo::core::compiler::fingerprint: fingerprint dirty for acorn-sample-apps v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-sample-apps)/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("acorn_sample_apps", ["lib"], "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-sample-apps/src/lib.rs", Edition2021) }
+   0.080839708s  INFO prepare_target{force=false package_id=acorn-sample-apps v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-sample-apps) target="acorn_sample_apps"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "acorn_core" })
+   0.081024125s  INFO prepare_target{force=false package_id=acorn-sample-apps v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-sample-apps) target="acorn_sample_apps"}: cargo::core::compiler::fingerprint: fingerprint dirty for acorn-sample-apps v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-sample-apps)/Check { test: true }/TargetInner { name_inferred: true, ..: lib_target("acorn_sample_apps", ["lib"], "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-sample-apps/src/lib.rs", Edition2021) }
+   0.081027917s  INFO prepare_target{force=false package_id=acorn-sample-apps v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-sample-apps) target="acorn_sample_apps"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "acorn_core" })
+   0.081221583s  INFO prepare_target{force=false package_id=acorn-sync v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-sync) target="acorn_sync"}: cargo::core::compiler::fingerprint: fingerprint dirty for acorn-sync v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-sync)/Check { test: true }/TargetInner { name_inferred: true, ..: lib_target("acorn_sync", ["lib"], "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-sync/src/lib.rs", Edition2021) }
+   0.081225833s  INFO prepare_target{force=false package_id=acorn-sync v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-sync) target="acorn_sync"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "acorn_core" })
+   0.082915542s  INFO prepare_target{force=false package_id=acorn-sync-server v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-sync-server) target="acorn-sync-server"}: cargo::core::compiler::fingerprint: fingerprint error for acorn-sync-server v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-sync-server)/Check { test: false }/TargetInner { name: "acorn-sync-server", doc: true, ..: with_path("/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-sync-server/src/main.rs", Edition2021) }
+   0.082919625s  INFO prepare_target{force=false package_id=acorn-sync-server v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-sync-server) target="acorn-sync-server"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/dan.hurley/dev/projects/AcornDB-binding/rust/target/debug/.fingerprint/acorn-sync-server-572b28f9b2b7f13b/bin-acorn-sync-server`
 
 Caused by:
     No such file or directory (os error 2)
@@ -27,36 +58,8 @@ Stack backtrace:
   15: std::rt::lang_start::<()>::{closure#0}
   16: std::rt::lang_start_internal
   17: _main
-   0.083247042s  INFO prepare_target{force=false package_id=acorn-core v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-core) target="acorn_core"}: cargo::core::compiler::fingerprint: fingerprint dirty for acorn-core v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-core)/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("acorn_core", ["lib"], "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-core/src/lib.rs", Edition2021) }
-   0.083252458s  INFO prepare_target{force=false package_id=acorn-core v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-core) target="acorn_core"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleItem(ChangedFile { reference: "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/target/debug/.fingerprint/acorn-core-65bd2729c584e681/dep-lib-acorn_core", reference_mtime: FileTime { seconds: 1764988578, nanos: 651899096 }, stale: "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-core/src/lib.rs", stale_mtime: FileTime { seconds: 1764990072, nanos: 264271999 } }))
-   0.085113583s  INFO prepare_target{force=false package_id=acorn-sync v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-sync) target="acorn_sync"}: cargo::core::compiler::fingerprint: fingerprint error for acorn-sync v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-sync)/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("acorn_sync", ["lib"], "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-sync/src/lib.rs", Edition2021) }
-   0.085117958s  INFO prepare_target{force=false package_id=acorn-sync v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-sync) target="acorn_sync"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/dan.hurley/dev/projects/AcornDB-binding/rust/target/debug/.fingerprint/acorn-sync-d076cc07cf018060/lib-acorn_sync`
-
-Caused by:
-    No such file or directory (os error 2)
-
-Stack backtrace:
-   0: std::backtrace::Backtrace::create
-   1: std::backtrace::Backtrace::capture
-   2: cargo_util::paths::read_bytes
-   3: cargo_util::paths::read
-   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
-   5: cargo::core::compiler::fingerprint::prepare_target
-   6: cargo::core::compiler::compile
-   7: cargo::core::compiler::compile
-   8: <cargo::core::compiler::build_runner::BuildRunner>::compile
-   9: cargo::ops::cargo_compile::compile_ws
-  10: cargo::ops::cargo_compile::compile_with_exec
-  11: cargo::ops::cargo_compile::compile
-  12: cargo::commands::check::exec
-  13: <cargo::cli::Exec>::exec
-  14: cargo::main
-  15: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
-  16: std::rt::lang_start::<()>::{closure#0}
-  17: std::rt::lang_start_internal
-  18: _main
-   0.086756958s  INFO prepare_target{force=false package_id=acorn-bench v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-bench) target="acorn_bench"}: cargo::core::compiler::fingerprint: fingerprint error for acorn-bench v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-bench)/Check { test: true }/TargetInner { name_inferred: true, ..: lib_target("acorn_bench", ["lib"], "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-bench/src/lib.rs", Edition2021) }
-   0.086762375s  INFO prepare_target{force=false package_id=acorn-bench v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-bench) target="acorn_bench"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/dan.hurley/dev/projects/AcornDB-binding/rust/target/debug/.fingerprint/acorn-bench-52764dfff55a3096/test-lib-acorn_bench`
+   0.086431833s  INFO prepare_target{force=false package_id=acorn-sync-server v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-sync-server) target="acorn-sync-server"}: cargo::core::compiler::fingerprint: fingerprint error for acorn-sync-server v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-sync-server)/Check { test: true }/TargetInner { name: "acorn-sync-server", doc: true, ..: with_path("/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-sync-server/src/main.rs", Edition2021) }
+   0.086435750s  INFO prepare_target{force=false package_id=acorn-sync-server v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-sync-server) target="acorn-sync-server"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/dan.hurley/dev/projects/AcornDB-binding/rust/target/debug/.fingerprint/acorn-sync-server-2f520b92c32eb5b4/test-bin-acorn-sync-server`
 
 Caused by:
     No such file or directory (os error 2)
@@ -80,327 +83,49 @@ Stack backtrace:
   15: std::rt::lang_start::<()>::{closure#0}
   16: std::rt::lang_start_internal
   17: _main
-   0.088884292s  INFO prepare_target{force=false package_id=acorn-canopy v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-canopy) target="acorn-canopy"}: cargo::core::compiler::fingerprint: fingerprint error for acorn-canopy v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-canopy)/Check { test: false }/TargetInner { name: "acorn-canopy", doc: true, ..: with_path("/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-canopy/src/main.rs", Edition2021) }
-   0.088889875s  INFO prepare_target{force=false package_id=acorn-canopy v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-canopy) target="acorn-canopy"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/dan.hurley/dev/projects/AcornDB-binding/rust/target/debug/.fingerprint/acorn-canopy-d6b2215d837a93b2/bin-acorn-canopy`
-
-Caused by:
-    No such file or directory (os error 2)
-
-Stack backtrace:
-   0: std::backtrace::Backtrace::create
-   1: std::backtrace::Backtrace::capture
-   2: cargo_util::paths::read_bytes
-   3: cargo_util::paths::read
-   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
-   5: cargo::core::compiler::fingerprint::prepare_target
-   6: cargo::core::compiler::compile
-   7: <cargo::core::compiler::build_runner::BuildRunner>::compile
-   8: cargo::ops::cargo_compile::compile_ws
-   9: cargo::ops::cargo_compile::compile_with_exec
-  10: cargo::ops::cargo_compile::compile
-  11: cargo::commands::check::exec
-  12: <cargo::cli::Exec>::exec
-  13: cargo::main
-  14: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
-  15: std::rt::lang_start::<()>::{closure#0}
-  16: std::rt::lang_start_internal
-  17: _main
-   0.090165042s  INFO prepare_target{force=false package_id=acorn-canopy v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-canopy) target="acorn-canopy"}: cargo::core::compiler::fingerprint: fingerprint error for acorn-canopy v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-canopy)/Check { test: true }/TargetInner { name: "acorn-canopy", doc: true, ..: with_path("/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-canopy/src/main.rs", Edition2021) }
-   0.090171542s  INFO prepare_target{force=false package_id=acorn-canopy v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-canopy) target="acorn-canopy"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/dan.hurley/dev/projects/AcornDB-binding/rust/target/debug/.fingerprint/acorn-canopy-d8190b1fd3fcb2b9/test-bin-acorn-canopy`
-
-Caused by:
-    No such file or directory (os error 2)
-
-Stack backtrace:
-   0: std::backtrace::Backtrace::create
-   1: std::backtrace::Backtrace::capture
-   2: cargo_util::paths::read_bytes
-   3: cargo_util::paths::read
-   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
-   5: cargo::core::compiler::fingerprint::prepare_target
-   6: cargo::core::compiler::compile
-   7: <cargo::core::compiler::build_runner::BuildRunner>::compile
-   8: cargo::ops::cargo_compile::compile_ws
-   9: cargo::ops::cargo_compile::compile_with_exec
-  10: cargo::ops::cargo_compile::compile
-  11: cargo::commands::check::exec
-  12: <cargo::cli::Exec>::exec
-  13: cargo::main
-  14: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
-  15: std::rt::lang_start::<()>::{closure#0}
-  16: std::rt::lang_start_internal
-  17: _main
-   0.092151250s  INFO prepare_target{force=false package_id=acorn-cli v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-cli) target="acorn-cli"}: cargo::core::compiler::fingerprint: fingerprint error for acorn-cli v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-cli)/Check { test: false }/TargetInner { name: "acorn-cli", doc: true, ..: with_path("/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-cli/src/main.rs", Edition2021) }
-   0.092155542s  INFO prepare_target{force=false package_id=acorn-cli v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-cli) target="acorn-cli"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/dan.hurley/dev/projects/AcornDB-binding/rust/target/debug/.fingerprint/acorn-cli-4ac07d918d3a317d/bin-acorn-cli`
-
-Caused by:
-    No such file or directory (os error 2)
-
-Stack backtrace:
-   0: std::backtrace::Backtrace::create
-   1: std::backtrace::Backtrace::capture
-   2: cargo_util::paths::read_bytes
-   3: cargo_util::paths::read
-   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
-   5: cargo::core::compiler::fingerprint::prepare_target
-   6: cargo::core::compiler::compile
-   7: <cargo::core::compiler::build_runner::BuildRunner>::compile
-   8: cargo::ops::cargo_compile::compile_ws
-   9: cargo::ops::cargo_compile::compile_with_exec
-  10: cargo::ops::cargo_compile::compile
-  11: cargo::commands::check::exec
-  12: <cargo::cli::Exec>::exec
-  13: cargo::main
-  14: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
-  15: std::rt::lang_start::<()>::{closure#0}
-  16: std::rt::lang_start_internal
-  17: _main
-   0.092659250s  INFO prepare_target{force=false package_id=acorn-trunk-file v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-file) target="acorn_trunk_file"}: cargo::core::compiler::fingerprint: fingerprint dirty for acorn-trunk-file v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-file)/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("acorn_trunk_file", ["lib"], "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-file/src/lib.rs", Edition2021) }
-   0.092663917s  INFO prepare_target{force=false package_id=acorn-trunk-file v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-file) target="acorn_trunk_file"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "acorn_core" })
-   0.093687125s  INFO prepare_target{force=false package_id=acorn-trunk-mem v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-mem) target="acorn_trunk_mem"}: cargo::core::compiler::fingerprint: fingerprint dirty for acorn-trunk-mem v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-mem)/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("acorn_trunk_mem", ["lib"], "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-mem/src/lib.rs", Edition2021) }
-   0.093691250s  INFO prepare_target{force=false package_id=acorn-trunk-mem v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-mem) target="acorn_trunk_mem"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "acorn_core" })
-   0.094368625s  INFO prepare_target{force=false package_id=acorn-cli v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-cli) target="acorn-cli"}: cargo::core::compiler::fingerprint: fingerprint error for acorn-cli v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-cli)/Check { test: true }/TargetInner { name: "acorn-cli", doc: true, ..: with_path("/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-cli/src/main.rs", Edition2021) }
-   0.094372167s  INFO prepare_target{force=false package_id=acorn-cli v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-cli) target="acorn-cli"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/dan.hurley/dev/projects/AcornDB-binding/rust/target/debug/.fingerprint/acorn-cli-660f2cb5e9768152/test-bin-acorn-cli`
-
-Caused by:
-    No such file or directory (os error 2)
-
-Stack backtrace:
-   0: std::backtrace::Backtrace::create
-   1: std::backtrace::Backtrace::capture
-   2: cargo_util::paths::read_bytes
-   3: cargo_util::paths::read
-   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
-   5: cargo::core::compiler::fingerprint::prepare_target
-   6: cargo::core::compiler::compile
-   7: <cargo::core::compiler::build_runner::BuildRunner>::compile
-   8: cargo::ops::cargo_compile::compile_ws
-   9: cargo::ops::cargo_compile::compile_with_exec
-  10: cargo::ops::cargo_compile::compile
-  11: cargo::commands::check::exec
-  12: <cargo::cli::Exec>::exec
-  13: cargo::main
-  14: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
-  15: std::rt::lang_start::<()>::{closure#0}
-  16: std::rt::lang_start_internal
-  17: _main
-   0.094642000s  INFO prepare_target{force=false package_id=acorn-core v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-core) target="acorn_core"}: cargo::core::compiler::fingerprint: stale: changed "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-core/src/lib.rs"
-   0.094644542s  INFO prepare_target{force=false package_id=acorn-core v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-core) target="acorn_core"}: cargo::core::compiler::fingerprint:           (vs) "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/target/debug/.fingerprint/acorn-core-54471ca43e71504b/dep-test-lib-acorn_core"
-   0.094646250s  INFO prepare_target{force=false package_id=acorn-core v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-core) target="acorn_core"}: cargo::core::compiler::fingerprint:                FileTime { seconds: 1764988578, nanos: 656038589 } < FileTime { seconds: 1764990072, nanos: 264271999 }
-   0.094863250s  INFO prepare_target{force=false package_id=acorn-core v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-core) target="acorn_core"}: cargo::core::compiler::fingerprint: fingerprint dirty for acorn-core v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-core)/Check { test: true }/TargetInner { name_inferred: true, ..: lib_target("acorn_core", ["lib"], "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-core/src/lib.rs", Edition2021) }
-   0.094867417s  INFO prepare_target{force=false package_id=acorn-core v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-core) target="acorn_core"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleItem(ChangedFile { reference: "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/target/debug/.fingerprint/acorn-core-54471ca43e71504b/dep-test-lib-acorn_core", reference_mtime: FileTime { seconds: 1764988578, nanos: 656038589 }, stale: "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-core/src/lib.rs", stale_mtime: FileTime { seconds: 1764990072, nanos: 264271999 } }))
-   0.095057667s  INFO prepare_target{force=false package_id=acorn-sample-apps v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-sample-apps) target="acorn_sample_apps"}: cargo::core::compiler::fingerprint: fingerprint error for acorn-sample-apps v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-sample-apps)/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("acorn_sample_apps", ["lib"], "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-sample-apps/src/lib.rs", Edition2021) }
-   0.095061625s  INFO prepare_target{force=false package_id=acorn-sample-apps v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-sample-apps) target="acorn_sample_apps"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/dan.hurley/dev/projects/AcornDB-binding/rust/target/debug/.fingerprint/acorn-sample-apps-590c1b32dae2fb2a/lib-acorn_sample_apps`
-
-Caused by:
-    No such file or directory (os error 2)
-
-Stack backtrace:
-   0: std::backtrace::Backtrace::create
-   1: std::backtrace::Backtrace::capture
-   2: cargo_util::paths::read_bytes
-   3: cargo_util::paths::read
-   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
-   5: cargo::core::compiler::fingerprint::prepare_target
-   6: cargo::core::compiler::compile
-   7: <cargo::core::compiler::build_runner::BuildRunner>::compile
-   8: cargo::ops::cargo_compile::compile_ws
-   9: cargo::ops::cargo_compile::compile_with_exec
-  10: cargo::ops::cargo_compile::compile
-  11: cargo::commands::check::exec
-  12: <cargo::cli::Exec>::exec
-  13: cargo::main
-  14: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
-  15: std::rt::lang_start::<()>::{closure#0}
-  16: std::rt::lang_start_internal
-  17: _main
-   0.095271500s  INFO prepare_target{force=false package_id=acorn-sample-apps v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-sample-apps) target="acorn_sample_apps"}: cargo::core::compiler::fingerprint: fingerprint error for acorn-sample-apps v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-sample-apps)/Check { test: true }/TargetInner { name_inferred: true, ..: lib_target("acorn_sample_apps", ["lib"], "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-sample-apps/src/lib.rs", Edition2021) }
-   0.095275500s  INFO prepare_target{force=false package_id=acorn-sample-apps v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-sample-apps) target="acorn_sample_apps"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/dan.hurley/dev/projects/AcornDB-binding/rust/target/debug/.fingerprint/acorn-sample-apps-2a106ec058af2975/test-lib-acorn_sample_apps`
-
-Caused by:
-    No such file or directory (os error 2)
-
-Stack backtrace:
-   0: std::backtrace::Backtrace::create
-   1: std::backtrace::Backtrace::capture
-   2: cargo_util::paths::read_bytes
-   3: cargo_util::paths::read
-   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
-   5: cargo::core::compiler::fingerprint::prepare_target
-   6: cargo::core::compiler::compile
-   7: <cargo::core::compiler::build_runner::BuildRunner>::compile
-   8: cargo::ops::cargo_compile::compile_ws
-   9: cargo::ops::cargo_compile::compile_with_exec
-  10: cargo::ops::cargo_compile::compile
-  11: cargo::commands::check::exec
-  12: <cargo::cli::Exec>::exec
-  13: cargo::main
-  14: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
-  15: std::rt::lang_start::<()>::{closure#0}
-  16: std::rt::lang_start_internal
-  17: _main
-   0.095501542s  INFO prepare_target{force=false package_id=acorn-sync v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-sync) target="acorn_sync"}: cargo::core::compiler::fingerprint: fingerprint error for acorn-sync v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-sync)/Check { test: true }/TargetInner { name_inferred: true, ..: lib_target("acorn_sync", ["lib"], "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-sync/src/lib.rs", Edition2021) }
-   0.095506167s  INFO prepare_target{force=false package_id=acorn-sync v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-sync) target="acorn_sync"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/dan.hurley/dev/projects/AcornDB-binding/rust/target/debug/.fingerprint/acorn-sync-7a8153f5ce8a1579/test-lib-acorn_sync`
-
-Caused by:
-    No such file or directory (os error 2)
-
-Stack backtrace:
-   0: std::backtrace::Backtrace::create
-   1: std::backtrace::Backtrace::capture
-   2: cargo_util::paths::read_bytes
-   3: cargo_util::paths::read
-   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
-   5: cargo::core::compiler::fingerprint::prepare_target
-   6: cargo::core::compiler::compile
-   7: <cargo::core::compiler::build_runner::BuildRunner>::compile
-   8: cargo::ops::cargo_compile::compile_ws
-   9: cargo::ops::cargo_compile::compile_with_exec
-  10: cargo::ops::cargo_compile::compile
-  11: cargo::commands::check::exec
-  12: <cargo::cli::Exec>::exec
-  13: cargo::main
-  14: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
-  15: std::rt::lang_start::<()>::{closure#0}
-  16: std::rt::lang_start_internal
-  17: _main
-   0.101152333s  INFO prepare_target{force=false package_id=acorn-sync-server v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-sync-server) target="acorn-sync-server"}: cargo::core::compiler::fingerprint: fingerprint error for acorn-sync-server v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-sync-server)/Check { test: false }/TargetInner { name: "acorn-sync-server", doc: true, ..: with_path("/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-sync-server/src/main.rs", Edition2021) }
-   0.101156750s  INFO prepare_target{force=false package_id=acorn-sync-server v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-sync-server) target="acorn-sync-server"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/dan.hurley/dev/projects/AcornDB-binding/rust/target/debug/.fingerprint/acorn-sync-server-083d0587266a7340/bin-acorn-sync-server`
-
-Caused by:
-    No such file or directory (os error 2)
-
-Stack backtrace:
-   0: std::backtrace::Backtrace::create
-   1: std::backtrace::Backtrace::capture
-   2: cargo_util::paths::read_bytes
-   3: cargo_util::paths::read
-   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
-   5: cargo::core::compiler::fingerprint::prepare_target
-   6: cargo::core::compiler::compile
-   7: <cargo::core::compiler::build_runner::BuildRunner>::compile
-   8: cargo::ops::cargo_compile::compile_ws
-   9: cargo::ops::cargo_compile::compile_with_exec
-  10: cargo::ops::cargo_compile::compile
-  11: cargo::commands::check::exec
-  12: <cargo::cli::Exec>::exec
-  13: cargo::main
-  14: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
-  15: std::rt::lang_start::<()>::{closure#0}
-  16: std::rt::lang_start_internal
-  17: _main
-   0.105692667s  INFO prepare_target{force=false package_id=acorn-sync-server v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-sync-server) target="acorn-sync-server"}: cargo::core::compiler::fingerprint: fingerprint error for acorn-sync-server v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-sync-server)/Check { test: true }/TargetInner { name: "acorn-sync-server", doc: true, ..: with_path("/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-sync-server/src/main.rs", Edition2021) }
-   0.105696500s  INFO prepare_target{force=false package_id=acorn-sync-server v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-sync-server) target="acorn-sync-server"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/dan.hurley/dev/projects/AcornDB-binding/rust/target/debug/.fingerprint/acorn-sync-server-71dcd8fef71a680d/test-bin-acorn-sync-server`
-
-Caused by:
-    No such file or directory (os error 2)
-
-Stack backtrace:
-   0: std::backtrace::Backtrace::create
-   1: std::backtrace::Backtrace::capture
-   2: cargo_util::paths::read_bytes
-   3: cargo_util::paths::read
-   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
-   5: cargo::core::compiler::fingerprint::prepare_target
-   6: cargo::core::compiler::compile
-   7: <cargo::core::compiler::build_runner::BuildRunner>::compile
-   8: cargo::ops::cargo_compile::compile_ws
-   9: cargo::ops::cargo_compile::compile_with_exec
-  10: cargo::ops::cargo_compile::compile
-  11: cargo::commands::check::exec
-  12: <cargo::cli::Exec>::exec
-  13: cargo::main
-  14: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
-  15: std::rt::lang_start::<()>::{closure#0}
-  16: std::rt::lang_start_internal
-  17: _main
-   0.106075917s  INFO prepare_target{force=false package_id=acorn-test-harness v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-test-harness) target="acorn_test_harness"}: cargo::core::compiler::fingerprint: fingerprint error for acorn-test-harness v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-test-harness)/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("acorn_test_harness", ["lib"], "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-test-harness/src/lib.rs", Edition2021) }
-   0.106080083s  INFO prepare_target{force=false package_id=acorn-test-harness v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-test-harness) target="acorn_test_harness"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/dan.hurley/dev/projects/AcornDB-binding/rust/target/debug/.fingerprint/acorn-test-harness-efb728247f306f0c/lib-acorn_test_harness`
-
-Caused by:
-    No such file or directory (os error 2)
-
-Stack backtrace:
-   0: std::backtrace::Backtrace::create
-   1: std::backtrace::Backtrace::capture
-   2: cargo_util::paths::read_bytes
-   3: cargo_util::paths::read
-   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
-   5: cargo::core::compiler::fingerprint::prepare_target
-   6: cargo::core::compiler::compile
-   7: <cargo::core::compiler::build_runner::BuildRunner>::compile
-   8: cargo::ops::cargo_compile::compile_ws
-   9: cargo::ops::cargo_compile::compile_with_exec
-  10: cargo::ops::cargo_compile::compile
-  11: cargo::commands::check::exec
-  12: <cargo::cli::Exec>::exec
-  13: cargo::main
-  14: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
-  15: std::rt::lang_start::<()>::{closure#0}
-  16: std::rt::lang_start_internal
-  17: _main
-   0.106287667s  INFO prepare_target{force=false package_id=acorn-test-harness v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-test-harness) target="acorn_test_harness"}: cargo::core::compiler::fingerprint: fingerprint error for acorn-test-harness v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-test-harness)/Check { test: true }/TargetInner { name_inferred: true, ..: lib_target("acorn_test_harness", ["lib"], "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-test-harness/src/lib.rs", Edition2021) }
-   0.106291750s  INFO prepare_target{force=false package_id=acorn-test-harness v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-test-harness) target="acorn_test_harness"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/dan.hurley/dev/projects/AcornDB-binding/rust/target/debug/.fingerprint/acorn-test-harness-54430d9db99eac4e/test-lib-acorn_test_harness`
-
-Caused by:
-    No such file or directory (os error 2)
-
-Stack backtrace:
-   0: std::backtrace::Backtrace::create
-   1: std::backtrace::Backtrace::capture
-   2: cargo_util::paths::read_bytes
-   3: cargo_util::paths::read
-   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
-   5: cargo::core::compiler::fingerprint::prepare_target
-   6: cargo::core::compiler::compile
-   7: <cargo::core::compiler::build_runner::BuildRunner>::compile
-   8: cargo::ops::cargo_compile::compile_ws
-   9: cargo::ops::cargo_compile::compile_with_exec
-  10: cargo::ops::cargo_compile::compile
-  11: cargo::commands::check::exec
-  12: <cargo::cli::Exec>::exec
-  13: cargo::main
-  14: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
-  15: std::rt::lang_start::<()>::{closure#0}
-  16: std::rt::lang_start_internal
-  17: _main
-   0.106691625s  INFO prepare_target{force=false package_id=acorn-trunk-cloud-azure v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-cloud-azure) target="acorn_trunk_cloud_azure"}: cargo::core::compiler::fingerprint: fingerprint dirty for acorn-trunk-cloud-azure v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-cloud-azure)/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("acorn_trunk_cloud_azure", ["lib"], "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-cloud-azure/src/lib.rs", Edition2021) }
-   0.106696208s  INFO prepare_target{force=false package_id=acorn-trunk-cloud-azure v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-cloud-azure) target="acorn_trunk_cloud_azure"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "acorn_core" })
-   0.107120292s  INFO prepare_target{force=false package_id=acorn-trunk-cloud-azure v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-cloud-azure) target="acorn_trunk_cloud_azure"}: cargo::core::compiler::fingerprint: fingerprint dirty for acorn-trunk-cloud-azure v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-cloud-azure)/Check { test: true }/TargetInner { name_inferred: true, ..: lib_target("acorn_trunk_cloud_azure", ["lib"], "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-cloud-azure/src/lib.rs", Edition2021) }
-   0.107124000s  INFO prepare_target{force=false package_id=acorn-trunk-cloud-azure v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-cloud-azure) target="acorn_trunk_cloud_azure"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "acorn_core" })
-   0.107352667s  INFO prepare_target{force=false package_id=acorn-trunk-cloud-s3 v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-cloud-s3) target="acorn_trunk_cloud_s3"}: cargo::core::compiler::fingerprint: fingerprint dirty for acorn-trunk-cloud-s3 v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-cloud-s3)/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("acorn_trunk_cloud_s3", ["lib"], "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-cloud-s3/src/lib.rs", Edition2021) }
-   0.107356667s  INFO prepare_target{force=false package_id=acorn-trunk-cloud-s3 v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-cloud-s3) target="acorn_trunk_cloud_s3"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "acorn_core" })
-   0.107551292s  INFO prepare_target{force=false package_id=acorn-trunk-cloud-s3 v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-cloud-s3) target="acorn_trunk_cloud_s3"}: cargo::core::compiler::fingerprint: fingerprint dirty for acorn-trunk-cloud-s3 v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-cloud-s3)/Check { test: true }/TargetInner { name_inferred: true, ..: lib_target("acorn_trunk_cloud_s3", ["lib"], "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-cloud-s3/src/lib.rs", Edition2021) }
-   0.107555167s  INFO prepare_target{force=false package_id=acorn-trunk-cloud-s3 v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-cloud-s3) target="acorn_trunk_cloud_s3"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "acorn_core" })
-   0.107762792s  INFO prepare_target{force=false package_id=acorn-trunk-datalake v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-datalake) target="acorn_trunk_datalake"}: cargo::core::compiler::fingerprint: fingerprint dirty for acorn-trunk-datalake v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-datalake)/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("acorn_trunk_datalake", ["lib"], "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-datalake/src/lib.rs", Edition2021) }
-   0.107766667s  INFO prepare_target{force=false package_id=acorn-trunk-datalake v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-datalake) target="acorn_trunk_datalake"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "acorn_core" })
-   0.107963375s  INFO prepare_target{force=false package_id=acorn-trunk-datalake v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-datalake) target="acorn_trunk_datalake"}: cargo::core::compiler::fingerprint: fingerprint dirty for acorn-trunk-datalake v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-datalake)/Check { test: true }/TargetInner { name_inferred: true, ..: lib_target("acorn_trunk_datalake", ["lib"], "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-datalake/src/lib.rs", Edition2021) }
-   0.107967542s  INFO prepare_target{force=false package_id=acorn-trunk-datalake v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-datalake) target="acorn_trunk_datalake"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "acorn_core" })
-   0.108173417s  INFO prepare_target{force=false package_id=acorn-trunk-file v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-file) target="acorn_trunk_file"}: cargo::core::compiler::fingerprint: fingerprint dirty for acorn-trunk-file v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-file)/Check { test: true }/TargetInner { name_inferred: true, ..: lib_target("acorn_trunk_file", ["lib"], "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-file/src/lib.rs", Edition2021) }
-   0.108177500s  INFO prepare_target{force=false package_id=acorn-trunk-file v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-file) target="acorn_trunk_file"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "acorn_core" })
-   0.108400708s  INFO prepare_target{force=false package_id=acorn-trunk-git v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-git) target="acorn_trunk_git"}: cargo::core::compiler::fingerprint: fingerprint dirty for acorn-trunk-git v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-git)/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("acorn_trunk_git", ["lib"], "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-git/src/lib.rs", Edition2021) }
-   0.108404792s  INFO prepare_target{force=false package_id=acorn-trunk-git v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-git) target="acorn_trunk_git"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "acorn_core" })
-   0.108623125s  INFO prepare_target{force=false package_id=acorn-trunk-git v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-git) target="acorn_trunk_git"}: cargo::core::compiler::fingerprint: fingerprint dirty for acorn-trunk-git v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-git)/Check { test: true }/TargetInner { name_inferred: true, ..: lib_target("acorn_trunk_git", ["lib"], "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-git/src/lib.rs", Edition2021) }
-   0.108626917s  INFO prepare_target{force=false package_id=acorn-trunk-git v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-git) target="acorn_trunk_git"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "acorn_core" })
-   0.108891083s  INFO prepare_target{force=false package_id=acorn-trunk-mem v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-mem) target="acorn_trunk_mem"}: cargo::core::compiler::fingerprint: fingerprint dirty for acorn-trunk-mem v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-mem)/Check { test: true }/TargetInner { name_inferred: true, ..: lib_target("acorn_trunk_mem", ["lib"], "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-mem/src/lib.rs", Edition2021) }
-   0.108894833s  INFO prepare_target{force=false package_id=acorn-trunk-mem v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-mem) target="acorn_trunk_mem"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "acorn_core" })
-   0.109238208s  INFO prepare_target{force=false package_id=acorn-trunk-rdbms v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-rdbms) target="acorn_trunk_rdbms"}: cargo::core::compiler::fingerprint: fingerprint dirty for acorn-trunk-rdbms v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-rdbms)/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("acorn_trunk_rdbms", ["lib"], "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-rdbms/src/lib.rs", Edition2021) }
-   0.109242000s  INFO prepare_target{force=false package_id=acorn-trunk-rdbms v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-rdbms) target="acorn_trunk_rdbms"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "acorn_core" })
-   0.109737125s  INFO prepare_target{force=false package_id=acorn-trunk-rdbms v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-rdbms) target="acorn_trunk_rdbms"}: cargo::core::compiler::fingerprint: fingerprint dirty for acorn-trunk-rdbms v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-rdbms)/Check { test: true }/TargetInner { name_inferred: true, ..: lib_target("acorn_trunk_rdbms", ["lib"], "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-rdbms/src/lib.rs", Edition2021) }
-   0.109745167s  INFO prepare_target{force=false package_id=acorn-trunk-rdbms v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-rdbms) target="acorn_trunk_rdbms"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "acorn_core" })
+   0.086763042s  INFO prepare_target{force=false package_id=acorn-test-harness v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-test-harness) target="acorn_test_harness"}: cargo::core::compiler::fingerprint: fingerprint dirty for acorn-test-harness v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-test-harness)/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("acorn_test_harness", ["lib"], "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-test-harness/src/lib.rs", Edition2021) }
+   0.086767292s  INFO prepare_target{force=false package_id=acorn-test-harness v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-test-harness) target="acorn_test_harness"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "acorn_core" })
+   0.086939167s  INFO prepare_target{force=false package_id=acorn-test-harness v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-test-harness) target="acorn_test_harness"}: cargo::core::compiler::fingerprint: fingerprint dirty for acorn-test-harness v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-test-harness)/Check { test: true }/TargetInner { name_inferred: true, ..: lib_target("acorn_test_harness", ["lib"], "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-test-harness/src/lib.rs", Edition2021) }
+   0.086943167s  INFO prepare_target{force=false package_id=acorn-test-harness v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-test-harness) target="acorn_test_harness"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "acorn_core" })
+   0.087125917s  INFO prepare_target{force=false package_id=acorn-trunk-cloud-azure v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-cloud-azure) target="acorn_trunk_cloud_azure"}: cargo::core::compiler::fingerprint: fingerprint dirty for acorn-trunk-cloud-azure v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-cloud-azure)/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("acorn_trunk_cloud_azure", ["lib"], "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-cloud-azure/src/lib.rs", Edition2021) }
+   0.087129917s  INFO prepare_target{force=false package_id=acorn-trunk-cloud-azure v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-cloud-azure) target="acorn_trunk_cloud_azure"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "acorn_core" })
+   0.087279042s  INFO prepare_target{force=false package_id=acorn-trunk-cloud-azure v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-cloud-azure) target="acorn_trunk_cloud_azure"}: cargo::core::compiler::fingerprint: fingerprint dirty for acorn-trunk-cloud-azure v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-cloud-azure)/Check { test: true }/TargetInner { name_inferred: true, ..: lib_target("acorn_trunk_cloud_azure", ["lib"], "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-cloud-azure/src/lib.rs", Edition2021) }
+   0.087282917s  INFO prepare_target{force=false package_id=acorn-trunk-cloud-azure v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-cloud-azure) target="acorn_trunk_cloud_azure"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "acorn_core" })
+   0.087441583s  INFO prepare_target{force=false package_id=acorn-trunk-cloud-s3 v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-cloud-s3) target="acorn_trunk_cloud_s3"}: cargo::core::compiler::fingerprint: fingerprint dirty for acorn-trunk-cloud-s3 v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-cloud-s3)/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("acorn_trunk_cloud_s3", ["lib"], "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-cloud-s3/src/lib.rs", Edition2021) }
+   0.087445458s  INFO prepare_target{force=false package_id=acorn-trunk-cloud-s3 v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-cloud-s3) target="acorn_trunk_cloud_s3"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "acorn_core" })
+   0.087589958s  INFO prepare_target{force=false package_id=acorn-trunk-cloud-s3 v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-cloud-s3) target="acorn_trunk_cloud_s3"}: cargo::core::compiler::fingerprint: fingerprint dirty for acorn-trunk-cloud-s3 v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-cloud-s3)/Check { test: true }/TargetInner { name_inferred: true, ..: lib_target("acorn_trunk_cloud_s3", ["lib"], "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-cloud-s3/src/lib.rs", Edition2021) }
+   0.087593667s  INFO prepare_target{force=false package_id=acorn-trunk-cloud-s3 v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-cloud-s3) target="acorn_trunk_cloud_s3"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "acorn_core" })
+   0.087751167s  INFO prepare_target{force=false package_id=acorn-trunk-datalake v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-datalake) target="acorn_trunk_datalake"}: cargo::core::compiler::fingerprint: fingerprint dirty for acorn-trunk-datalake v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-datalake)/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("acorn_trunk_datalake", ["lib"], "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-datalake/src/lib.rs", Edition2021) }
+   0.087754875s  INFO prepare_target{force=false package_id=acorn-trunk-datalake v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-datalake) target="acorn_trunk_datalake"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "acorn_core" })
+   0.087898500s  INFO prepare_target{force=false package_id=acorn-trunk-datalake v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-datalake) target="acorn_trunk_datalake"}: cargo::core::compiler::fingerprint: fingerprint dirty for acorn-trunk-datalake v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-datalake)/Check { test: true }/TargetInner { name_inferred: true, ..: lib_target("acorn_trunk_datalake", ["lib"], "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-datalake/src/lib.rs", Edition2021) }
+   0.087901958s  INFO prepare_target{force=false package_id=acorn-trunk-datalake v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-datalake) target="acorn_trunk_datalake"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "acorn_core" })
+   0.088057000s  INFO prepare_target{force=false package_id=acorn-trunk-file v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-file) target="acorn_trunk_file"}: cargo::core::compiler::fingerprint: fingerprint dirty for acorn-trunk-file v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-file)/Check { test: true }/TargetInner { name_inferred: true, ..: lib_target("acorn_trunk_file", ["lib"], "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-file/src/lib.rs", Edition2021) }
+   0.088060625s  INFO prepare_target{force=false package_id=acorn-trunk-file v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-file) target="acorn_trunk_file"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "acorn_core" })
+   0.088225583s  INFO prepare_target{force=false package_id=acorn-trunk-git v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-git) target="acorn_trunk_git"}: cargo::core::compiler::fingerprint: fingerprint dirty for acorn-trunk-git v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-git)/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("acorn_trunk_git", ["lib"], "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-git/src/lib.rs", Edition2021) }
+   0.088229375s  INFO prepare_target{force=false package_id=acorn-trunk-git v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-git) target="acorn_trunk_git"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "acorn_core" })
+   0.088374583s  INFO prepare_target{force=false package_id=acorn-trunk-git v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-git) target="acorn_trunk_git"}: cargo::core::compiler::fingerprint: fingerprint dirty for acorn-trunk-git v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-git)/Check { test: true }/TargetInner { name_inferred: true, ..: lib_target("acorn_trunk_git", ["lib"], "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-git/src/lib.rs", Edition2021) }
+   0.088377917s  INFO prepare_target{force=false package_id=acorn-trunk-git v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-git) target="acorn_trunk_git"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "acorn_core" })
+   0.088594000s  INFO prepare_target{force=false package_id=acorn-trunk-mem v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-mem) target="acorn_trunk_mem"}: cargo::core::compiler::fingerprint: fingerprint dirty for acorn-trunk-mem v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-mem)/Check { test: true }/TargetInner { name_inferred: true, ..: lib_target("acorn_trunk_mem", ["lib"], "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-mem/src/lib.rs", Edition2021) }
+   0.088597333s  INFO prepare_target{force=false package_id=acorn-trunk-mem v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-mem) target="acorn_trunk_mem"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "acorn_core" })
+   0.088767458s  INFO prepare_target{force=false package_id=acorn-trunk-rdbms v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-rdbms) target="acorn_trunk_rdbms"}: cargo::core::compiler::fingerprint: fingerprint dirty for acorn-trunk-rdbms v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-rdbms)/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("acorn_trunk_rdbms", ["lib"], "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-rdbms/src/lib.rs", Edition2021) }
+   0.088771333s  INFO prepare_target{force=false package_id=acorn-trunk-rdbms v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-rdbms) target="acorn_trunk_rdbms"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "acorn_core" })
+   0.088924250s  INFO prepare_target{force=false package_id=acorn-trunk-rdbms v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-rdbms) target="acorn_trunk_rdbms"}: cargo::core::compiler::fingerprint: fingerprint dirty for acorn-trunk-rdbms v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-rdbms)/Check { test: true }/TargetInner { name_inferred: true, ..: lib_target("acorn_trunk_rdbms", ["lib"], "/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-rdbms/src/lib.rs", Edition2021) }
+   0.088927500s  INFO prepare_target{force=false package_id=acorn-trunk-rdbms v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-rdbms) target="acorn_trunk_rdbms"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "acorn_core" })
     Checking acorn-core v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-core)
     Checking acorn-sync v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-sync)
     Checking acorn-trunk-mem v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-mem)
     Checking acorn-trunk-file v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-file)
     Checking acorn-trunk-git v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-git)
-    Checking acorn-trunk-cloud-s3 v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-cloud-s3)
     Checking acorn-trunk-rdbms v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-rdbms)
-    Checking acorn-trunk-cloud-azure v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-cloud-azure)
+    Checking acorn-trunk-cloud-s3 v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-cloud-s3)
     Checking acorn-trunk-datalake v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-datalake)
-    Checking acorn-sample-apps v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-sample-apps)
-    Checking acorn-test-harness v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-test-harness)
-    Checking acorn-canopy v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-canopy)
-    Checking acorn-cli v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-cli)
+    Checking acorn-trunk-cloud-azure v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-trunk-cloud-azure)
     Checking acorn-bench v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-bench)
+    Checking acorn-cli v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-cli)
+    Checking acorn-test-harness v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-test-harness)
     Checking acorn-sync-server v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-sync-server)
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.58s
+    Checking acorn-canopy v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-canopy)
+    Checking acorn-sample-apps v0.0.1-alpha.0 (/Users/dan.hurley/dev/projects/AcornDB-binding/rust/acorn-sample-apps)
+error: could not compile `acorn-sync-server` (bin "acorn-sync-server") due to 5 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `acorn-sync-server` (bin "acorn-sync-server" test) due to 5 previous errors
