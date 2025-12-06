@@ -15,6 +15,7 @@ websocket = ["tokio-tungstenite"]
 [dependencies]
 acorn-core = { path = "../acorn-core" }
 futures = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
 reqwest = { workspace = true, optional = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, optional = true }

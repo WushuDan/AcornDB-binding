@@ -73,3 +73,21 @@ pub enum SyncEvent {
     Conflict { key: String },
     Heartbeat,
 }
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub enum SyncMutation {
+    Put { key: String, value: Vec<u8> },
+    Delete { key: String },
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct SyncBatch {
+    pub branch: BranchId,
+    pub operations: Vec<SyncMutation>,
+}
+
+#[derive(Debug, Clone)]
+pub struct SyncResult {
+    pub applied: usize,
+    pub conflicts: usize,
+}
