@@ -11,6 +11,7 @@ acorn-sync = { path = "../acorn-sync" }
 serde = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
+tokio = { workspace = true, optional = true }
 
 [features]
 default = []

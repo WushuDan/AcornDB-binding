@@ -46,8 +46,7 @@ impl Trunk<Vec<u8>> for FileTrunk {
             let ttl_path = self.branch_dir(branch).join(format!("{}.ttl", key));
             if let Ok(raw) = fs::read_to_string(&ttl_path) {
                 if let Ok(ms) = raw.parse::<u128>() {
-                    let expires_at =
-                        SystemTime::UNIX_EPOCH + std::time::Duration::from_millis(ms as u64);
+                    let expires_at = SystemTime::UNIX_EPOCH + std::time::Duration::from_millis(ms as u64);
                     if SystemTime::now() >= expires_at {
                         let _ = fs::remove_file(&path);
                         let _ = fs::remove_file(&ttl_path);
@@ -73,6 +72,8 @@ impl Trunk<Vec<u8>> for FileTrunk {
 
     fn delete(&self, branch: &BranchId, key: &str) -> AcornResult<()> {
         let path = self.branch_dir(branch).join(key);
+        let ttl_path = self.branch_dir(branch).join(format!("{}.ttl", key));
+        let _ = fs::remove_file(&ttl_path);
         fs::remove_file(path).map_err(|e| AcornError::Trunk(e.to_string()))
     }
 }
