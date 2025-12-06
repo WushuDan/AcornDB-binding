@@ -1,4 +1,4 @@
-use acorn_core::BranchId;
+use acorn_core::{BranchId, Trunk};
 use acorn_sync::{
     SyncApplyRequest, SyncApplyResponse, SyncConflict, SyncErrorResponse, SyncMutation, SyncPullResponse,
 };
@@ -49,10 +49,8 @@ async fn main() {
 
     let addr: SocketAddr = "0.0.0.0:8080".parse().unwrap();
     tracing::info!("acorn-sync-server listening on {}", addr);
-    axum::Server::bind(&addr)
-        .serve(app.into_make_service())
-        .await
-        .unwrap();
+    let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+    axum::serve(listener, app.into_make_service()).await.unwrap();
 }
 
 async fn health() -> &'static str {
@@ -62,7 +60,6 @@ async fn health() -> &'static str {
 #[derive(Clone)]
 struct AppState {
     trunk: Arc<Mutex<BackendTrunk>>,
-    versions: Arc<Mutex<HashMap<(BranchId, String), u64>>>,
     notifier: broadcast::Sender<StreamEvent>,
 }
 
@@ -70,8 +67,7 @@ impl AppState {
     fn new() -> Self {
         let (tx, _rx) = broadcast::channel(64);
         Self {
-            trunk: Arc::new(BackendTrunk::from_env()),
-            versions: Arc::new(Mutex::new(HashMap::new())),
+            trunk: Arc::new(Mutex::new(BackendTrunk::from_env())),
             notifier: tx,
         }
     }
@@ -119,6 +115,13 @@ impl BackendTrunk {
             BackendTrunk::File(t) => t.keys(branch),
         }
     }
+
+    fn version(&self, branch: &BranchId, key: &str) -> Option<u64> {
+        match self {
+            BackendTrunk::Memory(t) => t.version(branch, key),
+            BackendTrunk::File(t) => t.version(branch, key),
+        }
+    }
 }
 
 async fn apply_batch(
@@ -126,63 +129,57 @@ async fn apply_batch(
     Json(payload): Json<SyncApplyRequest>,
 ) -> Result<Json<SyncApplyResponse>, (StatusCode, Json<SyncErrorResponse>)> {
     let trunk = state.trunk.lock();
-    let mut versions = state.versions.lock();
     let mut applied_ops = Vec::new();
     let mut conflicts = Vec::new();
 
     for op in &payload.batch.operations {
         match op {
             SyncMutation::Put { key, value, version } => {
-                let current_version = versions
-                    .get(&(payload.batch.branch.clone(), key.clone()))
-                    .copied();
-                if let Some(expected) = version {
+                let current_version = trunk.version(&payload.batch.branch, key.as_str());
+                if let Some(expected) = *version {
                     if let Some(existing) = current_version {
-                        if existing != *expected {
+                        if existing != expected {
                             conflicts.push(SyncConflict {
                                 key: key.clone(),
-                                remote_value: trunk.get(&payload.batch.branch, key),
+                                remote_value: trunk.get(&payload.batch.branch, key.as_str()),
                                 local_value: Some(value.clone()),
                                 remote_version: current_version,
-                                local_version: *version,
+                                local_version: Some(expected),
                             });
                             continue;
                         }
                     }
                 }
-                if let Err(e) = trunk.put(&payload.batch.branch, key, value.clone()) {
+                if let Err(e) = trunk.put(&payload.batch.branch, key.as_str(), value.clone()) {
                     return Err((
                         StatusCode::INTERNAL_SERVER_ERROR,
                         Json(SyncErrorResponse { error: e.to_string() }),
                     ));
                 }
-                let next_version = current_version.unwrap_or(0).saturating_add(1);
-                versions.insert((payload.batch.branch.clone(), key.clone()), next_version);
+                let next_version = trunk.version(&payload.batch.branch, key.as_str());
                 applied_ops.push(StreamOp {
                     key: key.clone(),
                     op: "put".into(),
-                    version: Some(next_version),
+                    version: next_version,
                 });
             }
             SyncMutation::Delete { key, version } => {
-                let current_version = versions
-                    .get(&(payload.batch.branch.clone(), key.clone()))
-                    .copied();
-                if let Some(expected) = version {
+                let current_version = trunk.version(&payload.batch.branch, key.as_str());
+                if let Some(expected) = *version {
                     if let Some(existing) = current_version {
-                        if existing != *expected {
+                        if existing != expected {
                             conflicts.push(SyncConflict {
                                 key: key.clone(),
-                                remote_value: trunk.get(&payload.batch.branch, key),
+                                remote_value: trunk.get(&payload.batch.branch, key.as_str()),
                                 local_value: None,
                                 remote_version: current_version,
-                                local_version: *version,
+                                local_version: Some(expected),
                             });
                             continue;
                         }
                     }
                 }
-                if trunk.get(&payload.batch.branch, key).is_none() {
+                if trunk.get(&payload.batch.branch, key.as_str()).is_none() {
                     conflicts.push(SyncConflict {
                         key: key.clone(),
                         remote_value: None,
@@ -192,13 +189,12 @@ async fn apply_batch(
                     });
                     continue;
                 }
-                if let Err(e) = trunk.delete(&payload.batch.branch, key) {
+                if let Err(e) = trunk.delete(&payload.batch.branch, key.as_str()) {
                     return Err((
                         StatusCode::INTERNAL_SERVER_ERROR,
                         Json(SyncErrorResponse { error: e.to_string() }),
                     ));
                 }
-                versions.remove(&(payload.batch.branch.clone(), key.clone()));
                 applied_ops.push(StreamOp {
                     key: key.clone(),
                     op: "delete".into(),
@@ -236,12 +232,13 @@ async fn pull_batch(
 
     for key in trunk.keys(&branch) {
         if let Some(value) = trunk.get(&branch, &key) {
+            let version = trunk.version(&branch, &key);
             ops.push(SyncMutation::Put {
                 key: key.clone(),
                 value,
-                version: state.versions.lock().get(&(branch.clone(), key.clone())).copied(),
+                version,
             });
-            if let Some(v) = state.versions.lock().get(&(branch.clone(), key.clone())).copied() {
+            if let Some(v) = version {
                 versions.push((key, v));
             }
         }
@@ -269,7 +266,7 @@ async fn handle_ws(mut socket: axum::extract::ws::WebSocket, mut receiver: broad
                 match maybe_msg {
                     Ok(evt) => {
                         let payload = serde_json::to_string(&evt).unwrap_or_else(|_| "{}".into());
-                        if socket.send(Message::Text(payload)).await.is_err() {
+                        if socket.send(Message::Text(payload.into())).await.is_err() {
                             break;
                         }
                     }
