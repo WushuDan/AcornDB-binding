@@ -6,7 +6,7 @@ use std::time::SystemTime;
 
 use acorn_core::{
     AcornError, AcornResult, BranchId, CapabilityAdvertiser, HistoryEvent, HistoryProvider, KeyedTrunk, Nut,
-    Trunk, TrunkCapability, Ttl, TtlProvider,
+    TombstoneProvider, Trunk, TrunkCapability, Ttl, TtlCleaner, TtlProvider,
 };
 use parking_lot::RwLock;
 
@@ -21,6 +21,7 @@ struct Inner {
     history: HashMap<BranchId, Vec<HistoryEvent<Vec<u8>>>>,
     ttl: HashMap<(BranchId, String), SystemTime>,
     versions: HashMap<(BranchId, String), u64>,
+    tombstones: HashMap<(BranchId, String), Option<u64>>,
 }
 
 impl S3Trunk {
@@ -47,7 +48,10 @@ impl Trunk<Vec<u8>> for S3Trunk {
             if SystemTime::now() >= *expires_at {
                 guard.ttl.remove(&(branch.clone(), key.to_string()));
                 guard.data.remove(&(branch.clone(), key.to_string()));
-                guard.versions.remove(&(branch.clone(), key.to_string()));
+                let removed_version = guard.versions.remove(&(branch.clone(), key.to_string()));
+                guard
+                    .tombstones
+                    .insert((branch.clone(), key.to_string()), removed_version);
                 guard
                     .history
                     .entry(branch.clone())
@@ -85,6 +89,7 @@ impl Trunk<Vec<u8>> for S3Trunk {
                     value: nut.value.clone(),
                 },
             });
+        guard.tombstones.remove(&(branch.clone(), key.to_string()));
         guard.data.insert((branch.clone(), key.to_string()), nut.value);
         Ok(())
     }
@@ -95,7 +100,10 @@ impl Trunk<Vec<u8>> for S3Trunk {
             .data
             .remove(&(branch.clone(), key.to_string()))
             .map(|_| {
-                guard.versions.remove(&(branch.clone(), key.to_string()));
+                let removed_version = guard.versions.remove(&(branch.clone(), key.to_string()));
+                guard
+                    .tombstones
+                    .insert((branch.clone(), key.to_string()), removed_version);
                 guard
                     .history
                     .entry(branch.clone())
@@ -141,6 +149,7 @@ impl Trunk<Vec<u8>> for S3Trunk {
                     value: nut.value.clone(),
                 },
             });
+        guard.tombstones.remove(&(branch.clone(), key.to_string()));
         guard.data.insert((branch.clone(), key.to_string()), nut.value);
         Ok(())
     }
@@ -160,7 +169,10 @@ impl Trunk<Vec<u8>> for S3Trunk {
             .data
             .remove(&(branch.clone(), key.to_string()))
             .map(|_| {
-                guard.versions.remove(&(branch.clone(), key.to_string()));
+                let removed_version = guard.versions.remove(&(branch.clone(), key.to_string()));
+                guard
+                    .tombstones
+                    .insert((branch.clone(), key.to_string()), removed_version);
                 guard
                     .history
                     .entry(branch.clone())
@@ -180,6 +192,18 @@ impl KeyedTrunk<Vec<u8>> for S3Trunk {
             .keys()
             .filter(|(b, _)| b == branch)
             .map(|(_, k)| k.clone())
+            .collect()
+    }
+}
+
+impl TombstoneProvider<Vec<u8>> for S3Trunk {
+    fn tombstones(&self, branch: &BranchId) -> Vec<(String, Option<u64>)> {
+        let guard = self.inner.read();
+        guard
+            .tombstones
+            .iter()
+            .filter(|((b, _), _)| b == branch)
+            .map(|((_, k), v)| (k.clone(), *v))
             .collect()
     }
 }
@@ -219,6 +243,7 @@ impl TtlProvider<Vec<u8>> for S3Trunk {
                     value: nut.value.clone(),
                 },
             });
+        guard.tombstones.remove(&(branch.clone(), key.to_string()));
         guard.data.insert((branch.clone(), key.to_string()), nut.value);
         Ok(())
     }
@@ -228,6 +253,35 @@ impl HistoryProvider<Vec<u8>> for S3Trunk {
     fn history(&self, branch: &BranchId) -> AcornResult<Vec<HistoryEvent<Vec<u8>>>> {
         let guard = self.inner.read();
         Ok(guard.history.get(branch).cloned().unwrap_or_else(Vec::new))
+    }
+}
+
+impl TtlCleaner<Vec<u8>> for S3Trunk {
+    fn purge_expired(&self, branch: &BranchId) -> usize {
+        let mut removed = 0usize;
+        let mut guard = self.inner.write();
+        let now = SystemTime::now();
+        let keys: Vec<_> = guard
+            .ttl
+            .iter()
+            .filter(|((b, _), expires)| b == branch && **expires <= now)
+            .map(|((_, k), _)| k.clone())
+            .collect();
+        for key in keys {
+            removed += 1;
+            guard.ttl.remove(&(branch.clone(), key.clone()));
+            guard.data.remove(&(branch.clone(), key.clone()));
+            let removed_version = guard.versions.remove(&(branch.clone(), key.clone()));
+            guard
+                .tombstones
+                .insert((branch.clone(), key.clone()), removed_version);
+            guard
+                .history
+                .entry(branch.clone())
+                .or_default()
+                .push(HistoryEvent::Delete { key });
+        }
+        removed
     }
 }
 
@@ -304,13 +358,6 @@ mod tests {
     }
 
     #[test]
-    fn advertises_versions_capability() {
-        let trunk = S3Trunk::new();
-        let caps = CapabilityAdvertiser::capabilities(&trunk);
-        assert!(caps.contains(&TrunkCapability::Versions));
-    }
-
-    #[test]
     fn cas_delete_conflict() {
         let trunk = S3Trunk::new();
         let branch = BranchId::new("cas-del");
@@ -337,5 +384,12 @@ mod tests {
 
         assert!(trunk.delete_if_version(&branch, "key", Some(1)).is_ok());
         assert_eq!(trunk.current_version(&branch, "key"), None);
+    }
+
+    #[test]
+    fn advertises_versions_capability() {
+        let trunk = S3Trunk::new();
+        let caps = CapabilityAdvertiser::capabilities(&trunk);
+        assert!(caps.contains(&TrunkCapability::Versions));
     }
 }

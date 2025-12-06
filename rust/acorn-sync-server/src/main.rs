@@ -242,7 +242,6 @@ async fn pull_batch(
     let mut versions = Vec::new();
     let mut deleted = Vec::new();
     let mut deleted_versions = Vec::new();
-    let tombstones = trunk.tombstones(&branch);
 
     for key in trunk.keys(&branch) {
         if let Some(value) = trunk.get(&branch, &key) {
@@ -255,16 +254,10 @@ async fn pull_batch(
             if let Some(v) = version {
                 versions.push((key, v));
             }
-        } else {
-            let tomb_version = trunk.version(&branch, &key);
-            deleted_versions.push((key.clone(), tomb_version));
-            let tomb_version = trunk.version(&branch, &key);
-            deleted_versions.push((key.clone(), tomb_version));
-            deleted.push(key);
         }
     }
 
-    for (k, v) in tombstones {
+    for (k, v) in trunk.tombstones(&branch) {
         deleted_versions.push((k.clone(), v));
         deleted.push(k);
     }
@@ -275,7 +268,7 @@ async fn pull_batch(
         },
         versions,
         deleted,
-        deleted_versions: Vec::new(),
+        deleted_versions,
     }))
 }
 
