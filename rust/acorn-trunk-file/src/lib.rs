@@ -14,6 +14,7 @@ pub struct FileTrunk {
     root: PathBuf,
     ttl_enabled: bool,
     history_enabled: bool,
+    versions_enabled: bool,
 }
 
 impl FileTrunk {
@@ -22,6 +23,7 @@ impl FileTrunk {
             root: root.into(),
             ttl_enabled: false,
             history_enabled: false,
+            versions_enabled: false,
         }
     }
 
@@ -30,6 +32,7 @@ impl FileTrunk {
             root: root.into(),
             ttl_enabled: true,
             history_enabled: false,
+            versions_enabled: false,
         }
     }
 
@@ -38,6 +41,7 @@ impl FileTrunk {
             root: root.into(),
             ttl_enabled: false,
             history_enabled: true,
+            versions_enabled: true,
         }
     }
 
@@ -46,6 +50,7 @@ impl FileTrunk {
             root: root.into(),
             ttl_enabled: true,
             history_enabled: true,
+            versions_enabled: true,
         }
     }
 
@@ -55,6 +60,45 @@ impl FileTrunk {
 
     fn branch_dir(&self, branch: &BranchId) -> PathBuf {
         self.root.join(branch.to_string())
+    }
+
+    fn versions_dir(&self, branch: &BranchId) -> PathBuf {
+        self.branch_dir(branch).join(".versions")
+    }
+
+    fn version_path(&self, branch: &BranchId, key: &str) -> PathBuf {
+        self.versions_dir(branch).join(key)
+    }
+
+    fn bump_version(&self, branch: &BranchId, key: &str) -> AcornResult<u64> {
+        if !self.versions_enabled {
+            return Ok(0);
+        }
+
+        fs::create_dir_all(self.versions_dir(branch)).map_err(|e| AcornError::Trunk(e.to_string()))?;
+        let path = self.version_path(branch, key);
+        let next = fs::read_to_string(&path)
+            .ok()
+            .and_then(|raw| raw.parse::<u64>().ok())
+            .unwrap_or(0)
+            .saturating_add(1);
+        fs::write(&path, next.to_string()).map_err(|e| AcornError::Trunk(e.to_string()))?;
+        Ok(next)
+    }
+
+    fn clear_version(&self, branch: &BranchId, key: &str) {
+        if self.versions_enabled {
+            let _ = fs::remove_file(self.version_path(branch, key));
+        }
+    }
+
+    pub fn version(&self, branch: &BranchId, key: &str) -> Option<u64> {
+        if !self.versions_enabled {
+            return None;
+        }
+        fs::read_to_string(self.version_path(branch, key))
+            .ok()
+            .and_then(|raw| raw.parse::<u64>().ok())
     }
 }
 
@@ -70,6 +114,7 @@ impl Trunk<Vec<u8>> for FileTrunk {
                     if SystemTime::now() >= expires_at {
                         let _ = fs::remove_file(&path);
                         let _ = fs::remove_file(&ttl_path);
+                        self.clear_version(branch, key);
                         return Ok(None);
                     }
                 }
@@ -88,6 +133,7 @@ impl Trunk<Vec<u8>> for FileTrunk {
         fs::create_dir_all(&dir).map_err(|e| AcornError::Trunk(e.to_string()))?;
         let path = dir.join(key);
         fs::write(&path, nut.value.clone()).map_err(|e| AcornError::Trunk(e.to_string()))?;
+        let _ = self.bump_version(branch, key)?;
         if self.history_enabled {
             self.append_history(
                 branch,
@@ -105,6 +151,7 @@ impl Trunk<Vec<u8>> for FileTrunk {
         let ttl_path = self.branch_dir(branch).join(format!("{}.ttl", key));
         let _ = fs::remove_file(&ttl_path);
         fs::remove_file(&path).map_err(|e| AcornError::Trunk(e.to_string()))?;
+        self.clear_version(branch, key);
         if self.history_enabled {
             self.append_history(branch, HistoryEvent::Delete { key: key.to_string() })?;
         }
@@ -115,9 +162,15 @@ impl Trunk<Vec<u8>> for FileTrunk {
 impl CapabilityAdvertiser for FileTrunk {
     fn capabilities(&self) -> &'static [TrunkCapability] {
         match (self.ttl_enabled, self.history_enabled) {
+            (true, true) if self.versions_enabled => {
+                &[TrunkCapability::Ttl, TrunkCapability::History, TrunkCapability::Versions]
+            }
             (true, true) => &[TrunkCapability::Ttl, TrunkCapability::History],
+            (true, false) if self.versions_enabled => &[TrunkCapability::Ttl, TrunkCapability::Versions],
             (true, false) => &[TrunkCapability::Ttl],
+            (false, true) if self.versions_enabled => &[TrunkCapability::History, TrunkCapability::Versions],
             (false, true) => &[TrunkCapability::History],
+            (false, false) if self.versions_enabled => &[TrunkCapability::Versions],
             (false, false) => &[],
         }
     }
@@ -144,6 +197,7 @@ impl TtlProvider<Vec<u8>> for FileTrunk {
         )
         .map_err(|e| AcornError::Trunk(e.to_string()))?;
 
+        let _ = self.bump_version(branch, key)?;
         if self.history_enabled {
             self.append_history(
                 branch,
@@ -229,6 +283,7 @@ mod tests {
     use super::*;
     #[cfg(feature = "contract-tests")]
     use acorn_test_harness::TrunkContract;
+    use acorn_core::CapabilityAdvertiser;
     use std::fs;
     #[cfg(feature = "contract-tests")]
     use std::io::Read;
@@ -299,6 +354,47 @@ mod tests {
         let tmp_dir = tempfile::tempdir().unwrap();
         let trunk = FileTrunk::with_ttl(tmp_dir.path());
         TrunkContract::ttl_expiry(&trunk).unwrap();
+    }
+
+    #[test]
+    fn advertises_versions_capability_when_enabled() {
+        let tmp_dir = tempfile::tempdir().unwrap();
+        let trunk = FileTrunk::with_history(tmp_dir.path());
+        let caps = CapabilityAdvertiser::capabilities(&trunk);
+        assert!(caps.contains(&TrunkCapability::History));
+        assert!(caps.contains(&TrunkCapability::Versions));
+    }
+
+    #[test]
+    fn tracks_versions_when_enabled() {
+        let tmp_dir = tempfile::tempdir().unwrap();
+        let trunk = FileTrunk::with_history(tmp_dir.path());
+        let branch = BranchId::new("versions");
+
+        trunk
+            .put(
+                &branch,
+                "key",
+                Nut {
+                    value: b"one".to_vec(),
+                },
+            )
+            .unwrap();
+        assert_eq!(trunk.version(&branch, "key"), Some(1));
+
+        trunk
+            .put(
+                &branch,
+                "key",
+                Nut {
+                    value: b"two".to_vec(),
+                },
+            )
+            .unwrap();
+        assert_eq!(trunk.version(&branch, "key"), Some(2));
+
+        trunk.delete(&branch, "key").unwrap();
+        assert_eq!(trunk.version(&branch, "key"), None);
     }
 
     #[cfg(feature = "contract-tests")]
