@@ -1,0 +1,32 @@
+[package]
+name = "acorn-cli"
+version = "0.0.1-alpha.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+publish = false
+
+[dependencies]
+acorn-core = { path = "../acorn-core" }
+acorn-sync = { path = "../acorn-sync" }
+acorn-trunk-mem = { path = "../acorn-trunk-mem", optional = true }
+acorn-trunk-file = { path = "../acorn-trunk-file", optional = true }
+acorn-trunk-git = { path = "../acorn-trunk-git", optional = true }
+acorn-trunk-rdbms = { path = "../acorn-trunk-rdbms", optional = true }
+acorn-trunk-cloud-s3 = { path = "../acorn-trunk-cloud-s3", optional = true }
+acorn-trunk-cloud-azure = { path = "../acorn-trunk-cloud-azure", optional = true }
+acorn-trunk-datalake = { path = "../acorn-trunk-datalake", optional = true }
+clap = { workspace = true }
+console = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+
+[features]
+default = ["mem-trunk", "file-trunk"]
+mem-trunk = ["acorn-trunk-mem"]
+file-trunk = ["acorn-trunk-file"]
+git-trunk = ["acorn-trunk-git"]
+rdbms-trunk = ["acorn-trunk-rdbms"]
+s3-trunk = ["acorn-trunk-cloud-s3"]
+azure-trunk = ["acorn-trunk-cloud-azure"]
+datalake-trunk = ["acorn-trunk-datalake"]

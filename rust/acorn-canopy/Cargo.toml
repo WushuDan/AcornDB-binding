@@ -1,0 +1,19 @@
+[package]
+name = "acorn-canopy"
+version = "0.0.1-alpha.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+publish = false
+
+[dependencies]
+acorn-core = { path = "../acorn-core" }
+acorn-sync = { path = "../acorn-sync" }
+acorn-sync-server = { path = "../acorn-sync-server", optional = true }
+clap = { workspace = true }
+tracing = { workspace = true }
+
+[features]
+default = ["server"]
+server = ["acorn-sync-server"]
+leptos-ui = []
+dioxus-ui = []

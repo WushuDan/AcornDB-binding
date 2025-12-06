@@ -1,0 +1,17 @@
+[package]
+name = "acorn-sync"
+version = "0.0.1-alpha.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+publish = false
+
+[features]
+default = ["std"]
+std = []
+backpressure-tests = []
+
+[dependencies]
+acorn-core = { path = "../acorn-core" }
+futures = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }

@@ -1,0 +1,50 @@
+[workspace]
+resolver = "2"
+members = [
+    "acorn-core",
+    "acorn-sync",
+    "acorn-sync-server",
+    "acorn-trunk-mem",
+    "acorn-trunk-file",
+    "acorn-trunk-git",
+    "acorn-trunk-rdbms",
+    "acorn-trunk-cloud-s3",
+    "acorn-trunk-cloud-azure",
+    "acorn-trunk-datalake",
+    "acorn-cli",
+    "acorn-canopy",
+    "acorn-bench",
+    "acorn-sample-apps",
+    "acorn-test-harness",
+]
+default-members = [
+    "acorn-core",
+    "acorn-sync",
+    "acorn-trunk-mem",
+    "acorn-trunk-file",
+    "acorn-cli",
+]
+
+[workspace.package]
+version = "0.0.1-alpha.0"
+license = "MIT OR Apache-2.0"
+edition = "2021"
+authors = ["AcornDB Team"]
+
+[workspace.dependencies]
+anyhow = "1"
+bytes = "1"
+clap = { version = "4.5", features = ["derive"] }
+console = "0.15"
+futures = "0.3"
+indicatif = "0.17"
+parking_lot = "0.12"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_yaml = "0.9"
+thiserror = "1"
+time = { version = "0.3", features = ["macros"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+uuid = { version = "1", features = ["v4", "serde"] }

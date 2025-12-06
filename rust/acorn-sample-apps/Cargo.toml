@@ -1,0 +1,20 @@
+[package]
+name = "acorn-sample-apps"
+version = "0.0.1-alpha.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+publish = false
+
+[dependencies]
+acorn-core = { path = "../acorn-core" }
+acorn-sync = { path = "../acorn-sync" }
+acorn-trunk-mem = { path = "../acorn-trunk-mem", optional = true }
+acorn-trunk-file = { path = "../acorn-trunk-file", optional = true }
+serde = { workspace = true }
+tracing = { workspace = true }
+
+[features]
+default = ["mem-trunk"]
+mem-trunk = ["acorn-trunk-mem"]
+file-trunk = ["acorn-trunk-file"]
+demo-sync = []
