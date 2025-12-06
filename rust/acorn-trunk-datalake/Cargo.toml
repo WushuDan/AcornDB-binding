@@ -10,9 +10,13 @@ acorn-core = { path = "../acorn-core" }
 arrow = { workspace = true, optional = true }
 parquet = { workspace = true, optional = true }
 tracing = { workspace = true }
+parking_lot = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+acorn-test-harness = { path = "../acorn-test-harness", optional = true }
 
 [features]
 default = []
 parquet = ["dep:parquet"]
 arrow = ["dep:arrow"]
 delta-lake = []
+contract-tests = ["acorn-test-harness"]

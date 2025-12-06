@@ -11,6 +11,9 @@ sqlx = { workspace = true, optional = true }
 sqlx-oldapi = { workspace = true, optional = true }
 tokio = { workspace = true, optional = true }
 tracing = { workspace = true }
+parking_lot = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+acorn-test-harness = { path = "../acorn-test-harness", optional = true }
 
 [features]
 default = []
@@ -18,3 +21,4 @@ sqlite = ["sqlx/sqlite", "dep:sqlx", "dep:tokio"]
 postgres = ["sqlx/postgres", "dep:sqlx", "dep:tokio"]
 mysql = ["sqlx/mysql", "dep:sqlx", "dep:tokio"]
 sqlserver = ["sqlx-oldapi/mssql", "dep:sqlx-oldapi", "dep:tokio"]
+contract-tests = ["acorn-test-harness"]

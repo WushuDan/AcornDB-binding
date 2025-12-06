@@ -11,8 +11,12 @@ aws-config = { workspace = true, optional = true }
 aws-sdk-s3 = { workspace = true, optional = true }
 tokio = { workspace = true, optional = true }
 tracing = { workspace = true }
+parking_lot = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+acorn-test-harness = { path = "../acorn-test-harness", optional = true }
 
 [features]
 default = []
 aws-sdk-rust = ["dep:aws-config", "dep:aws-sdk-s3", "dep:tokio"]
 mock = []
+contract-tests = ["acorn-test-harness"]

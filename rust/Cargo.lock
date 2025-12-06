@@ -117,8 +117,11 @@ name = "acorn-trunk-cloud-azure"
 version = "0.0.1-alpha.0"
 dependencies = [
  "acorn-core",
+ "acorn-test-harness",
  "azure_identity",
  "azure_storage_blobs",
+ "parking_lot 0.12.5",
+ "serde",
  "tokio",
  "tracing",
 ]
@@ -128,8 +131,11 @@ name = "acorn-trunk-cloud-s3"
 version = "0.0.1-alpha.0"
 dependencies = [
  "acorn-core",
+ "acorn-test-harness",
  "aws-config",
  "aws-sdk-s3",
+ "parking_lot 0.12.5",
+ "serde",
  "tokio",
  "tracing",
 ]
@@ -139,8 +145,11 @@ name = "acorn-trunk-datalake"
 version = "0.0.1-alpha.0"
 dependencies = [
  "acorn-core",
+ "acorn-test-harness",
  "arrow",
+ "parking_lot 0.12.5",
  "parquet",
+ "serde",
  "tracing",
 ]
 
@@ -163,7 +172,10 @@ name = "acorn-trunk-git"
 version = "0.0.1-alpha.0"
 dependencies = [
  "acorn-core",
+ "acorn-test-harness",
  "git2",
+ "parking_lot 0.12.5",
+ "serde",
  "tracing",
 ]
 
@@ -183,6 +195,9 @@ name = "acorn-trunk-rdbms"
 version = "0.0.1-alpha.0"
 dependencies = [
  "acorn-core",
+ "acorn-test-harness",
+ "parking_lot 0.12.5",
+ "serde",
  "sqlx",
  "sqlx-oldapi",
  "tokio",
