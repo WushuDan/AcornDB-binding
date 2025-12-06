@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use acorn_core::{AcornError, AcornResult, Tree};
+use acorn_core::{AcornError, AcornResult, Tree, Trunk};
 use tracing::instrument;
 
 #[derive(Debug, Default)]
@@ -11,7 +11,7 @@ impl SyncClient {
     pub async fn synchronize<T, S>(&self, _tree: &Tree<T, S>) -> AcornResult<()>
     where
         T: Clone + Send + Sync + 'static,
-        S: Send + Sync,
+        S: Trunk<T> + Send + Sync,
     {
         Err(AcornError::NotImplemented)
     }

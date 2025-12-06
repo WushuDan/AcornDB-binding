@@ -8,6 +8,7 @@ publish = false
 [dependencies]
 acorn-core = { path = "../acorn-core" }
 sqlx = { workspace = true, optional = true }
+sqlx-oldapi = { workspace = true, optional = true }
 tokio = { workspace = true, optional = true }
 tracing = { workspace = true }
 
@@ -16,4 +17,4 @@ default = []
 sqlite = ["sqlx/sqlite", "dep:sqlx", "dep:tokio"]
 postgres = ["sqlx/postgres", "dep:sqlx", "dep:tokio"]
 mysql = ["sqlx/mysql", "dep:sqlx", "dep:tokio"]
-sqlserver = ["sqlx/mssql", "dep:sqlx", "dep:tokio"]
+sqlserver = ["sqlx-oldapi/mssql", "dep:sqlx-oldapi", "dep:tokio"]

@@ -19,3 +19,5 @@ obj/
 
 # macOS system files
 .DS_Store
+
+/rust/target/

@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use std::fmt::Debug;
+use std::fmt::{self, Debug};
 
 pub type AcornResult<T> = Result<T, AcornError>;
 
@@ -10,6 +10,8 @@ pub enum AcornError {
     NotImplemented,
     #[error("trunk operation failed: {0}")]
     Trunk(String),
+    #[error("serialization failed: {0}")]
+    Serialization(String),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -18,6 +20,16 @@ pub struct BranchId(String);
 impl BranchId {
     pub fn new<T: Into<String>>(value: T) -> Self {
         BranchId(value.into())
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl fmt::Display for BranchId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.0)
     }
 }
 
@@ -41,6 +53,25 @@ pub trait Trunk<T>: Send + Sync + Debug {
     fn get(&self, branch: &BranchId, key: &str) -> AcornResult<Option<Nut<T>>>;
     fn put(&self, branch: &BranchId, key: &str, nut: Nut<T>) -> AcornResult<()>;
     fn delete(&self, branch: &BranchId, key: &str) -> AcornResult<()>;
+}
+
+/// Capability flags for trunks; extend as behaviors are implemented.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TrunkCapability {
+    History,
+    Transactions,
+    Ttl,
+    Streaming,
+}
+
+pub trait CapabilityAdvertiser {
+    fn capabilities(&self) -> &'static [TrunkCapability];
+}
+
+/// Serialization hooks to ensure deterministic cross-language payloads.
+pub trait NutCodec<T>: Send + Sync {
+    fn encode(&self, value: &T) -> AcornResult<Vec<u8>>;
+    fn decode(&self, bytes: &[u8]) -> AcornResult<T>;
 }
 
 /// Tree provides typed access to a trunk.

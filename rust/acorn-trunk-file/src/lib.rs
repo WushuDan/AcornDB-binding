@@ -24,12 +24,6 @@ impl FileTrunk {
     }
 }
 
-impl ToString for BranchId {
-    fn to_string(&self) -> String {
-        self.0.clone()
-    }
-}
-
 impl Trunk<Vec<u8>> for FileTrunk {
     fn get(&self, branch: &BranchId, key: &str) -> AcornResult<Option<Nut<Vec<u8>>>> {
         let path = self.branch_dir(branch).join(key);
@@ -50,5 +44,29 @@ impl Trunk<Vec<u8>> for FileTrunk {
     fn delete(&self, branch: &BranchId, key: &str) -> AcornResult<()> {
         let path = self.branch_dir(branch).join(key);
         fs::remove_file(path).map_err(|e| AcornError::Trunk(e.to_string()))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+
+    #[test]
+    fn put_get_delete_round_trip() {
+        let tmp_dir = tempfile::tempdir().unwrap();
+        let trunk = FileTrunk::new(tmp_dir.path());
+        let branch = BranchId::new("main");
+
+        trunk.init_filesystem().unwrap();
+        trunk
+            .put(&branch, "key", Nut { value: b"hello".to_vec() })
+            .unwrap();
+
+        let fetched = trunk.get(&branch, "key").unwrap().unwrap();
+        assert_eq!(fetched.value, b"hello".to_vec());
+
+        trunk.delete(&branch, "key").unwrap();
+        assert!(!fs::metadata(tmp_dir.path().join("main").join("key")).is_ok());
     }
 }

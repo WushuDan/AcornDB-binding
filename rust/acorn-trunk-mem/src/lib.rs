@@ -44,3 +44,24 @@ impl Trunk<Vec<u8>> for MemoryTrunk {
             .ok_or_else(|| AcornError::Trunk("missing key".into()))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn put_get_delete_round_trip() {
+        let trunk = MemoryTrunk::new();
+        let branch = BranchId::new("main");
+
+        trunk
+            .put(&branch, "key", Nut { value: b"hello".to_vec() })
+            .unwrap();
+
+        let fetched = trunk.get(&branch, "key").unwrap().unwrap();
+        assert_eq!(fetched.value, b"hello".to_vec());
+
+        trunk.delete(&branch, "key").unwrap();
+        assert!(trunk.get(&branch, "key").unwrap().is_none());
+    }
+}
